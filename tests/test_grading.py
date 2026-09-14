@@ -90,3 +90,18 @@ def test_every_syllabus_grade_boundary():
     ]
     for expected, purple_standards, purple_total, missing in cases:
         assert estimate_grade(12, purple_standards, purple_total, missing) == expected
+
+
+def test_ehf38_fake_fixture_is_valid_and_demonstrates_b_threshold():
+    from sync.validate import validate_record
+
+    record = json.loads(Path("fixtures/ehf38-grades.fake.json").read_text())
+    assert validate_record(record) == []
+    assert summarize(record) == {
+        "standards": 12,
+        "green": 13,
+        "purple": 9,
+        "purple_standards": 9,
+        "missing": 2,
+        "estimated_grade": "B",
+    }

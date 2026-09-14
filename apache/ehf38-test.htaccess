@@ -1,0 +1,12 @@
+# TEST ONLY: protects the temporary students/me endpoint for ehf38.
+AuthType shibboleth
+ShibRequestSetting requireSession 1
+
+<RequireAll>
+    Require valid-user
+    Require shib-user ehf38
+</RequireAll>
+
+<IfModule mod_headers.c>
+    Header always set Cache-Control "private, no-store"
+</IfModule>

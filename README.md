@@ -38,7 +38,7 @@ The browser requests the relative URL `students/me/grades.json`, so local and st
 
 ## Data model and grading rules
 
-`fixtures/grades.json` is the canonical example. Each record contains:
+`fixtures/grades.json` is the canonical example. `fixtures/ehf38-grades.fake.json` is clearly labeled fake data for the first authenticated server test. Each record contains:
 
 - `course`: `ORIE 4580`, `ORIE 5580`, or `ORIE 5581`.
 - `standards`: all 12 syllabus standards for 4580/5580, or an evaluated subset for 5581.
@@ -85,6 +85,7 @@ Do not infer authorization in JavaScript. A course-wide AD group is useful for s
 ## Repository layout
 
 ```text
+apache/               Temporary fake-data authorization test configuration
 config.toml           Canonical Zola configuration (`zola.toml` is a compatibility symlink)
 content/              Zola content entry point
 templates/            Dashboard HTML
