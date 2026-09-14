@@ -1,0 +1,20 @@
+# Secrets and private/generated grade data
+.env
+.env.*
+!.env.example
+credentials/
+student-data/
+generated/
+/static/students/
+
+# Build and tool output
+public/
+*.log
+__pycache__/
+*.py[cod]
+.pytest_cache/
+.venv/
+.DS_Store
+
+# Local infrastructure notes
+notes.md

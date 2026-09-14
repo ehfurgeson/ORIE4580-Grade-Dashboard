@@ -1,0 +1,39 @@
+{% extends "base.html" %}
+{% block content %}
+<header>
+  <h1 id="page-title">ORIE 4580 Grade Dashboard</h1>
+  <p>Standards-based grading progress for <span id="course-name">the course</span>.</p>
+</header>
+<p id="status" class="status" role="status" aria-live="polite">Loading your grades…</p>
+<section id="dashboard" aria-labelledby="page-title" hidden>
+  <div class="student-meta">
+    <p>Student: <strong id="student-name"></strong></p>
+    <p>Last updated: <time id="updated-at"></time></p>
+  </div>
+
+  <section aria-labelledby="progress-title">
+    <h2 id="progress-title">Progress summary</h2>
+    <dl class="summary">
+      <div><dt>Green checkmarks</dt><dd id="green-total">0</dd></div>
+      <div><dt>Purple checkmarks</dt><dd id="purple-total">0</dd></div>
+      <div><dt>Standards with a purple</dt><dd id="purple-standards">0</dd></div>
+      <div><dt>Missing to reach two per standard</dt><dd id="missing-total">0</dd></div>
+    </dl>
+    <p><strong>Tentative current threshold:</strong> <span id="grade-estimate"></span></p>
+    <p class="note">This estimate applies the tentative syllabus scale to recorded checkmarks. It is not an official grade.</p>
+  </section>
+
+  <section aria-labelledby="standards-title">
+    <h2 id="standards-title">Checkmarks by standard</h2>
+    <p class="legend">
+      <span class="legend-item"><span class="checkmark green earned" aria-hidden="true">✓</span> Green: lab checkoff</span>
+      <span class="legend-item"><span class="checkmark purple earned" aria-hidden="true">✓</span> Purple: exam or exam-like opportunity</span>
+    </p>
+    <div id="standards"></div>
+  </section>
+</section>
+{% endblock %}
+{% block scripts %}
+<script>window.GRADE_DATA_URL = "students/me/grades.json";</script>
+<script src="{{ get_url(path="dashboard.js") }}" defer></script>
+{% endblock %}

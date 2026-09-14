@@ -1,0 +1,127 @@
+{
+  "updated_at": "2026-09-14T12:00:00Z",
+  "course": "ORIE 4580",
+  "student": {
+    "id": "test123",
+    "name": "Test Student"
+  },
+  "standards": [
+    {
+      "id": "P1",
+      "name": "I can state the defining features of uniform samplers, use them to construct new samplers, and use them to check if a given sampler is valid.",
+      "category": "Probability",
+      "opportunities": [
+        {
+          "id": "lab_01_p1",
+          "label": "Lab 1",
+          "source": "lab",
+          "kind": "green",
+          "status": "complete"
+        },
+        {
+          "id": "exam_01_p1",
+          "label": "In-class exam 1",
+          "source": "exam",
+          "kind": "purple",
+          "status": "not_graded"
+        }
+      ]
+    },
+    {
+      "id": "P2",
+      "name": "I can state the defining features of Poisson samplers, use them to construct new samplers, and use them to check if a given sampler is valid.",
+      "category": "Probability",
+      "opportunities": [
+        {
+          "id": "lab_01_p2",
+          "label": "Lab 1",
+          "source": "lab",
+          "kind": "green",
+          "status": "complete"
+        },
+        {
+          "id": "lab_02_p2",
+          "label": "Lab 2",
+          "source": "lab",
+          "kind": "green",
+          "status": "incomplete"
+        }
+      ]
+    },
+    {
+      "id": "P3",
+      "name": "I can state the defining features of Gaussian samplers, use them to construct new samplers, and use them to check if a given sampler is valid.",
+      "category": "Probability",
+      "opportunities": []
+    },
+    {
+      "id": "P4",
+      "name": "I can create a sampler for a general one-dimensional probability distribution given its CDF or PDF.",
+      "category": "Probability",
+      "opportunities": []
+    },
+    {
+      "id": "P5",
+      "name": "I can list different ways in which a stochastic process might be unstable and assess whether each is occurring in a given simulation.",
+      "category": "Probability",
+      "opportunities": []
+    },
+    {
+      "id": "S1",
+      "name": "I can explain how different histogram parameters impact the resulting plot and choose appropriate parameters for a given dataset.",
+      "category": "Statistics",
+      "opportunities": []
+    },
+    {
+      "id": "S2",
+      "name": "I can apply the formal definition of confidence intervals to derive confidence interval procedures for both traditional and novel parameter estimation tasks.",
+      "category": "Statistics",
+      "opportunities": []
+    },
+    {
+      "id": "S3",
+      "name": "I can apply confidence intervals in practical situations, handling concerns such as non-independence, multiple hypotheses, and multiple stages of study.",
+      "category": "Statistics",
+      "opportunities": []
+    },
+    {
+      "id": "S4",
+      "name": "I can write an expression for the log-likelihood of a candidate parameterized model.",
+      "category": "Statistics",
+      "opportunities": []
+    },
+    {
+      "id": "S5",
+      "name": "I can implement a variance reduction technique, explain in what sense it reduces variance, and explain the tradeoffs of the technique.",
+      "category": "Statistics",
+      "opportunities": []
+    },
+    {
+      "id": "M1",
+      "name": "I can model a scenario as a Markov chain or event-driven simulation by specifying what the system state is and how the state changes over time.",
+      "category": "Modeling",
+      "opportunities": [
+        {
+          "id": "lab_02_m1",
+          "label": "Lab 2",
+          "source": "lab",
+          "kind": "green",
+          "status": "incomplete"
+        },
+        {
+          "id": "exam_01_m1",
+          "label": "In-class exam 1",
+          "source": "exam",
+          "kind": "purple",
+          "status": "not_graded"
+        }
+      ]
+    },
+    {
+      "id": "M2",
+      "name": "I can combine multiple sources of evidence and my own reasoning to make practical decisions about how to model or optimize a process.",
+      "category": "Modeling",
+      "opportunities": []
+    }
+  ]
+}

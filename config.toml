@@ -1,0 +1,4 @@
+base_url = "https://zivscully.orie.cornell.edu/orie4580_fa26/"
+title = "ORIE 4580 Grade Dashboard"
+compile_sass = false
+minify_html = true
