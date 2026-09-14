@@ -85,6 +85,7 @@ Do not infer authorization in JavaScript. A course-wide AD group is useful for s
 ## Repository layout
 
 ```text
+config.toml           Canonical Zola configuration (`zola.toml` is a compatibility symlink)
 content/              Zola content entry point
 templates/            Dashboard HTML
 static/               Public CSS and JavaScript only
