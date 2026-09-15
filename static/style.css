@@ -18,8 +18,10 @@ h2 { margin-top: 2rem; }
 .legend .checkmark { width: 1.35rem; height: 1.35rem; font-size: .8rem; }
 .checkmark.green { color: #126c35; border-color: #126c35; }
 .checkmark.purple { color: #6d28d9; border-color: #6d28d9; }
+.checkmark.shiny_purple { color: #5b21b6; border-color: #5b21b6; box-shadow: 0 0 0 3px #ede9fe; }
 .checkmark.green.earned { color: #fff; background: #126c35; }
 .checkmark.purple.earned { color: #fff; background: #6d28d9; }
+.checkmark.shiny_purple.earned { color: #fff; background: #5b21b6; }
 .checkmark.unearned { color: #59636f; border-color: #59636f; background: transparent; }
 .standard { margin: 1rem 0; padding: 1rem 1.25rem; border: 1px solid #d8dee4; border-radius: .5rem; }
 .standard h3 { margin: .1rem 0 .75rem; }
@@ -39,3 +41,10 @@ h2 { margin-top: 2rem; }
   .container { margin: 0; padding: 0; max-width: none; box-shadow: none; }
   .note::after { content: " Keep printed grade information private."; }
 }
+
+.linked-boxes { display: flex; align-items: center; gap: .5rem; flex-wrap: wrap; margin: .5rem 0 1rem; font-size: .9rem; }
+.linked-box { min-width: 5.5rem; padding: .3rem .55rem; border: 2px solid #59636f; border-radius: .3rem; text-align: center; font-weight: 650; }
+.linked-box.green { color: #126c35; border-color: #126c35; background: #ecfdf3; }
+.linked-box.purple { color: #6d28d9; border-color: #6d28d9; background: #f5f3ff; }
+.linked-box.shiny_purple { color: #5b21b6; border-color: #5b21b6; background: #ede9fe; box-shadow: 0 0 0 2px #ddd6fe; }
+.linked-box.empty-box { color: #59636f; border-style: dashed; font-weight: 500; }

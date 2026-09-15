@@ -1,8 +1,8 @@
 # ORIE 4580 Grade Dashboard
 
-A small Zola frontend and Python publishing pipeline for the Fall 2026 standards-based grade dashboard. The UI shows green lab checkmarks, purple exam or exam-like checkmarks, progress toward two checkmarks per standard, and the first currently satisfied threshold in the tentative syllabus scale.
+A small Zola frontend and Python publishing pipeline for the Fall 2026 standards-based grade dashboard. The UI allocates green, purple, and shiny-purple checkmarks to the syllabus checkbox system and shows the first currently satisfied grading threshold.
 
-> **Deployment status:** local fake-data MVP. Do not publish real student data yet. Per-student Shibboleth authorization and the student/TA access matrix are still pending.
+> **Deployment status:** the local MVP and a protected single-user fake-data test work. Do not publish real student data yet. Dynamic per-student Shibboleth authorization and the student/TA access matrix are still pending.
 
 ## Requirements
 
@@ -42,10 +42,12 @@ The browser requests the relative URL `students/me/grades.json`, so local and st
 
 - `course`: `ORIE 4580`, `ORIE 5580`, or `ORIE 5581`.
 - `standards`: all 12 syllabus standards for 4580/5580, or an evaluated subset for 5581.
-- `kind`: `green` for a lab or `purple` for an exam/exam-like opportunity.
+- `kind`: `green` for a lab, `purple` for an exam/exam-like opportunity, or `shiny_purple` for a challenging purple problem.
 - `status`: `complete`, `incomplete`, `not_graded`, or `excused`.
 
-Only `complete` earns a checkmark. `not_graded` and `excused` remain visible but do not count. “Missing” is `sum(max(0, 2 - earned checkmarks))` across evaluated standards. The displayed grade estimate checks the syllabus rules from A+ through C in order and uses the required floor operations. It is labeled tentative and is not an official grade.
+Only `complete` earns a checkmark. For each standard, two linked boxes are filled in priority order: purple, shiny purple, then green. Extra ordinary purple and green checkmarks do not count. Every shiny purple not selected for a linked box fills an unlimited shiny box. A shiny purple counts in the purple and shiny totals whether it occupies a linked or shiny box, but it occupies only one box. Missing is the number of empty standard-linked boxes.
+
+The grade calculation checks A+ through C in order. Every threshold is interpreted as “at least,” except missing is “at most.” In particular, A+ requires `floor(2n)` purple and `n - 1` shiny purple; A requires `floor(1.5n)` purple and one shiny purple. The displayed result is an estimate, not an official grade, and the syllabus says conditions may be made easier.
 
 Validate and atomically replace each generated JSON file with:
 

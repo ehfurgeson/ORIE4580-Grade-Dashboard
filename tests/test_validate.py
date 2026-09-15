@@ -68,3 +68,10 @@ def test_atomic_generation_leaves_no_temp_file(valid, tmp_path):
     path = write_record(valid, tmp_path)
     assert json.loads(path.read_text())["student"]["id"] == "test123"
     assert list(path.parent.glob("*.tmp")) == []
+
+
+def test_accepts_shiny_purple_exam_opportunity(valid):
+    item = valid["standards"][0]["opportunities"][0]
+    item["kind"] = "shiny_purple"
+    item["source"] = "exam"
+    assert validate_record(valid) == []

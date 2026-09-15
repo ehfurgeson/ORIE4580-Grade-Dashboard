@@ -20,9 +20,9 @@
         },
         {
           "id": "exam_01_p1",
-          "label": "In-class exam 1",
+          "label": "Challenging demo exam problem",
           "source": "exam",
-          "kind": "purple",
+          "kind": "shiny_purple",
           "status": "not_graded"
         }
       ]

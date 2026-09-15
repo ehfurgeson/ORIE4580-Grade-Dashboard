@@ -24,6 +24,20 @@
           "source": "exam",
           "kind": "purple",
           "status": "complete"
+        },
+        {
+          "id": "exam_shiny_demo_a_p1",
+          "label": "Demo challenging exam problem A",
+          "source": "exam",
+          "kind": "shiny_purple",
+          "status": "complete"
+        },
+        {
+          "id": "exam_shiny_demo_b_p1",
+          "label": "Demo challenging exam problem B",
+          "source": "exam",
+          "kind": "shiny_purple",
+          "status": "complete"
         }
       ]
     },

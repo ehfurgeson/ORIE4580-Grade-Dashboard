@@ -14,13 +14,14 @@
   <section aria-labelledby="progress-title">
     <h2 id="progress-title">Progress summary</h2>
     <dl class="summary">
-      <div><dt>Green checkmarks</dt><dd id="green-total">0</dd></div>
-      <div><dt>Purple checkmarks</dt><dd id="purple-total">0</dd></div>
+      <div><dt>Green standard boxes</dt><dd id="green-total">0</dd></div>
+      <div><dt>Total purple checkmarks</dt><dd id="purple-total">0</dd></div>
+      <div><dt>Total shiny purple</dt><dd id="shiny-total">0</dd></div>
       <div><dt>Standards with a purple</dt><dd id="purple-standards">0</dd></div>
-      <div><dt>Missing to reach two per standard</dt><dd id="missing-total">0</dd></div>
+      <div><dt>Missing linked boxes</dt><dd id="missing-total">0</dd></div>
     </dl>
-    <p><strong>Tentative current threshold:</strong> <span id="grade-estimate"></span></p>
-    <p class="note">This estimate applies the tentative syllabus scale to recorded checkmarks. It is not an official grade.</p>
+    <p><strong>Current threshold:</strong> <span id="grade-estimate"></span></p>
+    <p class="note">This estimate allocates the currently recorded checkmarks under the syllabus rules. Shiny purple counts in both the purple and shiny totals. It is not an official grade, and the conditions may be made easier.</p>
   </section>
 
   <section aria-labelledby="standards-title">
@@ -28,6 +29,7 @@
     <p class="legend">
       <span class="legend-item"><span class="checkmark green earned" aria-hidden="true">✓</span> Green: lab checkoff</span>
       <span class="legend-item"><span class="checkmark purple earned" aria-hidden="true">✓</span> Purple: exam or exam-like opportunity</span>
+      <span class="legend-item"><span class="checkmark shiny_purple earned" aria-hidden="true">✦</span> Shiny purple: challenging problem</span>
     </p>
     <div id="standards"></div>
   </section>

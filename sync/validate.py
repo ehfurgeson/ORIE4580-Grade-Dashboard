@@ -10,7 +10,11 @@ from .standards import COURSES, FULL_STANDARD_COURSES, STANDARDS
 
 STATUSES = {"complete", "incomplete", "not_graded", "excused"}
 CATEGORIES = {"Probability", "Statistics", "Modeling"}
-SOURCES_BY_KIND = {"green": {"lab"}, "purple": {"exam", "exam_like"}}
+SOURCES_BY_KIND = {
+    "green": {"lab"},
+    "purple": {"exam", "exam_like"},
+    "shiny_purple": {"exam", "exam_like"},
+}
 STUDENT_ID_PATTERN = re.compile(r"[A-Za-z0-9](?:[A-Za-z0-9-]{0,62}[A-Za-z0-9])?\Z")
 
 
