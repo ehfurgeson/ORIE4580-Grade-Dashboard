@@ -1,9 +1,9 @@
-# TEST ONLY: protects the temporary ehf38 record and permits the TA group.
+# TEST ONLY: proves that either populated course group is received from Shibboleth.
 AuthType shibboleth
 ShibRequestSetting requireSession 1
 
 <RequireAny>
-    Require shib-user ehf38
+    Require shib-attr groups EN-OR-or4580-students
     Require shib-attr groups EN-OR-or4580-ta
 </RequireAny>
 
