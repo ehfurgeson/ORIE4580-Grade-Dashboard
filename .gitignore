@@ -7,6 +7,7 @@ student-data/
 generated/
 imports/
 /static/students/
+.config/
 
 # Build and tool output
 public/

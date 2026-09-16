@@ -70,7 +70,14 @@ python -m scripts.import_google_sheet_csv \
   generated/google-sheet-test
 ```
 
-For a real manual export, save the private file under the ignored `imports/` directory and generate only into the ignored `generated/` directory. Never commit either directory. The next live step is a read-only Google Sheets API client using credentials stored outside the repository; the existing row adapter and downstream validation will remain unchanged.
+For a real manual export, save the private file under the ignored `imports/` directory and generate only into the ignored `generated/` directory. Never commit either directory. The live API client uses only the `spreadsheets.readonly` OAuth scope. Copy `.env.example` to the ignored `.env`, set `GOOGLE_APPLICATION_CREDENTIALS` to the service-account JSON's absolute path, set `GOOGLE_SHEET_ID`, enable the Google Sheets API in that credential's Cloud project, and share the sheet with the service-account email as Viewer. Then run:
+
+```sh
+rm -rf generated/google-api-test
+python -m scripts.import_google_sheet_api generated/google-api-test
+```
+
+The client discovers the worksheet title from worksheet ID `0`, never logs cell values, sends the rows through the same adapter and validation, and writes only under the ignored output directory.
 
 Gradescope integration is not implemented yet. Prefer a supported CSV export or documented API over an unofficial endpoint, and establish its exact column format with fake or redacted data before adding credentials.
 
