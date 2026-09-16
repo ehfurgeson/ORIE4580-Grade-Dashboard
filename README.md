@@ -59,7 +59,20 @@ The command validates and serializes the whole input batch before it writes. A m
 
 ### Google Sheets adapter
 
-`sync.google_sheets.rows_to_records` accepts one standard per row. The required columns are `updated_at`, `course`, `student_id`, `student_name`, and `standard_id`. Rows with an opportunity also use `opportunity_id`, `opportunity_label`, `source`, `kind`, and `status`. The API client and credentials are intentionally outside this repository. Gradescope integration is not implemented yet.
+`sync.google_sheets.rows_to_records` accepts one standard per row. The required columns are `updated_at`, `course`, `student_id`, `student_name`, and `standard_id`. Rows with an opportunity also use `opportunity_id`, `opportunity_label`, `source`, `kind`, and `status`. Use additional rows when one standard has multiple opportunities; a standard with no opportunity still needs one row with the opportunity columns empty.
+
+Test the complete CSV-export path with fake data:
+
+```sh
+rm -rf generated/google-sheet-test
+python -m scripts.import_google_sheet_csv \
+  fixtures/google-sheet.fake.csv \
+  generated/google-sheet-test
+```
+
+For a real manual export, save the private file under the ignored `imports/` directory and generate only into the ignored `generated/` directory. Never commit either directory. The next live step is a read-only Google Sheets API client using credentials stored outside the repository; the existing row adapter and downstream validation will remain unchanged.
+
+Gradescope integration is not implemented yet. Prefer a supported CSV export or documented API over an unofficial endpoint, and establish its exact column format with fake or redacted data before adding credentials.
 
 ## Production security gate
 

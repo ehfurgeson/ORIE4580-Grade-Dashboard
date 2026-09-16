@@ -5,6 +5,7 @@
 credentials/
 student-data/
 generated/
+imports/
 /static/students/
 
 # Build and tool output

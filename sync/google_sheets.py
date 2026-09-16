@@ -2,6 +2,8 @@
 from __future__ import annotations
 
 from collections.abc import Iterable
+import csv
+from pathlib import Path
 from typing import Any
 
 from .standards import STANDARDS
@@ -9,6 +11,21 @@ from .standards import STANDARDS
 REQUIRED_COLUMNS = {
     "updated_at", "course", "student_id", "student_name", "standard_id",
 }
+
+
+def load_csv(path: str | Path) -> list[dict[str, str]]:
+    """Load a private Google Sheets CSV export without logging row contents."""
+    with Path(path).open(newline="", encoding="utf-8-sig") as source:
+        reader = csv.DictReader(source)
+        if reader.fieldnames is None:
+            raise ValueError("Google Sheets CSV has no header row")
+        missing = sorted(REQUIRED_COLUMNS - set(reader.fieldnames))
+        if missing:
+            raise ValueError("Google Sheets CSV missing columns: " + ", ".join(missing))
+        rows = list(reader)
+    if not rows:
+        raise ValueError("Google Sheets CSV contains no data rows")
+    return rows
 
 
 def rows_to_records(rows: Iterable[dict[str, Any]]) -> list[dict[str, Any]]:

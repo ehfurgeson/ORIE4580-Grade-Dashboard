@@ -1,0 +1,28 @@
+updated_at,course,student_id,student_name,standard_id,opportunity_id,opportunity_label,source,kind,status
+2026-09-14T12:30:00Z,ORIE 4580,ehf38,Eli Furgeson — FAKE DATA,P1,lab_demo_p1,Demo lab checkoff,lab,green,complete
+2026-09-14T12:30:00Z,ORIE 4580,ehf38,Eli Furgeson — FAKE DATA,P1,exam_demo_p1,Demo exam problem,exam,purple,complete
+2026-09-14T12:30:00Z,ORIE 4580,ehf38,Eli Furgeson — FAKE DATA,P1,exam_shiny_demo_a_p1,Demo challenging exam problem A,exam,shiny_purple,complete
+2026-09-14T12:30:00Z,ORIE 4580,ehf38,Eli Furgeson — FAKE DATA,P1,exam_shiny_demo_b_p1,Demo challenging exam problem B,exam,shiny_purple,complete
+2026-09-14T12:30:00Z,ORIE 4580,ehf38,Eli Furgeson — FAKE DATA,P2,lab_demo_p2,Demo lab checkoff,lab,green,complete
+2026-09-14T12:30:00Z,ORIE 4580,ehf38,Eli Furgeson — FAKE DATA,P2,exam_demo_p2,Demo exam problem,exam,purple,complete
+2026-09-14T12:30:00Z,ORIE 4580,ehf38,Eli Furgeson — FAKE DATA,P3,lab_demo_p3,Demo lab checkoff,lab,green,complete
+2026-09-14T12:30:00Z,ORIE 4580,ehf38,Eli Furgeson — FAKE DATA,P3,exam_demo_p3,Demo exam problem,exam,purple,complete
+2026-09-14T12:30:00Z,ORIE 4580,ehf38,Eli Furgeson — FAKE DATA,P4,lab_demo_p4,Demo lab checkoff,lab,green,complete
+2026-09-14T12:30:00Z,ORIE 4580,ehf38,Eli Furgeson — FAKE DATA,P4,exam_demo_p4,Demo exam problem,exam,purple,complete
+2026-09-14T12:30:00Z,ORIE 4580,ehf38,Eli Furgeson — FAKE DATA,P5,lab_demo_p5,Demo lab checkoff,lab,green,complete
+2026-09-14T12:30:00Z,ORIE 4580,ehf38,Eli Furgeson — FAKE DATA,P5,exam_demo_p5,Demo exam problem,exam,purple,complete
+2026-09-14T12:30:00Z,ORIE 4580,ehf38,Eli Furgeson — FAKE DATA,S1,lab_demo_s1,Demo lab checkoff,lab,green,complete
+2026-09-14T12:30:00Z,ORIE 4580,ehf38,Eli Furgeson — FAKE DATA,S1,exam_demo_s1,Demo exam problem,exam,purple,complete
+2026-09-14T12:30:00Z,ORIE 4580,ehf38,Eli Furgeson — FAKE DATA,S2,lab_demo_s2,Demo lab checkoff,lab,green,complete
+2026-09-14T12:30:00Z,ORIE 4580,ehf38,Eli Furgeson — FAKE DATA,S2,exam_demo_s2,Demo exam problem,exam,purple,complete
+2026-09-14T12:30:00Z,ORIE 4580,ehf38,Eli Furgeson — FAKE DATA,S3,lab_demo_s3,Demo lab checkoff,lab,green,complete
+2026-09-14T12:30:00Z,ORIE 4580,ehf38,Eli Furgeson — FAKE DATA,S3,exam_demo_s3,Demo exam problem,exam,purple,complete
+2026-09-14T12:30:00Z,ORIE 4580,ehf38,Eli Furgeson — FAKE DATA,S4,lab_demo_s4,Demo lab checkoff,lab,green,complete
+2026-09-14T12:30:00Z,ORIE 4580,ehf38,Eli Furgeson — FAKE DATA,S4,exam_demo_s4,Demo exam problem,exam,purple,complete
+2026-09-14T12:30:00Z,ORIE 4580,ehf38,Eli Furgeson — FAKE DATA,S5,lab_demo_a_s5,Demo lab checkoff A,lab,green,complete
+2026-09-14T12:30:00Z,ORIE 4580,ehf38,Eli Furgeson — FAKE DATA,S5,lab_demo_b_s5,Demo lab checkoff B,lab,green,complete
+2026-09-14T12:30:00Z,ORIE 4580,ehf38,Eli Furgeson — FAKE DATA,M1,lab_demo_a_m1,Demo lab checkoff A,lab,green,complete
+2026-09-14T12:30:00Z,ORIE 4580,ehf38,Eli Furgeson — FAKE DATA,M1,lab_demo_b_m1,Demo lab checkoff B,lab,green,complete
+2026-09-14T12:30:00Z,ORIE 4580,ehf38,Eli Furgeson — FAKE DATA,M2,lab_demo_m2,Demo lab checkoff,lab,green,incomplete
+2026-09-14T12:30:00Z,ORIE 4580,ehf38,Eli Furgeson — FAKE DATA,M2,exam_demo_m2,Demo exam problem,exam,purple,not_graded
+2026-09-14T12:30:00Z,ORIE 4580,ehf38,Eli Furgeson — FAKE DATA,M2,exam_like_demo_m2,Demo alternate opportunity,exam_like,purple,excused
