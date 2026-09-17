@@ -81,6 +81,60 @@ The client discovers the worksheet title from worksheet ID `0`, never logs cell 
 
 Gradescope integration is not implemented yet. Prefer a supported CSV export or documented API over an unofficial endpoint, and establish its exact column format with fake or redacted data before adding credentials.
 
+## Simple NetID-protected checkoff dashboard
+
+The temporary simple dashboard is separate from the standards dashboard. It treats every worksheet column except the exact `NetID` column as one checkoff, preserves the sheet's column order, and displays only `Complete` or `Incomplete`. It does not infer standards, checkmark colors, or grades.
+
+Each generated NetID directory contains its own HTML, JSON, and authorization rule:
+
+```text
+students/ehf38/
+├── index.html
+├── checkoffs.json
+└── .htaccess   # Require shib-user ehf38; no course-group fallback
+```
+
+Generate only the authorized bottom-row test account from the real `Lab Checkoffs` worksheet:
+
+```sh
+rm -rf generated/simple-ehf38
+python -m scripts.import_simple_google_sheet_api \
+  generated/simple-ehf38/students \
+  --spreadsheet-id 1e_5BQpysMUWfKrNw4MS7qg--2TySAno8rCBmuKapiME \
+  --worksheet-id 41104109 \
+  --student-id ehf38
+```
+
+The command validates the entire worksheet but publishes only `ehf38`. Publishing every row requires the explicit `--all-students` flag and must wait until the two-user access matrix passes. Unknown checkbox values, unsafe NetIDs, and duplicate NetIDs fail closed.
+
+For the initial server test, deploy `static/simple-dashboard.js` and `static/simple-style.css` as public assets under the course root, then copy the generated `ehf38` directory—including its dotfile—to the server's private `students/` tree. Open:
+
+```text
+https://zivscully.orie.cornell.edu/orie4580_fa26/students/ehf38/
+```
+
+Apache must read `.htaccess`, `index.html`, and `checkoffs.json`; the generated files use group-readable modes so deployment must assign the web-server group. Confirm `AllowOverride` permits the auth/header rules and `Options -Indexes`. Do not use a copy glob that drops `.htaccess`. The standards dashboard and its files remain unchanged.
+
+### Scheduled refresh
+
+After the exact-user server test passes and the full simple site replaces the old document root, Ubuntu can refresh the sheet with the supplied systemd unit and timer:
+
+```text
+deployment/orie4580-checkoffs.service
+deployment/orie4580-checkoffs.timer
+deployment/simple-dashboard.env.example
+```
+
+The timer runs every three hours with a randomized delay and persistent catch-up after downtime. The service uses `--all-students`, so do not enable it during the initial `ehf38`-only test. `deployment/simple-index.html` is the simple root landing page; deploying a fresh root containing only that page, the two simple assets, and generated `students/` makes the standards dashboard unavailable.
+
+The importer fetches and validates the complete sheet before replacing the generated tree. A fetch or validation failure leaves the previous release intact. Check runs with:
+
+```sh
+sudo systemctl status orie4580-checkoffs.service
+sudo journalctl -u orie4580-checkoffs.service
+systemctl list-timers orie4580-checkoffs.timer
+```
+
 ## Production security gate
 
 Grades are FERPA-sensitive. Zola must own presentation, Python must own data, and Apache/Shibboleth must own authentication and authorization. Never place real grade JSON in `static/`, `public/`, or Git.

@@ -1,0 +1,44 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>ORIE 4580 Checkoff Dashboard</title>
+  <link rel="stylesheet" href="simple-style.css">
+</head>
+<body>
+  <main class="simple-container">
+    <header>
+      <h1>ORIE 4580 Checkoff Dashboard</h1>
+      <p>Enter your Cornell NetID to open your protected checkoff dashboard.</p>
+    </header>
+    <form id="netid-form">
+      <label for="netid"><strong>NetID</strong></label>
+      <div class="netid-entry">
+        <input id="netid" name="netid" required autocomplete="username" inputmode="text" pattern="[A-Za-z]{2,3}[0-9]+" maxlength="16">
+        <button type="submit">Open dashboard</button>
+      </div>
+      <p id="form-error" class="error" role="alert" hidden></p>
+    </form>
+    <p class="sheet-name">Cornell SSO will verify that the dashboard belongs to the signed-in NetID. Entering another student's NetID does not grant access.</p>
+  </main>
+  <script>
+    (() => {
+      'use strict';
+      const form = document.querySelector('#netid-form');
+      const input = document.querySelector('#netid');
+      const error = document.querySelector('#form-error');
+      form.addEventListener('submit', event => {
+        event.preventDefault();
+        const netid = input.value.trim().toLowerCase();
+        if (!/^[a-z]{2,3}[0-9]+$/.test(netid)) {
+          error.textContent = 'Enter a valid Cornell NetID.';
+          error.hidden = false;
+          return;
+        }
+        window.location.assign(`students/${encodeURIComponent(netid)}/`);
+      });
+    })();
+  </script>
+</body>
+</html>

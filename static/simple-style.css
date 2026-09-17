@@ -1,0 +1,29 @@
+:root { color-scheme: light; }
+* { box-sizing: border-box; }
+body { margin: 0; font-family: system-ui, sans-serif; line-height: 1.5; color: #202124; background: #f5f7fa; }
+.simple-container { max-width: 48rem; margin: 2rem auto; padding: 1.5rem 2rem 2.5rem; background: #fff; border-radius: .5rem; box-shadow: 0 1px 5px #0001; }
+h1 { margin-bottom: .25rem; }
+h2 { margin-top: 2rem; }
+.status { padding: .75rem 1rem; background: #eef3f8; border-radius: .35rem; }
+.error { color: #9b1c1c; background: #fff1f1; }
+.student-meta { display: flex; justify-content: space-between; gap: 1rem; flex-wrap: wrap; border-block: 1px solid #d8dee4; }
+.sheet-name { color: #555f6d; }
+.simple-checkoffs { margin: 0; padding: 0; list-style: none; border: 1px solid #d8dee4; border-radius: .5rem; overflow: hidden; }
+.simple-checkoff { display: flex; justify-content: space-between; align-items: center; gap: 1rem; padding: .8rem 1rem; }
+.simple-checkoff + .simple-checkoff { border-top: 1px solid #e5e7eb; }
+.checkoff-name { font-weight: 600; }
+.checkoff-status { flex: 0 0 auto; padding: .2rem .55rem; border-radius: 999px; font-size: .9rem; font-weight: 700; }
+.complete .checkoff-status { color: #0f5f2d; background: #dcfce7; }
+.incomplete .checkoff-status { color: #7c2d12; background: #ffedd5; }
+.netid-entry { display: flex; gap: .6rem; margin-top: .4rem; }
+.netid-entry input { min-width: 0; flex: 1 1 14rem; padding: .65rem .75rem; border: 1px solid #9ca3af; border-radius: .35rem; font: inherit; }
+.netid-entry button { padding: .65rem 1rem; border: 0; border-radius: .35rem; color: #fff; background: #1f4b7a; font: inherit; font-weight: 700; cursor: pointer; }
+.netid-entry button:hover { background: #173a60; }
+@media (max-width: 38rem) {
+  .simple-container { margin: 0; padding: 1rem; border-radius: 0; box-shadow: none; }
+  .simple-checkoff { align-items: flex-start; flex-direction: column; gap: .35rem; }
+}
+@media print {
+  body { background: #fff; }
+  .simple-container { margin: 0; padding: 0; max-width: none; box-shadow: none; }
+}

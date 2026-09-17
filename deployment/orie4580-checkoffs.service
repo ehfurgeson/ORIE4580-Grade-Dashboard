@@ -1,0 +1,24 @@
+[Unit]
+Description=Refresh ORIE 4580 simple checkoff dashboards
+Wants=network-online.target
+After=network-online.target
+
+[Service]
+Type=oneshot
+User=ehf38
+Group=www-data
+SupplementaryGroups=ehf38
+WorkingDirectory=/opt/orie4580-grade-dashboard
+EnvironmentFile=/etc/orie4580-dashboard/simple-dashboard.env
+Environment=PYTHONUNBUFFERED=1
+Environment=PYTHONDONTWRITEBYTECODE=1
+UMask=0027
+ExecStart=/opt/orie4580-grade-dashboard/.venv/bin/python -m scripts.import_simple_google_sheet_api /var/www/html/orie4580_fa26/students --worksheet-id 41104109 --all-students
+NoNewPrivileges=true
+PrivateTmp=true
+ProtectSystem=strict
+ProtectHome=true
+ReadWritePaths=/var/www/html/orie4580_fa26
+
+[Install]
+WantedBy=multi-user.target

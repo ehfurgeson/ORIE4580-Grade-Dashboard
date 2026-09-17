@@ -1,0 +1,29 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>ORIE 4580 Checkoff Dashboard</title>
+  <link rel="stylesheet" href="../../simple-style.css">
+</head>
+<body>
+  <main class="simple-container">
+    <header>
+      <h1>ORIE 4580 Checkoff Dashboard</h1>
+      <p>A simple view of the checkoffs currently recorded in the course sheet.</p>
+    </header>
+    <p id="status" class="status" role="status" aria-live="polite">Loading your checkoffs…</p>
+    <section id="dashboard" aria-labelledby="checkoffs-title" hidden>
+      <div class="student-meta">
+        <p>NetID: <strong id="student-netid"></strong></p>
+        <p>Last synced: <time id="updated-at"></time></p>
+      </div>
+      <h2 id="checkoffs-title">Checkoff status</h2>
+      <p class="sheet-name">Source worksheet: <span id="worksheet"></span></p>
+      <ul id="checkoffs" class="simple-checkoffs"></ul>
+    </section>
+  </main>
+  <script>window.CHECKOFF_DATA_URL = "checkoffs.json";</script>
+  <script src="../../simple-dashboard.js" defer></script>
+</body>
+</html>
