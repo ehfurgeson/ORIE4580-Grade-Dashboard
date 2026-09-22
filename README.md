@@ -127,7 +127,7 @@ deployment/orie4580-checkoffs.timer
 deployment/simple-dashboard.env.example
 ```
 
-The timer runs every three hours with a randomized delay and persistent catch-up after downtime. The service uses `--all-students`, so do not enable it during the initial `ehf38`-only test. `deployment/simple-index.html` is the simple root landing page; deploying a fresh root containing only that page, the two simple assets, and generated `students/` makes the standards dashboard unavailable.
+The timer runs every three hours with a randomized delay and persistent catch-up after downtime. The service uses `--all-students`, so do not enable it during the initial `ehf38`-only test. There is no NetID-entry landing page. Install `apache/course-root-redirect.conf` inside the active HTTPS virtual host so Shibboleth authenticates the course-root request and Apache redirects from trusted `REMOTE_USER` to the matching generated student directory. Keep the per-student `.htaccess` authorization in place.
 
 The importer fetches and validates the complete sheet before replacing the generated tree. A fetch or validation failure leaves the previous release intact. Check runs with:
 

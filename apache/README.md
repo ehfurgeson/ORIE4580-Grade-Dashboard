@@ -1,6 +1,14 @@
-# Apache test configuration
+# Apache configuration
 
-These files contain authorization rules only. They contain no grade data.
+These files contain authentication and authorization rules only. They contain no grade data.
+
+## Authenticated course-root redirect
+
+`course-root-redirect.conf` is a virtual-host snippet for the exact course root. After Shibboleth establishes a session, it validates the trusted `REMOTE_USER` as a lowercase Cornell NetID and sends a temporary `302` redirect to `/orie4580_fa26/students/<netid>/`. It never reads identity from JavaScript, a query parameter, or another browser-controlled value.
+
+Install the snippet inside the active HTTPS `<VirtualHost *:443>`, normally with an `Include` directive. Do not put this rule only in `.htaccess`: authentication and rewrite processing occur in different phases. Keep the generated `students/<netid>/.htaccess` rules. The redirect is navigation, not authorization.
+
+Keep `R=302` during testing. An authenticated staff member without a generated student record will be redirected to their own absent directory and receive `404`; use a direct protected staff route until a separate staff dashboard is designed. Do not weaken student-directory authorization to solve that navigation issue.
 
 ## Positive course-group test
 

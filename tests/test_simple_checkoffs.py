@@ -140,10 +140,3 @@ def test_flat_styles_and_shiny_shimmer_are_accessible():
     assert "border-radius: 0 !important" in simple
     assert "shiny-checkmark-shimmer" in full
     assert "prefers-reduced-motion: reduce" in full
-
-
-def test_simple_landing_links_only_valid_netid_paths():
-    landing = Path("deployment/simple-index.html").read_text()
-    assert "^[a-z]{2,3}[0-9]+$" in landing
-    assert "students/${encodeURIComponent(netid)}/" in landing
-    assert "dashboard.js" not in landing
