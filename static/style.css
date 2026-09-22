@@ -1,29 +1,29 @@
 :root { color-scheme: light; }
 * { box-sizing: border-box; }
 body { margin: 0; font-family: system-ui, sans-serif; line-height: 1.5; color: #202124; background: #f5f7fa; }
-.container { max-width: 64rem; margin: 2rem auto; padding: 1.5rem 2rem 2.5rem; background: #fff; border-radius: .5rem; box-shadow: 0 1px 5px #0001; }
+.container { max-width: 64rem; margin: 2rem auto; padding: 1.5rem 2rem 2.5rem; background: #fff; border-radius: 0; box-shadow: none; }
 h1 { margin-bottom: .25rem; }
 h2 { margin-top: 2rem; }
-.status { padding: .75rem 1rem; background: #eef3f8; border-radius: .35rem; }
+.status { padding: .75rem 1rem; background: #eef3f8; border-radius: 0; }
 .error { color: #9b1c1c; background: #fff1f1; }
 .student-meta { display: flex; justify-content: space-between; gap: 1rem; flex-wrap: wrap; border-block: 1px solid #d8dee4; }
 .summary { display: grid; grid-template-columns: repeat(auto-fit, minmax(11rem, 1fr)); gap: .75rem; }
-.summary div { padding: .75rem; background: #f5f7fa; border-radius: .35rem; }
+.summary div { padding: .75rem; background: #f5f7fa; border-radius: 0; }
 .summary dt { color: #4b5563; font-size: .9rem; }
 .summary dd { margin: .2rem 0 0; font-size: 1.35rem; font-weight: 700; }
 .note, .opportunity-source, .category { color: #555f6d; font-size: .9rem; }
 .legend { display: flex; gap: 1.25rem; flex-wrap: wrap; }
 .legend-item { display: inline-flex; align-items: center; gap: .4rem; }
-.checkmark { display: inline-grid; flex: 0 0 auto; place-items: center; width: 1.7rem; height: 1.7rem; border: 2px solid; border-radius: 50%; font-weight: 800; }
+.checkmark { display: inline-grid; flex: 0 0 auto; place-items: center; width: 1.7rem; height: 1.7rem; border: 2px solid; border-radius: 0; font-weight: 800; }
 .legend .checkmark { width: 1.35rem; height: 1.35rem; font-size: .8rem; }
 .checkmark.green { color: #126c35; border-color: #126c35; }
 .checkmark.purple { color: #6d28d9; border-color: #6d28d9; }
-.checkmark.shiny_purple { color: #5b21b6; border-color: #5b21b6; box-shadow: 0 0 0 3px #ede9fe; }
+.checkmark.shiny_purple { color: #5b21b6; border-color: #5b21b6; box-shadow: none; }
 .checkmark.green.earned { color: #fff; background: #126c35; }
 .checkmark.purple.earned { color: #fff; background: #6d28d9; }
 .checkmark.shiny_purple.earned { color: #fff; background: #5b21b6; }
 .checkmark.unearned { color: #59636f; border-color: #59636f; background: transparent; }
-.standard { margin: 1rem 0; padding: 1rem 1.25rem; border: 1px solid #d8dee4; border-radius: .5rem; }
+.standard { margin: 1rem 0; padding: 1rem 1.25rem; border: 1px solid #d8dee4; border-radius: 0; }
 .standard h3 { margin: .1rem 0 .75rem; }
 .category { margin: 0; font-weight: 650; text-transform: uppercase; letter-spacing: .04em; }
 .opportunities { margin: 0; padding: 0; list-style: none; }
@@ -43,8 +43,38 @@ h2 { margin-top: 2rem; }
 }
 
 .linked-boxes { display: flex; align-items: center; gap: .5rem; flex-wrap: wrap; margin: .5rem 0 1rem; font-size: .9rem; }
-.linked-box { min-width: 5.5rem; padding: .3rem .55rem; border: 2px solid #59636f; border-radius: .3rem; text-align: center; font-weight: 650; }
+.linked-box { min-width: 5.5rem; padding: .3rem .55rem; border: 2px solid #59636f; border-radius: 0; text-align: center; font-weight: 650; }
 .linked-box.green { color: #126c35; border-color: #126c35; background: #ecfdf3; }
 .linked-box.purple { color: #6d28d9; border-color: #6d28d9; background: #f5f3ff; }
-.linked-box.shiny_purple { color: #5b21b6; border-color: #5b21b6; background: #ede9fe; box-shadow: 0 0 0 2px #ddd6fe; }
+.linked-box.shiny_purple { color: #5b21b6; border-color: #5b21b6; background: #ede9fe; box-shadow: none; }
 .linked-box.empty-box { color: #59636f; border-style: dashed; font-weight: 500; }
+
+
+/* Flat visual system and animated sheen for earned shiny-purple marks. */
+* { border-radius: 0 !important; }
+.checkmark.shiny_purple.earned,
+.linked-box.shiny_purple {
+  position: relative;
+  overflow: hidden;
+  isolation: isolate;
+}
+.checkmark.shiny_purple.earned::after,
+.linked-box.shiny_purple::after {
+  content: "";
+  position: absolute;
+  z-index: 1;
+  inset: -40% auto -40% -70%;
+  width: 45%;
+  transform: skewX(-20deg);
+  background: linear-gradient(90deg, transparent, rgb(255 255 255 / 78%), transparent);
+  animation: shiny-checkmark-shimmer 2.4s ease-in-out infinite;
+  pointer-events: none;
+}
+@keyframes shiny-checkmark-shimmer {
+  0%, 35% { left: -70%; }
+  75%, 100% { left: 135%; }
+}
+@media (prefers-reduced-motion: reduce) {
+  .checkmark.shiny_purple.earned::after,
+  .linked-box.shiny_purple::after { animation: none; display: none; }
+}

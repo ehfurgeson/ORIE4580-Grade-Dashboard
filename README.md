@@ -83,7 +83,9 @@ Gradescope integration is not implemented yet. Prefer a supported CSV export or 
 
 ## Simple NetID-protected checkoff dashboard
 
-The temporary simple dashboard is separate from the standards dashboard. It treats every worksheet column except the exact `NetID` column as one checkoff, preserves the sheet's column order, and displays only `Complete` or `Incomplete`. It does not infer standards, checkmark colors, or grades.
+The protected worksheet dashboard maps each known checkoff column to the standard named in the Lab 1–3 handouts. The mapping lives in `sync/checkoff_mappings.py`; unknown columns fail closed so a new lab cannot be silently assigned to the wrong standard. Multi-column opportunities are aggregated explicitly: the three recorded Lab 1 Q1–2 milestones produce one S1 green checkmark and all must be complete. Generated schema-version-2 records retain the source requirements for auditability.
+
+The handouts’ displayed `S1`/`S2`/`S3` labels conflict with the older tentative category IDs in `sync/standards.py`. The live pipeline therefore joins on stable semantic keys (`uniform_samplers`, `general_1d_sampler`, and `simulation_output_variability`) and uses the handout IDs only for display. See §17 of `notes.md` for the full mapping and the Lab 3 wording note.
 
 Each generated NetID directory contains its own HTML, JSON, and authorization rule:
 
