@@ -35,6 +35,7 @@ Options -Indexes
 
 <IfModule mod_headers.c>
     Header always set Cache-Control "private, no-store, max-age=0"
+    Header always set X-Robots-Tag "noindex, nofollow, noarchive"
 </IfModule>
 """
 
@@ -52,6 +53,44 @@ Options -Indexes
 <IfModule mod_headers.c>
     Header always set Cache-Control "private, no-store, max-age=0"
 </IfModule>
+"""
+
+
+def render_staff_index(netids: list[str]) -> str:
+    """Render a protected staff index from validated canonical NetIDs."""
+    if not netids or any(not NETID_PATTERN.fullmatch(netid) for netid in netids):
+        raise ValueError("staff index requires validated Cornell NetIDs")
+    if len(netids) != len(set(netids)):
+        raise ValueError("staff index NetIDs must be unique")
+    links = "\n".join(
+        f'          <li><a href="./{netid}/">{netid}</a></li>'
+        for netid in sorted(netids)
+    )
+    return f"""<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="robots" content="noindex, nofollow, noarchive">
+  <title>ORIE 4580 Staff Dashboard Index</title>
+  <link rel="stylesheet" href="../simple-style.css">
+</head>
+<body>
+  <main class="simple-container">
+    <header>
+      <p class="eyebrow">ORIE 4580</p>
+      <h1>Student dashboards</h1>
+      <p>Protected staff index. Select a NetID to open that student's dashboard.</p>
+    </header>
+    <section aria-labelledby="student-list-title">
+      <h2 id="student-list-title">Students ({len(netids)})</h2>
+      <ul class="staff-student-index">
+{links}
+      </ul>
+    </section>
+  </main>
+</body>
+</html>
 """
 
 
@@ -105,6 +144,10 @@ def update_authorization_files(output_dir: str | Path) -> list[Path]:
         path = student_dir / ".htaccess"
         _replace_text_atomic(path, HTACCESS_TEMPLATE.format(netid=student_dir.name))
         written.append(path)
+    _replace_text_atomic(
+        output / "index.html",
+        render_staff_index([student_dir.name for student_dir in student_dirs]),
+    )
     parent_rule = output / ".htaccess"
     _replace_text_atomic(parent_rule, STUDENTS_HTACCESS)
     written.append(parent_rule)
@@ -148,6 +191,11 @@ def write_simple_release(
     try:
         (staging / ".htaccess").write_text(STUDENTS_HTACCESS, encoding="utf-8")
         os.chmod(staging / ".htaccess", 0o640)
+        (staging / "index.html").write_text(
+            render_staff_index([record["student"]["netid"] for record in records]),
+            encoding="utf-8",
+        )
+        os.chmod(staging / "index.html", 0o640)
         for record in records:
             netid = record["student"]["netid"]
             student_dir = staging / netid

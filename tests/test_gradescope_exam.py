@@ -1,12 +1,12 @@
 from decimal import Decimal
 
 from sync.combined_checkoffs import merge_checkoffs_with_autograders, merge_exam_checkmarks, validate_combined_record
-from sync.gradescope import ExamRule
+from sync.gradescope import ExamRule, assignment_title_matches
 from sync.gradescope_exam import EXAM_OPPORTUNITIES, import_exam_soft, parse_exam_scores_csv
 from sync.simple_checkoffs import rows_to_simple_records
 
 
-RULE = ExamRule(8667062, "Exam_1", 6, Decimal("1"), Decimal("0.8"))
+RULE = ExamRule(8667062, "Exam 1", 6, Decimal("1"), Decimal("0.8"))
 HEADERS = [
     "Email",
     "1: One (1.0 pts)", "2: Two (1.0 pts)", "3: Three (1.0 pts)",
@@ -43,6 +43,13 @@ def lab_snapshot():
         }]}],
         "unmatched_members": 0,
     }
+
+
+def test_exam_title_uses_spaces_but_matches_upstream_separator():
+    assert RULE.title == "Exam 1"
+    assert assignment_title_matches(RULE.title.replace(" ", "_"), RULE.title)
+    assert assignment_title_matches("Exam 1", RULE.title)
+    assert not assignment_title_matches("Exam 2", RULE.title)
 
 
 def test_exam_threshold_is_strictly_over_point_eight():

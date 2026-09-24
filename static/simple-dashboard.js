@@ -137,6 +137,7 @@
   }
 
   function render(data, updatedAt) {
+    document.querySelector('.summary-strip span').textContent = 'Checkmarks earned';
     if (data.schema_version >= 3) {
       document.querySelector('#dashboard-description').textContent =
         data.schema_version === 4

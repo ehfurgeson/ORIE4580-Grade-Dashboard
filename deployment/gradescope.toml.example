@@ -18,7 +18,7 @@ maximum_submissions_per_student = 500
 
 [exam]
 assignment_id = 8667062
-title = "Exam_1"
+title = "Exam 1"
 expected_question_count = 6
 expected_question_score = "1"
 earn_threshold = "0.8"

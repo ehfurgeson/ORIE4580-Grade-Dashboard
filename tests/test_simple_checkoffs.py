@@ -3,7 +3,9 @@ from pathlib import Path
 import pytest
 
 from sync.simple_checkoffs import rows_to_simple_records, validate_simple_record
-from sync.simple_generate import STAFF_USERS, update_authorization_files, write_simple_release
+from sync.simple_generate import (
+    STAFF_USERS, render_staff_index, update_authorization_files, write_simple_release,
+)
 
 
 UPDATED_AT = "2026-09-17T12:00:00Z"
@@ -102,6 +104,11 @@ def test_publisher_creates_exact_netid_authorization(tmp_path):
     assert "<RequireAny>" in parent_rule
     for staff_netid in STAFF_USERS:
         assert f"Require shib-user {staff_netid}" in parent_rule
+    assert 'X-Robots-Tag "noindex, nofollow, noarchive"' in parent_rule
+    staff_index = (output / "index.html").read_text()
+    assert "Protected staff index" in staff_index
+    assert '<a href="./abc123/">abc123</a>' in staff_index
+    assert "noindex, nofollow, noarchive" in staff_index
     assert (student_dir / "index.html").exists()
     rule = (student_dir / ".htaccess").read_text()
     assert "<RequireAny>" in rule
@@ -189,6 +196,10 @@ def test_authorization_only_update_does_not_touch_dashboard_data(tmp_path):
     written = update_authorization_files(output)
 
     assert len(written) == len(records) + 1
+    staff_index = (output / "index.html").read_text()
+    for record in records:
+        netid = record["student"]["netid"]
+        assert f'<a href="./{netid}/">{netid}</a>' in staff_index
     assert {path: path.read_bytes() for path in paths} == before_json
     assert {
         student_dir.name: (student_dir / "index.html").read_bytes()
@@ -210,3 +221,10 @@ def test_authorization_only_update_rejects_unsafe_directory_before_writing(tmp_p
     with pytest.raises(ValueError, match="unsafe directory"):
         update_authorization_files(output)
     assert (output / "abc123" / ".htaccess").read_text() == original
+
+
+def test_staff_index_renderer_rejects_unsafe_or_duplicate_netids():
+    with pytest.raises(ValueError, match="validated Cornell NetIDs"):
+        render_staff_index(["../unsafe"])
+    with pytest.raises(ValueError, match="unique"):
+        render_staff_index(["abc123", "abc123"])

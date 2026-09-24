@@ -68,6 +68,12 @@ class ExamRule:
     earn_threshold: Decimal
 
 
+def assignment_title_matches(actual: str, configured: str) -> bool:
+    """Match an upstream title while keeping configured names human-readable."""
+    normalize = lambda value: " ".join(value.replace("_", " ").split())
+    return normalize(actual) == normalize(configured)
+
+
 @dataclass(frozen=True)
 class AdapterConfig:
     course_id: int
@@ -255,6 +261,8 @@ def load_config(path: str | Path) -> AdapterConfig:
             raise ValueError("exam assignment_id duplicates a lab assignment")
         if not isinstance(exam_title, str) or not exam_title.strip():
             raise ValueError("exam title must be nonempty")
+        if "_" in exam_title:
+            raise ValueError("exam title must use spaces instead of underscores")
         if not isinstance(question_count, int) or isinstance(question_count, bool) or question_count != 6:
             raise ValueError("Exam 1 expected_question_count must be 6")
         try:
@@ -878,7 +886,7 @@ class PrivateWebGradescopeSource:
                 # Exam data is optional while the rubric is being finalized.
                 # The caller converts this condition to not-graded checkmarks.
                 return
-            if exam_assignment.title == config.exam.title:
+            if assignment_title_matches(exam_assignment.title, config.exam.title):
                 self._exam_assignment = exam_assignment
 
     @staticmethod

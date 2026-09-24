@@ -134,7 +134,7 @@ Use the dedicated, non-login `orie4580-dashboard` system account from the unit. 
 
 ### Optional Exam 1 results
 
-Schema version 4 adds the six Exam 1 question results to the same protected dashboard. The checked-in Gradescope config allowlists assignment `Exam_1`. Each question must appear in the Gradescope CSV export as exactly 1 point. A numeric score strictly greater than `0.8` earns its configured purple or shiny-purple checkmark; exactly `0.8` does not. Questions 1, 2, and 6 map to S2. Questions 3, 4, and 5 map to S1. Questions 5 and 6 are shiny purple.
+Schema version 4 adds the six Exam 1 question results to the same protected dashboard. The checked-in Gradescope config names the allowlisted assignment `Exam 1`; title matching treats spaces and upstream underscore separators as equivalent. Each question must appear in the Gradescope CSV export as exactly 1 point. A numeric score strictly greater than `0.8` earns its configured purple or shiny-purple checkmark; exactly `0.8` does not. Questions 1, 2, and 6 map to S2. Questions 3, 4, and 5 map to S1. Questions 5 and 6 are shiny purple.
 
 Exam ingestion is deliberately soft-failing while the professor finalizes the rubric. A missing assignment, changed title, missing or non-1-point question column, nonnumeric/out-of-range score, duplicate student, or unavailable export converts all Exam 1 entries to **Not available yet** and does not block the strict Lab refresh. Raw question scores are never written to student JSON. Lab source, contract, roster, and merge errors still fail closed and preserve the prior release.
 
@@ -248,7 +248,7 @@ sudo systemctl enable --now orie4580-checkoffs.timer
 
 ### Authorization-only update
 
-Staff authorization can be updated without fetching Google Sheets or Gradescope and without changing any HTML or JSON:
+Staff authorization and the protected staff index can be updated without fetching Google Sheets or Gradescope and without changing any student HTML or JSON:
 
 ```sh
 sudo -u orie4580-dashboard \
@@ -257,7 +257,7 @@ sudo -u orie4580-dashboard \
   /var/www/html/orie4580_fa26/students
 ```
 
-The command validates all student directory names before writing, atomically replaces each per-student `.htaccess`, and updates the protected parent index rule last. It is intended for narrow authorization changes; normal refreshes continue to generate the same rules automatically.
+The command validates all student directory names before writing, atomically replaces each per-student `.htaccess`, rebuilds `students/index.html` from those validated NetIDs, and updates the protected parent index rule last. It is intended for narrow authorization changes; normal refreshes continue to generate the same rules automatically.
 
 ### Scheduled refresh
 
