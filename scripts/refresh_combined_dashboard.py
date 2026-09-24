@@ -51,6 +51,18 @@ def _require_private_snapshot(snapshot: Path, output: Path, asset_root: Path | N
         raise ValueError("Gradescope snapshot must be outside every served dashboard root")
 
 
+def _validate_roster_coverage(
+    google_netids: set[str], gradescope_netids: set[str], allow_missing: bool
+) -> set[str]:
+    missing = google_netids - gradescope_netids
+    extra = gradescope_netids - google_netids
+    if missing and not allow_missing:
+        raise ValueError("Google students are missing from Gradescope")
+    if extra:
+        raise ValueError("Gradescope contains students absent from the Google Sheet")
+    return missing
+
+
 def _selected_netid(explicit: str | None, all_students: bool) -> str | None:
     if all_students:
         return None
@@ -85,6 +97,10 @@ def main() -> None:
     parser.add_argument(
         "--copy-assets-to", type=Path,
         help="local preview only: copy dashboard JS/CSS into this directory",
+    )
+    parser.add_argument(
+        "--allow-missing-gradescope-students", action="store_true",
+        help="allow Google-roster students absent from Gradescope; they receive not_found",
     )
     args = parser.parse_args()
 
@@ -124,7 +140,18 @@ def main() -> None:
                 raise ValueError("existing Gradescope snapshot is invalid; refusing to publish")
             snapshot = carry_forward_verified_passes(snapshot, previous)
 
-        combined = merge_checkoffs_with_autograders(records, snapshot)
+        google_netids = {record["student"]["netid"] for record in records}
+        gradescope_netids = {student["netid"] for student in snapshot["students"]}
+        missing_gradescope = _validate_roster_coverage(
+            google_netids,
+            gradescope_netids,
+            args.allow_missing_gradescope_students,
+        )
+        combined = merge_checkoffs_with_autograders(
+            records,
+            snapshot,
+            allow_missing_students=bool(missing_gradescope),
+        )
         exam = import_exam_soft(
             source,
             config.exam,
@@ -148,7 +175,8 @@ def main() -> None:
     mode = "all students" if args.all_students else selected_netid
     print(
         f"published combined lab dashboards for {mode}: {len(paths)} protected record(s), "
-        f"{len(config.assignments)} lab assignment(s); {exam.message}"
+        f"{len(config.assignments)} lab assignment(s); "
+        f"Gradescope-missing students={len(missing_gradescope)}; {exam.message}"
     )
 
 

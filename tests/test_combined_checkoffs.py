@@ -198,3 +198,14 @@ def test_strict_merge_covers_every_configured_lab_opportunity():
     assert {item["id"] for item in checkmarks} == OPPORTUNITY_IDS
     assert all(item["status"] == "complete" for item in checkmarks)
     assert validate_combined_record(merged) == []
+
+
+def test_bounded_missing_gradescope_student_gets_not_found_without_a_mark():
+    record = merge_checkoffs_with_autograders(
+        [google_q1_only_record()],
+        snapshot(include_student=False),
+        allow_missing_students=True,
+    )[0]
+    checkmark = find_checkmark(record, "lab1-q1-2")
+    assert checkmark["requirements"][1]["status"] == "not_found"
+    assert checkmark["status"] == "incomplete"

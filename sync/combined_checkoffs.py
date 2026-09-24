@@ -30,6 +30,7 @@ def merge_checkoffs_with_autograders(
     snapshot: dict[str, Any],
     *,
     allow_unconfigured: bool = False,
+    allow_missing_students: bool = False,
 ) -> list[dict[str, Any]]:
     """Return schema-v3 records; inputs are not mutated.
 
@@ -72,7 +73,7 @@ def merge_checkoffs_with_autograders(
         record = deepcopy(original)
         netid = record["student"]["netid"]
         gradescope_student = gradescope_students.get(netid)
-        if gradescope_student is None and not allow_unconfigured:
+        if gradescope_student is None and not (allow_unconfigured or allow_missing_students):
             raise ValueError(f"Google student {netid} is missing from the Gradescope snapshot")
         result_map = {
             result["opportunity_id"]: result

@@ -238,15 +238,15 @@ def test_roles_filter_staff_and_unknown_roles_fail_closed():
         build_snapshot(unknown, CONFIG, generated_at=NOW)
 
 
-def test_roster_removal_cannot_replace_prior_snapshot():
+def test_roster_removal_is_allowed_but_old_student_results_are_not_copied():
     prior_source = FakeSource({}, members=[
         MemberRef("1", "abc123@cornell.edu", "0"),
         MemberRef("2", "xy99@cornell.edu", "0"),
     ])
     prior = build_snapshot(prior_source, CONFIG, generated_at=NOW)
     current = build_snapshot(FakeSource({}), CONFIG, generated_at="2026-09-23T18:00:00Z")
-    with pytest.raises(ValueError, match="removed previously published students"):
-        carry_forward_verified_passes(current, prior)
+    merged = carry_forward_verified_passes(current, prior)
+    assert [student["netid"] for student in merged["students"]] == ["abc123"]
 
 
 def test_test_maxima_vector_is_part_of_contract():

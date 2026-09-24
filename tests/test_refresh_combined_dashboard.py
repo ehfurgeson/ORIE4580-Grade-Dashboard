@@ -1,6 +1,8 @@
 import pytest
 
-from scripts.refresh_combined_dashboard import _require_private_snapshot, _secret, _selected_netid
+from scripts.refresh_combined_dashboard import (
+    _require_private_snapshot, _secret, _selected_netid, _validate_roster_coverage,
+)
 
 
 def test_local_student_defaults_to_fake_email_in_environment(monkeypatch):
@@ -50,3 +52,19 @@ def test_service_uses_systemd_credentials_not_secret_environment_file():
     assert "GRADESCOPE_PASSWORD_FILE=%d/gradescope-password" in unit
     assert "EnvironmentFile=" not in unit
     assert "GRADESCOPE_PASSWORD=" not in unit
+
+
+def test_production_allows_any_google_only_mismatch_but_not_gradescope_only():
+    google = {"abc123", "xy99", "zz999"}
+    assert _validate_roster_coverage(google, {"abc123"}, True) == {"xy99", "zz999"}
+    with pytest.raises(ValueError, match="missing from Gradescope"):
+        _validate_roster_coverage(google, {"abc123"}, False)
+    with pytest.raises(ValueError, match="absent from the Google Sheet"):
+        _validate_roster_coverage({"abc123"}, {"abc123", "xy99"}, True)
+
+
+def test_service_allows_google_students_missing_from_gradescope():
+    from pathlib import Path
+    unit = Path("deployment/orie4580-checkoffs.service").read_text()
+    assert "--allow-missing-gradescope-students" in unit
+    assert "--maximum-missing-gradescope-students" not in unit

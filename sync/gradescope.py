@@ -658,15 +658,9 @@ def carry_forward_verified_passes(
     if current["course_id"] != previous["course_id"] or current["assignments"] != previous["assignments"]:
         raise ValueError("cannot carry pass evidence across a changed course or assignment contract")
 
-    current_netids = {student["netid"] for student in current["students"]}
-    previous_netids = {student["netid"] for student in previous["students"]}
-    removed = previous_netids - current_netids
-    if removed:
-        raise ValueError(
-            "current Gradescope roster removed previously published students; "
-            "an explicit withdrawal migration is required"
-        )
-
+    # Google Sheets is the authoritative dashboard roster. Students may be
+    # removed from Gradescope after dropping the class; absent students are not
+    # copied into the new snapshot and receive not_found during the merge.
     merged = json.loads(json.dumps(current, allow_nan=False))
     prior = {
         (student["netid"], result["opportunity_id"]): result
