@@ -100,9 +100,12 @@ def test_publisher_creates_exact_netid_authorization(tmp_path):
     assert "Options -Indexes" in (output / ".htaccess").read_text()
     assert (student_dir / "index.html").exists()
     rule = (student_dir / ".htaccess").read_text()
+    assert "<RequireAny>" in rule
     assert "Require shib-user abc123" in rule
-    assert "shib-attr" not in rule
+    assert "Require shib-user zivscully" in rule
+    assert "Require shib-attr groups EN-OR-or4580-ta" in rule
     assert "valid-user" not in rule
+    assert "EN-OR-or4580-students" not in rule
     assert "Options -Indexes" in rule
     assert 'private, no-store, max-age=0' in rule
 
@@ -140,3 +143,27 @@ def test_flat_styles_and_shiny_shimmer_are_accessible():
     assert "border-radius: 0 !important" in simple
     assert "shiny-checkmark-shimmer" in full
     assert "prefers-reduced-motion: reduce" in full
+
+
+def test_retained_previous_release_supports_manual_rollback(tmp_path):
+    output = tmp_path / "students"
+    records = rows_to_simple_records(make_rows(), updated_at=UPDATED_AT, worksheet="Lab Checkoffs")
+    write_simple_release(records, output, retain_previous=True)
+    write_simple_release(records[:1], output, retain_previous=True)
+    previous = tmp_path / ".students-previous"
+    assert (output / "abc123").exists()
+    assert not (output / "xy99").exists()
+    assert (previous / "xy99" / "checkoffs.json").exists()
+
+
+def test_generated_staff_access_is_narrow_and_consistent(tmp_path):
+    records = rows_to_simple_records(make_rows(), updated_at=UPDATED_AT, worksheet="Lab Checkoffs")
+    output = tmp_path / "students"
+    write_simple_release(records, output)
+    for netid in ("abc123", "xy99"):
+        rule = (output / netid / ".htaccess").read_text()
+        assert rule.count("<RequireAny>") == 1
+        assert rule.count("Require shib-user zivscully") == 1
+        assert rule.count("Require shib-attr groups EN-OR-or4580-ta") == 1
+        assert f"Require shib-user {netid}" in rule
+        assert "Require valid-user" not in rule

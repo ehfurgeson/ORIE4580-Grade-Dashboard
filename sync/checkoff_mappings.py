@@ -1,6 +1,8 @@
 """Explicit syllabus mapping from Google Sheet columns to green checkmarks."""
 from __future__ import annotations
 
+import re
+
 STANDARDS = {
     "uniform_samplers": {
         "id": "S1",
@@ -34,3 +36,34 @@ COLUMN_MAPPINGS = {
     "Lab 3 - Q2.4": ("simulation_output_variability", "lab3-q2", "Lab 3 · Q2.1–2.4"),
     "Lab 3 - Q3": ("simulation_output_variability", "lab3-q3", "Lab 3 · Q3"),
 }
+
+
+OPPORTUNITY_IDS = frozenset(mapping[1] for mapping in COLUMN_MAPPINGS.values())
+LAB_ASSIGNMENT_PATTERN = re.compile(
+    r"^\s*Lab\s*(?P<lab>[0-9]+)\s*[,;:\-]\s*Q\s*"
+    r"(?P<start>[0-9]+)(?:\s*[-–—]\s*(?P<end>[0-9]+))?\s*$",
+    re.IGNORECASE,
+)
+
+
+def opportunity_from_assignment_title(title: object) -> str | None:
+    """Map an exact Lab N, QN[-N] convention to a known sheet opportunity.
+
+    Non-lab assignments return None. A title containing "Lab" that does not
+    match the convention or maps to no sheet opportunity raises ValueError so
+    quizzes/exams are ignored while malformed labs fail closed.
+    """
+    if not isinstance(title, str) or not title.strip():
+        raise ValueError("Gradescope assignment title is missing")
+    if not re.search(r"\blab\b", title, re.IGNORECASE):
+        return None
+    match = LAB_ASSIGNMENT_PATTERN.fullmatch(title)
+    if not match:
+        raise ValueError(f"Lab assignment title does not match the required convention: {title!r}")
+    question = match.group("start")
+    if match.group("end"):
+        question += f"-{match.group('end')}"
+    opportunity_id = f"lab{int(match.group('lab'))}-q{question}"
+    if opportunity_id not in OPPORTUNITY_IDS:
+        raise ValueError(f"Lab assignment has no Google Sheet opportunity mapping: {title!r}")
+    return opportunity_id

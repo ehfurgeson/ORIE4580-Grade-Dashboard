@@ -1,0 +1,88 @@
+# Lab-only Gradescope configuration. Exam 1 is intentionally not enabled here.
+# Install outside the checkout as /etc/orie4580-dashboard/gradescope.toml.
+schema_version = 1
+course_id = 1379687
+
+[roles]
+student = ["0"]
+non_student = ["1", "2"]
+
+[network]
+timeout_seconds = 30
+minimum_request_interval_seconds = 0.1
+maximum_requests = 20000
+maximum_response_bytes = 10000000
+minimum_roster_members = 150
+maximum_roster_members = 2000
+maximum_submissions_per_student = 500
+
+[exam]
+assignment_id = 8667062
+title = "Exam_1"
+expected_question_count = 6
+expected_question_score = "1"
+earn_threshold = "0.8"
+
+[assignments."8532407"]
+opportunity_id = "lab1-q1-2"
+contract_version = "lab1-q1-2-v1"
+expected_score = "11"
+expected_test_count = 11
+expected_test_maxima = ["1", "1", "1", "1", "1", "1", "1", "1", "1", "1", "1"]
+title_mapping_override = false
+
+[assignments."8532445"]
+opportunity_id = "lab1-q3"
+contract_version = "lab1-q3-v1"
+expected_score = "1"
+expected_test_count = 1
+expected_test_maxima = ["1"]
+title_mapping_override = false
+
+[assignments."8603427"]
+opportunity_id = "lab2-q1"
+contract_version = "lab2-q1-v1"
+expected_score = "6"
+expected_test_count = 6
+expected_test_maxima = ["1", "1", "1", "1", "1", "1"]
+title_mapping_override = false
+
+[assignments."8603442"]
+opportunity_id = "lab2-q2"
+contract_version = "lab2-q2-v1"
+expected_score = "1"
+expected_test_count = 1
+expected_test_maxima = ["1"]
+title_mapping_override = false
+
+[assignments."8603445"]
+opportunity_id = "lab2-q3"
+contract_version = "lab2-q3-v1"
+expected_score = "3"
+expected_test_count = 3
+expected_test_maxima = ["1", "1", "1"]
+title_mapping_override = false
+
+[assignments."8693888"]
+opportunity_id = "lab3-q1"
+contract_version = "lab3-q1-v1"
+expected_score = "1"
+expected_test_count = 1
+expected_test_maxima = ["1"]
+title_mapping_override = false
+
+[assignments."8693897"]
+opportunity_id = "lab3-q2"
+contract_version = "lab3-q2-v1"
+expected_score = "2"
+expected_test_count = 2
+expected_test_maxima = ["1", "1"]
+title_mapping_override = false
+
+[assignments."8693907"]
+opportunity_id = "lab3-q3"
+contract_version = "lab3-q3-v1"
+expected_score = "1"
+expected_test_count = 1
+expected_test_maxima = ["1"]
+title_mapping_override = false

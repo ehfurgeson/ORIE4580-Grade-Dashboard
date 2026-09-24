@@ -116,7 +116,10 @@ def rows_to_simple_records(
 
 
 def validate_simple_record(record: Any) -> list[str]:
-    """Validate a mapped record before writing it into a protected directory."""
+    """Validate either the manual-only or combined protected record schema."""
+    if isinstance(record, dict) and record.get("schema_version") in {3, 4}:
+        from .combined_checkoffs import validate_combined_record
+        return validate_combined_record(record)
     errors: list[str] = []
     if not isinstance(record, dict):
         return ["record must be an object"]

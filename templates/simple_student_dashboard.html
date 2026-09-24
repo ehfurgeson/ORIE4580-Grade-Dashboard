@@ -11,7 +11,7 @@
     <header>
       <p class="eyebrow">ORIE 4580</p>
       <h1>Standards Dashboard</h1>
-      <p>Your recorded lab checkoffs, mapped to the standards they demonstrate.</p>
+      <p id="dashboard-description">Your lab progress, mapped to the standards it demonstrates.</p>
     </header>
     <p id="status" class="status" role="status" aria-live="polite">Loading your checkoffs…</p>
     <section id="dashboard" aria-labelledby="standards-title" hidden>
@@ -28,10 +28,14 @@
           <h2 id="standards-title">Progress by standard</h2>
           <p class="sheet-name">Source worksheet: <span id="worksheet"></span></p>
         </div>
-        <p class="legend"><span class="checkmark green" aria-hidden="true">✓</span> Green = lab checkoff</p>
+        <p class="legend">
+          <span class="checkmark green" aria-hidden="true">✓</span> Lab
+          <span class="checkmark purple" aria-hidden="true">✓</span> Exam
+          <span class="checkmark shiny_purple" aria-hidden="true">✦</span> Shiny exam
+        </p>
       </div>
       <div id="standards"></div>
-      <p class="note">Each standard has two linked boxes. When exam results are added, purple and shiny purple checkmarks take priority over green checkmarks under the syllabus rules.</p>
+      <p id="completion-note" class="note">A lab green checkmark shows a completed recorded opportunity. Each standard has two linked boxes; future purple and shiny purple marks take priority under the syllabus rules.</p>
     </section>
   </main>
   <script>window.CHECKOFF_DATA_URL = "checkoffs.json";</script>

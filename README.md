@@ -2,7 +2,7 @@
 
 A small Zola frontend and Python publishing pipeline for the Fall 2026 standards-based grade dashboard. The UI allocates green, purple, and shiny-purple checkmarks to the syllabus checkbox system and shows the first currently satisfied grading threshold.
 
-> **Deployment status:** the local MVP and a protected single-user fake-data test work. Do not publish real student data yet. Dynamic per-student Shibboleth authorization and the student/TA access matrix are still pending.
+> **Deployment status:** the combined Google Sheets + Gradescope + Exam 1 dashboard works for the fake local student. The live sheet now validates with 174 unique NetIDs. Run one class-scale staging refresh and the same-user/cross-user Shibboleth access matrix before enabling the production timer.
 
 ## Requirements
 
@@ -79,7 +79,62 @@ python -m scripts.import_google_sheet_api generated/google-api-test
 
 The client discovers the worksheet title from worksheet ID `0`, never logs cell values, sends the rows through the same adapter and validation, and writes only under the ignored output directory.
 
-Gradescope integration is not implemented yet. Prefer a supported CSV export or documented API over an unofficial endpoint, and establish its exact column format with fake or redacted data before adding credentials.
+### Local Gradescope adapter
+
+A read-only, local-only adapter is implemented in `sync/gradescope.py` and `scripts/import_gradescope.py`. It uses pinned `gradescope-tool==0.1.4` to authenticate to Gradescope's unofficial private web interface, then validates the structured `AssignmentSubmissionViewer` properties for every current and historical submission. It does not use free-form autograder output or the package's broken `scores.csv` parser.
+
+Copy `deployment/gradescope.toml.example` to an ignored path such as `imports/gradescope/config.toml`, then configure an explicit course allowlist and one assignment rule per checkmark opportunity. Every rule contains a contract version, expected full score, exact test count, and exact ordered test-maxima vector. The role allowlists and roster minimum must also be confirmed from a live structural probe; the observed student role is `"0"`. Credentials stay in the ignored `.env` file:
+
+```dotenv
+GRADESCOPE_EMAIL=staff-account@example.edu
+GRADESCOPE_PASSWORD=use-a-secret-store-in-production
+```
+
+Run one local canary first. Canary mode requires `--no-carry-forward` and a new output path so it cannot replace a full snapshot:
+
+```sh
+python -m scripts.import_gradescope \
+  imports/gradescope/config.toml \
+  generated/gradescope-canary.json \
+  --student-netid abc123 \
+  --no-carry-forward
+```
+
+The normalized output contains only NetIDs, opportunity IDs, statuses, aggregate submission counts, and minimal pass-evidence provenance. It does not retain emails, member/submission IDs, HTML, source files, scores, cookies, CSRF tokens, or autograder output. A student passes an opportunity only when one individual current or historical submission is processed, has no autograder error, has the configured test count and score contract, and earns full credit on every required test. Tests from different submissions are never combined.
+
+Normal repeated runs should omit `--no-carry-forward`. A prior verified pass is then preserved when the course and assignment contract are unchanged, protecting the “ever passed” rule from later private-history truncation. A changed contract aborts and requires an explicit migration. The adapter enforces timeouts, bounded GET retries, request pacing, request/response/roster/history limits, same-origin redirects, strict schema checks, mode-600 atomic output, and last-known-good preservation on failure.
+
+### Local combined dashboard canary
+
+Schema version 3 combines the normalized Gradescope snapshot with the existing Google Sheet opportunities. Each opportunity displays two independent requirements: **Manual checkoff** and **Autograder**. A green checkmark is complete only when the aggregated manual sheet status is complete and at least one full historical Gradescope submission passed.
+
+Gradescope Lab titles are mapped by the reviewed convention `Lab N, QN` or `Lab N, QN-N`. In particular, `Lab 1, Q1-2` maps to the one `lab1-q1-2` opportunity that aggregates the three sheet columns `Lab 1 - Q1.3`, `Lab 1 - Q2.3`, and `Lab 1 - Q2.4`. Other recognized titles map one-to-one. Non-Lab assignments are ignored because they are not allowlisted. Malformed, unknown, duplicate, or conflicting Lab mappings fail closed. A reviewed config can set `title_mapping_override = true` as an explicit fallback; there is no fuzzy matching.
+
+The deployment-path refresh command can build a one-student local preview directly. By default it derives the canary NetID from `GRADESCOPE_TEST_STUDENT_EMAIL` in `.env`:
+
+```sh
+rm -rf generated/combined-env-preview
+python -m scripts.refresh_combined_dashboard \
+  imports/gradescope/config.toml \
+  generated/combined-env-preview/students \
+  generated/combined-env-state.json \
+  --worksheet-id 41104109 \
+  --spreadsheet-id 1e_5BQpysMUWfKrNw4MS7qg--2TySAno8rCBmuKapiME \
+  --copy-assets-to generated/combined-env-preview
+python -m http.server 8000 --bind 127.0.0.1 --directory generated/combined-env-preview
+```
+
+Open `http://localhost:8000/students/<fake-netid>/`. This path is strict: every current sheet opportunity must have exactly one configured Lab assignment, the selected student must occur in both sources, and any fetch, contract, mapping, or validation error prevents publication. `scripts.build_combined_canary` remains available only for diagnostics where unconfigured opportunities need to be displayed explicitly.
+
+For production, the same command uses `--all-students`. The supplied systemd service receives the Gradescope login, Google service-account key, and Gradescope config through systemd's per-service credential directory. It keeps normalized pass-history state under `/var/lib/orie4580-dashboard/` and atomically replaces the protected `students/` tree only after the strict Lab sources and merge validate. It retains one hidden previous student tree for manual rollback. systemd prevents concurrent starts of the same oneshot service.
+
+Use the dedicated, non-login `orie4580-dashboard` system account from the unit. This prevents ordinary interactive accounts—including `ehf38`—from reading the short-lived runtime credential files. Root-owned source credentials remain mode `0600`. As with every server-side secret, a user with `root` or unrestricted `sudo` can still retrieve it; Linux cannot hide a service credential from the administrator who controls that service.
+
+### Optional Exam 1 results
+
+Schema version 4 adds the six Exam 1 question results to the same protected dashboard. The checked-in Gradescope config allowlists assignment `Exam_1`. Each question must appear in the Gradescope CSV export as exactly 1 point. A numeric score strictly greater than `0.8` earns its configured purple or shiny-purple checkmark; exactly `0.8` does not. Questions 1, 2, and 6 map to S2. Questions 3, 4, and 5 map to S1. Questions 5 and 6 are shiny purple.
+
+Exam ingestion is deliberately soft-failing while the professor finalizes the rubric. A missing assignment, changed title, missing or non-1-point question column, nonnumeric/out-of-range score, duplicate student, or unavailable export converts all Exam 1 entries to **Not available yet** and does not block the strict Lab refresh. Raw question scores are never written to student JSON. Lab source, contract, roster, and merge errors still fail closed and preserve the prior release.
 
 ## Simple NetID-protected checkoff dashboard
 
@@ -87,13 +142,13 @@ The protected worksheet dashboard maps each known checkoff column to the standar
 
 The handouts’ displayed `S1`/`S2`/`S3` labels conflict with the older tentative category IDs in `sync/standards.py`. The live pipeline therefore joins on stable semantic keys (`uniform_samplers`, `general_1d_sampler`, and `simulation_output_variability`) and uses the handout IDs only for display. See §17 of `notes.md` for the full mapping and the Lab 3 wording note.
 
-Each generated NetID directory contains its own HTML, JSON, and authorization rule:
+Each generated NetID directory contains its own HTML, JSON, and authorization rule. Access is granted to the student owner, the explicit instructor account `zivscully`, or a released `EN-OR-or4580-ta` group value. There is no student-group or `valid-user` fallback:
 
 ```text
 students/ehf38/
 ├── index.html
 ├── checkoffs.json
-└── .htaccess   # Require shib-user ehf38; no course-group fallback
+└── .htaccess   # owner OR zivscully OR EN-OR-or4580-ta
 ```
 
 Generate only the authorized bottom-row test account from the real `Lab Checkoffs` worksheet:
@@ -117,14 +172,77 @@ https://zivscully.orie.cornell.edu/orie4580_fa26/students/ehf38/
 
 Apache must read `.htaccess`, `index.html`, and `checkoffs.json`; the generated files use group-readable modes so deployment must assign the web-server group. Confirm `AllowOverride` permits the auth/header rules and `Options -Indexes`. Do not use a copy glob that drops `.htaccess`. The standards dashboard and its files remain unchanged.
 
+### Production credentials with systemd
+
+The unit requires systemd 247 or newer (`systemd --version`). Create a dedicated non-login account and root-only credential sources:
+
+```sh
+sudo useradd --system --no-create-home --home-dir /nonexistent \
+  --shell /usr/sbin/nologin --gid www-data orie4580-dashboard
+sudo install -d -o root -g root -m 0700 /etc/orie4580-dashboard
+sudo install -o root -g root -m 0600 \
+  deployment/gradescope.toml.example /etc/orie4580-dashboard/gradescope.toml
+sudo install -o root -g root -m 0600 \
+  /secure/source/google-service-account.json \
+  /etc/orie4580-dashboard/google-service-account.json
+```
+
+Enter the Gradescope login without placing the password in shell history:
+
+```sh
+read -r -p 'Gradescope email: ' GS_EMAIL
+read -r -s -p 'Gradescope password: ' GS_PASSWORD; echo
+printf '%s\n' "$GS_EMAIL" | sudo tee /etc/orie4580-dashboard/gradescope-email >/dev/null
+printf '%s\n' "$GS_PASSWORD" | sudo tee /etc/orie4580-dashboard/gradescope-password >/dev/null
+unset GS_EMAIL GS_PASSWORD
+sudo chown root:root /etc/orie4580-dashboard/gradescope-email \
+  /etc/orie4580-dashboard/gradescope-password
+sudo chmod 0600 /etc/orie4580-dashboard/gradescope-email \
+  /etc/orie4580-dashboard/gradescope-password
+```
+
+`LoadCredential=` copies these files into a private, read-only credential directory only for the service invocation. The Python process reads the email and password from files, not environment values. Do not use `Environment=GRADESCOPE_PASSWORD=...`, an environment file containing the password, command-line arguments, Git, or the journal.
+
+Prepare the existing site root for atomic replacement by the dedicated publisher while keeping Apache read access:
+
+```sh
+SITE=/var/www/html/orie4580_fa26
+sudo chown orie4580-dashboard:www-data "$SITE"
+sudo chmod 2750 "$SITE"
+# The publisher must be able to retain and later remove the previous release.
+sudo chown -R orie4580-dashboard:www-data "$SITE/students"
+if [ -d /var/lib/orie4580-dashboard ]; then
+  sudo chown -R orie4580-dashboard:www-data /var/lib/orie4580-dashboard
+  sudo chmod 0700 /var/lib/orie4580-dashboard
+fi
+```
+
+Copy the reviewed unit, reload systemd, and test one manual run before touching the timer:
+
+```sh
+sudo install -o root -g root -m 0644 deployment/orie4580-checkoffs.service \
+  /etc/systemd/system/orie4580-checkoffs.service
+sudo install -o root -g root -m 0644 deployment/orie4580-checkoffs.timer \
+  /etc/systemd/system/orie4580-checkoffs.timer
+sudo systemctl daemon-reload
+sudo systemctl start orie4580-checkoffs.service
+sudo systemctl status orie4580-checkoffs.service
+sudo journalctl -u orie4580-checkoffs.service --since today
+```
+
+Inspect one owner page and repeat the authorization matrix: owner allowed; another student denied; a member of `EN-OR-or4580-ta` allowed; `zivscully` allowed; and an authenticated user in neither category denied. The TA test also confirms that Shibboleth is actually releasing the `groups` attribute to this service provider. Only then enable the schedule:
+
+```sh
+sudo systemctl enable --now orie4580-checkoffs.timer
+```
+
 ### Scheduled refresh
 
-After the exact-user server test passes and the full simple site replaces the old document root, Ubuntu can refresh the sheet with the supplied systemd unit and timer:
+After the owner/staff authorization tests pass and the full simple site replaces the old document root, Ubuntu can refresh the sheet with the supplied systemd unit and timer:
 
 ```text
 deployment/orie4580-checkoffs.service
 deployment/orie4580-checkoffs.timer
-deployment/simple-dashboard.env.example
 ```
 
 The timer runs every three hours with a randomized delay and persistent catch-up after downtime. The service uses `--all-students`, so do not enable it during the initial `ehf38`-only test. There is no NetID-entry landing page. Install `apache/course-root-redirect.conf` inside the active HTTPS virtual host so Shibboleth authenticates the course-root request and Apache redirects from trusted `REMOTE_USER` to the matching generated student directory. Keep the per-student `.htaccess` authorization in place.

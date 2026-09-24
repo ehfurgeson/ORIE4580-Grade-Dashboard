@@ -15,10 +15,14 @@ STUDENTS_HTACCESS = """# Generated parent rule: do not reveal the NetID director
 Options -Indexes
 """
 
-HTACCESS_TEMPLATE = """# Generated student-specific authorization. Do not edit in place.
+HTACCESS_TEMPLATE = """# Generated student/staff authorization. Do not edit in place.
 AuthType shibboleth
 ShibRequestSetting requireSession 1
-Require shib-user {netid}
+<RequireAny>
+    Require shib-user {netid}
+    Require shib-user zivscully
+    Require shib-attr groups EN-OR-or4580-ta
+</RequireAny>
 Options -Indexes
 
 <IfModule mod_headers.c>
@@ -36,8 +40,13 @@ def write_simple_release(
     output_dir: str | Path,
     *,
     template_path: str | Path = "templates/simple_student_dashboard.html",
+    retain_previous: bool = False,
 ) -> list[Path]:
-    """Validate everything, build a new tree, then replace the prior release."""
+    """Validate everything, build a new tree, then replace the prior release.
+
+    When ``retain_previous`` is true, keep the immediately preceding tree in a
+    hidden sibling directory for an operator-controlled rollback.
+    """
     if not isinstance(records, list) or not records:
         raise ValueError("records must be a nonempty list")
     errors: list[str] = []
@@ -87,7 +96,7 @@ def write_simple_release(
             if backup.exists() and not output.exists():
                 os.replace(backup, output)
             raise
-        if backup.exists():
+        if backup.exists() and not retain_previous:
             shutil.rmtree(backup)
         return [output / relative for relative in written_relative]
     finally:

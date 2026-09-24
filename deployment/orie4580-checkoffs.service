@@ -1,19 +1,28 @@
 [Unit]
-Description=Refresh ORIE 4580 simple checkoff dashboards
+Description=Refresh ORIE 4580 combined lab checkoff dashboards
 Wants=network-online.target
 After=network-online.target
 
 [Service]
 Type=oneshot
-User=ehf38
+User=orie4580-dashboard
 Group=www-data
-SupplementaryGroups=ehf38
 WorkingDirectory=/opt/orie4580-grade-dashboard
-EnvironmentFile=/etc/orie4580-dashboard/simple-dashboard.env
+LoadCredential=gradescope-email:/etc/orie4580-dashboard/gradescope-email
+LoadCredential=gradescope-password:/etc/orie4580-dashboard/gradescope-password
+LoadCredential=google-service-account:/etc/orie4580-dashboard/google-service-account.json
+LoadCredential=gradescope-config:/etc/orie4580-dashboard/gradescope.toml
+Environment=GRADESCOPE_EMAIL_FILE=%d/gradescope-email
+Environment=GRADESCOPE_PASSWORD_FILE=%d/gradescope-password
+Environment=GOOGLE_APPLICATION_CREDENTIALS=%d/google-service-account
+Environment=GOOGLE_SHEET_ID=1e_5BQpysMUWfKrNw4MS7qg--2TySAno8rCBmuKapiME
 Environment=PYTHONUNBUFFERED=1
 Environment=PYTHONDONTWRITEBYTECODE=1
 UMask=0027
-ExecStart=/opt/orie4580-grade-dashboard/.venv/bin/python -m scripts.import_simple_google_sheet_api /var/www/html/orie4580_fa26/students --worksheet-id 41104109 --all-students
+StateDirectory=orie4580-dashboard
+StateDirectoryMode=0700
+TimeoutStartSec=2h
+ExecStart=/opt/orie4580-grade-dashboard/.venv/bin/python -m scripts.refresh_combined_dashboard %d/gradescope-config /var/www/html/orie4580_fa26/students /var/lib/orie4580-dashboard/gradescope-snapshot.json --worksheet-id 41104109 --all-students
 NoNewPrivileges=true
 PrivateTmp=true
 ProtectSystem=strict
