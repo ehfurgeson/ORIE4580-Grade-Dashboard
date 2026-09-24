@@ -3,6 +3,9 @@ from __future__ import annotations
 
 import re
 
+LAB_MAPPING_VERSION = "lab-mapping-v1"
+MANUAL_SCHEMA_VERSION = 2
+
 STANDARDS = {
     "uniform_samplers": {
         "id": "S1",

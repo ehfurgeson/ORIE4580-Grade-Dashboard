@@ -18,6 +18,8 @@ Environment=GOOGLE_APPLICATION_CREDENTIALS=%d/google-service-account
 Environment=GOOGLE_SHEET_ID=1e_5BQpysMUWfKrNw4MS7qg--2TySAno8rCBmuKapiME
 Environment=PYTHONUNBUFFERED=1
 Environment=PYTHONDONTWRITEBYTECODE=1
+# Runtime validation overrides may set one reviewed non-secret CLI flag here.
+Environment=ORIE4580_REFRESH_FLAGS=
 StandardOutput=journal
 StandardError=journal
 SyslogIdentifier=orie4580-checkoffs
@@ -25,7 +27,7 @@ UMask=0027
 StateDirectory=orie4580-dashboard
 StateDirectoryMode=0700
 TimeoutStartSec=2h
-ExecStart=/opt/orie4580-grade-dashboard/.venv/bin/python -m scripts.refresh_combined_dashboard %d/gradescope-config /var/www/html/orie4580_fa26/students /var/lib/orie4580-dashboard/gradescope-snapshot.json --worksheet-id 41104109 --all-students --allow-missing-gradescope-students
+ExecStart=/opt/orie4580-grade-dashboard/.venv/bin/python -m scripts.refresh_combined_dashboard %d/gradescope-config /var/www/html/orie4580_fa26/students /var/lib/orie4580-dashboard/gradescope-snapshot.json --completion-cache /var/lib/orie4580-dashboard/completion-cache.json --lock-file /var/lib/orie4580-dashboard/refresh.lock --worksheet-id 41104109 --all-students --allow-missing-gradescope-students $ORIE4580_REFRESH_FLAGS
 NoNewPrivileges=true
 PrivateTmp=true
 ProtectSystem=strict

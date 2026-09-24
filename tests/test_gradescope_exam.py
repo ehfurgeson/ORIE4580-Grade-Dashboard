@@ -7,6 +7,10 @@ from sync.simple_checkoffs import rows_to_simple_records
 
 
 RULE = ExamRule(8667062, "Exam 1", 6, Decimal("1"), Decimal("0.8"))
+FINAL_RULE = ExamRule(
+    8667062, "Exam 1", 6, Decimal("1"), Decimal("0.8"),
+    "exam1-final-v1", True,
+)
 HEADERS = [
     "Email",
     "1: One (1.0 pts)", "2: Two (1.0 pts)", "3: Three (1.0 pts)",
@@ -103,3 +107,57 @@ def test_exam_results_merge_into_s1_and_s2_with_no_raw_scores():
     ]
     assert "0.8" not in str(record)
     assert validate_combined_record(record) == []
+
+
+def test_finalized_exam_cache_is_positive_only_and_monotone():
+    class Source:
+        calls = 0
+        def exam_scores_csv(self):
+            self.calls += 1
+            return exam_csv(["0.8", "1", "", "0", "0.9", ""])
+
+    source = Source()
+    prior = frozenset({("abc123", "exam1-q1"), ("abc123", "exam1-q3")})
+    result = import_exam_soft(
+        source, FINAL_RULE, ["abc123"],
+        current_gradescope_netids=frozenset({"abc123"}),
+        prior_completions=prior,
+    )
+    assert source.calls == 1  # ETag behavior is unproven; the export is still checked.
+    assert [item["status"] for item in result.by_netid["abc123"]] == [
+        "complete", "complete", "complete", "incomplete", "complete", "not_graded",
+    ]
+    assert ("abc123", "exam1-q1") in result.verified_completions
+    assert ("abc123", "exam1-q2") in result.verified_completions
+    assert result.cache_hits == 2
+
+
+def test_exam_soft_failure_reuses_only_current_roster_completions():
+    class Source:
+        def exam_scores_csv(self):
+            raise ValueError("unavailable")
+
+    prior = frozenset({("abc123", "exam1-q1"), ("xy99", "exam1-q1")})
+    result = import_exam_soft(
+        Source(), FINAL_RULE, ["abc123", "xy99"],
+        current_gradescope_netids=frozenset({"abc123"}),
+        prior_completions=prior,
+    )
+    assert not result.available
+    assert result.by_netid["abc123"][0]["status"] == "complete"
+    assert {item["status"] for item in result.by_netid["xy99"]} == {"not_graded"}
+    assert result.verified_completions == frozenset({("abc123", "exam1-q1")})
+
+
+def test_unfinalized_exam_does_not_reuse_positive_cache():
+    class Source:
+        def exam_scores_csv(self):
+            raise ValueError("unavailable")
+
+    result = import_exam_soft(
+        Source(), RULE, ["abc123"],
+        current_gradescope_netids=frozenset({"abc123"}),
+        prior_completions=frozenset({("abc123", "exam1-q1")}),
+    )
+    assert {item["status"] for item in result.by_netid["abc123"]} == {"not_graded"}
+    assert not result.verified_completions

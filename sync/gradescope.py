@@ -26,6 +26,7 @@ from urllib.parse import urljoin, urlparse
 from .checkoff_mappings import opportunity_from_assignment_title
 
 SCHEMA_VERSION = 1
+CONFIG_SCHEMA_VERSION = 2
 SOURCE_NAME = "gradescope_unofficial_read_only"
 NETID_EMAIL_PATTERN = re.compile(r"([a-z]{2,3}[0-9]+)@cornell\.edu\Z")
 STATUSES = {"passed", "failed", "pending", "error", "not_submitted"}
@@ -66,6 +67,16 @@ class ExamRule:
     expected_question_count: int
     expected_question_score: Decimal
     earn_threshold: Decimal
+    rubric_version: str = ""
+    rubric_finalized: bool = False
+
+
+@dataclass(frozen=True)
+class CachePolicy:
+    enabled: bool = False
+    lab_contract_canary_each_run: bool = True
+    google_conditional_requests: bool = False
+    exam_conditional_requests: bool = False
 
 
 def assignment_title_matches(actual: str, configured: str) -> bool:
@@ -88,6 +99,7 @@ class AdapterConfig:
     maximum_roster_members: int = 2_000
     maximum_submissions_per_student: int = 500
     exam: ExamRule | None = None
+    cache: CachePolicy = CachePolicy()
 
 
 @dataclass(frozen=True)
@@ -124,11 +136,11 @@ def load_config(path: str | Path) -> AdapterConfig:
     """Load an explicit course/assignment allowlist from TOML."""
     with Path(path).open("rb") as handle:
         raw = tomllib.load(handle)
-    required_top = {"schema_version", "course_id", "roles", "network", "assignments"}
+    required_top = {"schema_version", "course_id", "roles", "network", "assignments", "cache"}
     if set(raw) not in (required_top, required_top | {"exam"}):
         raise ValueError("Gradescope config fields do not match the expected schema")
-    if raw.get("schema_version") != SCHEMA_VERSION:
-        raise ValueError(f"Gradescope config schema_version must be {SCHEMA_VERSION}")
+    if raw.get("schema_version") != CONFIG_SCHEMA_VERSION:
+        raise ValueError(f"Gradescope config schema_version must be {CONFIG_SCHEMA_VERSION}; migrate the deployed config")
     course_id = raw.get("course_id")
     if not isinstance(course_id, int) or isinstance(course_id, bool) or course_id <= 0:
         raise ValueError("Gradescope course_id must be a positive integer")
@@ -247,13 +259,15 @@ def load_config(path: str | Path) -> AdapterConfig:
     exam_raw = raw.get("exam")
     if exam_raw is not None:
         exam_fields = {
-            "assignment_id", "title", "expected_question_count",
-            "expected_question_score", "earn_threshold",
+            "assignment_id", "title", "rubric_version", "rubric_finalized",
+            "expected_question_count", "expected_question_score", "earn_threshold",
         }
         if not isinstance(exam_raw, dict) or set(exam_raw) != exam_fields:
             raise ValueError("Gradescope exam config fields are invalid")
         exam_id = exam_raw["assignment_id"]
         exam_title = exam_raw["title"]
+        rubric_version = exam_raw["rubric_version"]
+        rubric_finalized = exam_raw["rubric_finalized"]
         question_count = exam_raw["expected_question_count"]
         if not isinstance(exam_id, int) or isinstance(exam_id, bool) or exam_id <= 0:
             raise ValueError("exam assignment_id must be a positive integer")
@@ -263,6 +277,10 @@ def load_config(path: str | Path) -> AdapterConfig:
             raise ValueError("exam title must be nonempty")
         if "_" in exam_title:
             raise ValueError("exam title must use spaces instead of underscores")
+        if not isinstance(rubric_version, str) or not re.fullmatch(r"[a-zA-Z0-9][a-zA-Z0-9._-]{0,63}", rubric_version):
+            raise ValueError("exam rubric_version is invalid")
+        if not isinstance(rubric_finalized, bool):
+            raise ValueError("exam rubric_finalized must be boolean")
         if not isinstance(question_count, int) or isinstance(question_count, bool) or question_count != 6:
             raise ValueError("Exam 1 expected_question_count must be 6")
         try:
@@ -274,7 +292,23 @@ def load_config(path: str | Path) -> AdapterConfig:
             raise ValueError("Exam 1 questions must each be configured out of 1")
         if threshold != Decimal("0.8"):
             raise ValueError("Exam 1 earn_threshold must be 0.8")
-        exam_rule = ExamRule(exam_id, exam_title, question_count, question_score, threshold)
+        exam_rule = ExamRule(
+            exam_id, exam_title, question_count, question_score, threshold,
+            rubric_version, rubric_finalized,
+        )
+
+    cache_raw = raw.get("cache")
+    cache_fields = {
+        "enabled", "lab_contract_canary_each_run",
+        "google_conditional_requests", "exam_conditional_requests",
+    }
+    if not isinstance(cache_raw, dict) or set(cache_raw) != cache_fields:
+        raise ValueError("Gradescope cache config is invalid")
+    if any(not isinstance(cache_raw[field], bool) for field in cache_fields):
+        raise ValueError("Gradescope cache settings must be boolean")
+    cache_policy = CachePolicy(**cache_raw)
+    if cache_policy.enabled and not cache_policy.lab_contract_canary_each_run:
+        raise ValueError("enabled completion caching requires Lab contract canaries")
 
     return AdapterConfig(
         course_id,
@@ -289,6 +323,7 @@ def load_config(path: str | Path) -> AdapterConfig:
         maximum_roster_members,
         maximum_submissions,
         exam_rule,
+        cache_policy,
     )
 
 
@@ -422,9 +457,12 @@ def build_snapshot(
     *,
     generated_at: str | None = None,
     only_netid: str | None = None,
+    prior_passes: frozenset[tuple[str, str]] = frozenset(),
+    force_full_revalidation: bool = False,
+    metrics: dict[str, int] | None = None,
     progress: Callable[[int, int], None] | None = None,
 ) -> dict[str, Any]:
-    """Read and normalize a complete snapshot in memory before any write."""
+    """Read and normalize a complete snapshot, reusing only verified passes."""
     members, unmatched = _normalize_members(source.list_members(), config)
     if only_netid is not None:
         normalized = only_netid.strip().casefold()
@@ -433,6 +471,16 @@ def build_snapshot(
         if normalized not in members:
             raise ValueError("requested NetID is not in the Gradescope roster")
         members = {normalized: members[normalized]}
+
+    rules = tuple(sorted(config.assignments, key=lambda rule: rule.assignment_id))
+    valid_opportunities = {rule.opportunity_id for rule in rules}
+    for key in prior_passes:
+        if (
+            not isinstance(key, tuple) or len(key) != 2
+            or not isinstance(key[0], str) or not re.fullmatch(r"[a-z]{2,3}[0-9]+", key[0])
+            or key[1] not in valid_opportunities
+        ):
+            raise ValueError("prior_passes contains an invalid cache key")
 
     if generated_at is None:
         generated_at = datetime.now(timezone.utc).isoformat().replace("+00:00", "Z")
@@ -443,37 +491,70 @@ def build_snapshot(
     except (AttributeError, ValueError) as error:
         raise ValueError("generated_at must be an ISO-8601 timestamp with timezone") from error
 
+    cache_metrics = metrics if metrics is not None else {}
+    current_candidates = sum(1 for netid, opportunity in prior_passes
+                             if netid in members and opportunity in valid_opportunities)
+    cache_metrics.update({"lab_cache_candidates": current_candidates, "lab_cache_hits": 0,
+                          "lab_source_checks": 0, "lab_canary_checks": 0})
     students: list[dict[str, Any]] = []
-    contract_matches = {rule.assignment_id: 0 for rule in config.assignments}
-    contract_mismatches = {rule.assignment_id: 0 for rule in config.assignments}
+    contract_matches = {rule.assignment_id: 0 for rule in rules}
+    contract_mismatches = {rule.assignment_id: 0 for rule in rules}
+    cached_candidates: dict[int, list[tuple[str, MemberRef, AssignmentRule]]] = {
+        rule.assignment_id: [] for rule in rules
+    }
+
+    def inspect(member: MemberRef, rule: AssignmentRule, *, canary: bool = False) -> tuple[str, int, int]:
+        cache_metrics["lab_source_checks"] += 1
+        if canary:
+            cache_metrics["lab_canary_checks"] += 1
+        batch = source.submissions(member.member_id, rule.assignment_id)
+        statuses: list[str] = []
+        checked = 0
+        for payload in batch.payloads:
+            checked += 1
+            status = evaluate_submission(payload, rule)
+            statuses.append(status)
+            if status == "contract_mismatch":
+                contract_mismatches[rule.assignment_id] += 1
+            elif status in {"passed", "failed"}:
+                contract_matches[rule.assignment_id] += 1
+            if status == "passed" or (canary and status == "failed"):
+                break
+        return aggregate_status(statuses), batch.observed, checked
+
     total_members = len(members)
     for member_index, (netid, member) in enumerate(sorted(members.items()), start=1):
         results: list[dict[str, Any]] = []
-        for rule in config.assignments:
-            batch = source.submissions(member.member_id, rule.assignment_id)
-            statuses: list[str] = []
-            checked = 0
-            for payload in batch.payloads:
-                checked += 1
-                status = evaluate_submission(payload, rule)
-                statuses.append(status)
-                if status == "contract_mismatch":
-                    contract_mismatches[rule.assignment_id] += 1
-                elif status in {"passed", "failed"}:
-                    contract_matches[rule.assignment_id] += 1
-                if status == "passed":
-                    break
-            status = aggregate_status(statuses)
+        for rule in rules:
+            cache_key = (netid, rule.opportunity_id)
+            if not force_full_revalidation and cache_key in prior_passes:
+                cache_metrics["lab_cache_hits"] += 1
+                cached_candidates[rule.assignment_id].append((netid, member, rule))
+                status, observed, checked, evidence = "passed", 0, 0, "completion_cache"
+            else:
+                status, observed, checked = inspect(member, rule)
+                evidence = "current_history" if status == "passed" else None
+                if force_full_revalidation and cache_key in prior_passes and status != "passed":
+                    status, evidence = "passed", "completion_cache"
             results.append({
                 "opportunity_id": rule.opportunity_id,
                 "status": status,
-                "pass_evidence": "current_history" if status == "passed" else None,
-                "submissions_observed": batch.observed,
+                "pass_evidence": evidence,
+                "submissions_observed": observed,
                 "submissions_checked": checked,
             })
         students.append({"netid": netid, "autograders": results})
         if progress is not None:
             progress(member_index, total_members)
+
+    if config.cache.lab_contract_canary_each_run and not force_full_revalidation:
+        for rule in rules:
+            if contract_matches[rule.assignment_id] > 0:
+                continue
+            for _netid, member, candidate_rule in cached_candidates[rule.assignment_id]:
+                inspect(member, candidate_rule, canary=True)
+                if contract_matches[rule.assignment_id] > 0:
+                    break
 
     drifted = [
         assignment_id
@@ -509,7 +590,6 @@ def build_snapshot(
     if errors:
         raise GradescopeSchemaError("invalid normalized snapshot: " + "; ".join(errors))
     return snapshot
-
 
 def validate_snapshot(snapshot: Any) -> list[str]:
     """Validate normalized output without raising on hostile JSON types."""
@@ -631,7 +711,7 @@ def validate_snapshot(snapshot: Any) -> list[str]:
                     errors.append("an autograder status is invalid")
                 evidence = result["pass_evidence"]
                 if status == "passed":
-                    if evidence not in {"current_history", "previous_snapshot"}:
+                    if evidence not in {"current_history", "previous_snapshot", "completion_cache"}:
                         errors.append("passed result has invalid evidence")
                 elif evidence is not None:
                     errors.append("non-passed result cannot have pass evidence")

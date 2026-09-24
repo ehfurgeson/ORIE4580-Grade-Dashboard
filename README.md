@@ -120,6 +120,7 @@ python -m scripts.refresh_combined_dashboard \
   generated/combined-env-state.json \
   --worksheet-id 41104109 \
   --spreadsheet-id 1e_5BQpysMUWfKrNw4MS7qg--2TySAno8rCBmuKapiME \
+  --disable-completion-cache \
   --copy-assets-to generated/combined-env-preview
 python -m http.server 8000 --bind 127.0.0.1 --directory generated/combined-env-preview
 ```
@@ -136,7 +137,15 @@ Use the dedicated, non-login `orie4580-dashboard` system account from the unit. 
 
 Schema version 4 adds the six Exam 1 question results to the same protected dashboard. The checked-in Gradescope config names the allowlisted assignment `Exam 1`; title matching treats spaces and upstream underscore separators as equivalent. Each question must appear in the Gradescope CSV export as exactly 1 point. A numeric score strictly greater than `0.8` earns its configured purple or shiny-purple checkmark; exactly `0.8` does not. Questions 1, 2, and 6 map to S2. Questions 3, 4, and 5 map to S1. Questions 5 and 6 are shiny purple.
 
-Exam ingestion is deliberately soft-failing while the professor finalizes the rubric. A missing assignment, changed title, missing or non-1-point question column, nonnumeric/out-of-range score, duplicate student, or unavailable export converts all Exam 1 entries to **Not available yet** and does not block the strict Lab refresh. Raw question scores are never written to student JSON. Lab source, contract, roster, and merge errors still fail closed and preserve the prior release.
+Exam ingestion remains deliberately soft-failing to isolate the optional source, although the rubric is finalized and versioned. A missing assignment, changed title, missing or non-1-point question column, nonnumeric/out-of-range score, duplicate student, or unavailable export converts all Exam 1 entries to **Not available yet** and does not block the strict Lab refresh. Raw question scores are never written to student JSON. Lab source, contract, roster, and merge errors still fail closed and preserve the prior release.
+
+### Positive completion cache
+
+Production uses `/var/lib/orie4580-dashboard/completion-cache.json` to retain only verified positive results under exact versioned contracts. Lab `passed` results can skip repeated student history reads. One deterministic live contract canary is still checked for each assignment that had no uncached compatible submission. Finalized Exam 1 `complete` results are monotone under `exam1-final-v1`; incomplete and unavailable questions are still read from the current export. Current Gradescope roster membership is required for every cache reuse, and current Google manual status still controls whether a green checkmark is earned.
+
+The cache is strict JSON, mode `0600`, outside the served tree, and written atomically only after the protected student release and normalized snapshot succeed. A missing or invalid cache causes a full strict refresh. The process also holds `/var/lib/orie4580-dashboard/refresh.lock`, so a manual invocation cannot race the timer. Use `--force-full-revalidation` to perform all Lab checks while preserving prior verified positive results, or `--disable-completion-cache` for isolated one-student canaries.
+
+Google Sheets still performs one complete read per refresh. Exam 1 still performs one CSV request per refresh. Conditional requests remain disabled because stable ETag behavior has not been proven for either source.
 
 ## Simple NetID-protected checkoff dashboard
 

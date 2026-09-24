@@ -1,7 +1,8 @@
 import pytest
 
 from scripts.refresh_combined_dashboard import (
-    _require_private_snapshot, _secret, _selected_netid, _validate_roster_coverage,
+    _acquire_lock, _lab_statuses, _require_private_snapshot, _require_private_state,
+    _secret, _selected_netid, _validate_roster_coverage,
 )
 
 
@@ -74,8 +75,71 @@ def test_refresh_progress_is_aggregate_and_journal_ready():
     from pathlib import Path
     script = Path("scripts/refresh_combined_dashboard.py").read_text()
     unit = Path("deployment/orie4580-checkoffs.service").read_text()
-    assert "Gradescope students processed: {completed}/{total}" in script
+    assert "Gradescope students visited: {completed}/{total}" in script
+    assert "Lab cache:" in script
+    assert "completion cache hits=" in script
     assert 'else "selected student"' in script
     assert "flush=True" in script
     assert "StandardOutput=journal" in unit
     assert "SyslogIdentifier=orie4580-checkoffs" in unit
+
+
+def test_cache_and_lock_are_private_and_configured_in_systemd(tmp_path):
+    served = tmp_path / "served"
+    _require_private_state(tmp_path / "state" / "cache.json", served, None)
+    with pytest.raises(ValueError, match="outside"):
+        _require_private_state(served / "cache.json", served, None)
+
+    from pathlib import Path
+    unit = Path("deployment/orie4580-checkoffs.service").read_text()
+    assert "--completion-cache /var/lib/orie4580-dashboard/completion-cache.json" in unit
+    assert "--lock-file /var/lib/orie4580-dashboard/refresh.lock" in unit
+    assert "StateDirectoryMode=0700" in unit
+    assert "Environment=ORIE4580_REFRESH_FLAGS=" in unit
+    assert "$ORIE4580_REFRESH_FLAGS" in unit
+
+
+def test_refresh_lock_rejects_a_concurrent_process(tmp_path):
+    path = tmp_path / "refresh.lock"
+    first = _acquire_lock(path)
+    try:
+        with pytest.raises(ValueError, match="already running"):
+            _acquire_lock(path)
+    finally:
+        first.close()
+    assert path.stat().st_mode & 0o777 == 0o600
+
+
+def test_publication_precedes_snapshot_and_cache_state_writes():
+    from pathlib import Path
+    script = Path("scripts/refresh_combined_dashboard.py").read_text()
+    publish = script.index("paths = write_simple_release")
+    snapshot = script.index("write_snapshot_atomic(snapshot", publish)
+    cache = script.index("write_completion_cache_atomic", snapshot)
+    assert publish < snapshot < cache
+
+
+def test_shadow_comparison_uses_only_semantic_lab_statuses():
+    snapshot = {
+        "students": [{"netid": "abc123", "autograders": [{
+            "opportunity_id": "lab1-q1-2", "status": "passed",
+            "pass_evidence": "completion_cache", "submissions_observed": 0,
+            "submissions_checked": 0,
+        }]}]
+    }
+    changed_provenance = {
+        "students": [{"netid": "abc123", "autograders": [{
+            "opportunity_id": "lab1-q1-2", "status": "passed",
+            "pass_evidence": "current_history", "submissions_observed": 3,
+            "submissions_checked": 1,
+        }]}]
+    }
+    assert _lab_statuses(snapshot) == _lab_statuses(changed_provenance)
+
+
+def test_shadow_mode_and_full_class_lock_are_enforced_in_refresh_source():
+    from pathlib import Path
+    script = Path("scripts/refresh_combined_dashboard.py").read_text()
+    assert "--shadow-cache-comparison" in script
+    assert "all-student publication requires --lock-file" in script
+    assert "zero semantic Lab differences" in script

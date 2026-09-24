@@ -15,6 +15,7 @@ from typing import Protocol
 
 from .gradescope import ExamRule, GradescopeAdapterError, netid_from_email
 
+EXAM_MAPPING_VERSION = "exam1-mapping-v1"
 EXAM_OPPORTUNITIES = (
     {"id": "exam1-q1", "question": 1, "standard_key": "general_1d_sampler", "label": "Exam 1 · Question 1", "kind": "purple"},
     {"id": "exam1-q2", "question": 2, "standard_key": "general_1d_sampler", "label": "Exam 1 · Question 2", "kind": "purple"},
@@ -38,6 +39,8 @@ class ExamImport:
     by_netid: dict[str, list[dict[str, str]]]
     available: bool
     message: str
+    verified_completions: frozenset[tuple[str, str]] = frozenset()
+    cache_hits: int = 0
 
 
 def _unavailable(netids: list[str], message: str) -> ExamImport:
@@ -119,11 +122,59 @@ def parse_exam_scores_csv(text: str, rule: ExamRule, netids: list[str]) -> ExamI
     return ExamImport(by_netid, True, "Exam 1 scores loaded")
 
 
-def import_exam_soft(source: ExamScoreSource, rule: ExamRule | None, netids: list[str]) -> ExamImport:
-    """Return not-graded opportunities instead of blocking Labs on exam drift."""
+def _apply_positive_cache(
+    result: ExamImport,
+    rule: ExamRule,
+    current_roster: frozenset[str],
+    prior_completions: frozenset[tuple[str, str]],
+) -> ExamImport:
+    known_ids = {item["id"] for item in EXAM_OPPORTUNITIES}
+    reusable = {
+        (netid, opportunity)
+        for netid, opportunity in prior_completions
+        if rule.rubric_finalized and netid in current_roster and opportunity in known_ids
+    }
+    by_netid = {
+        netid: [{**item} for item in opportunities]
+        for netid, opportunities in result.by_netid.items()
+    }
+    hits = 0
+    for netid, opportunities in by_netid.items():
+        if netid not in current_roster:
+            for item in opportunities:
+                item["status"] = "not_graded"
+            continue
+        for item in opportunities:
+            key = (netid, item["id"])
+            if key in reusable:
+                hits += 1
+                item["status"] = "complete"
+    verified = frozenset(
+        (netid, item["id"])
+        for netid, opportunities in by_netid.items()
+        if rule.rubric_finalized and netid in current_roster
+        for item in opportunities
+        if item["status"] == "complete"
+    )
+    return ExamImport(by_netid, result.available, result.message, verified, hits)
+
+
+def import_exam_soft(
+    source: ExamScoreSource,
+    rule: ExamRule | None,
+    netids: list[str],
+    *,
+    current_gradescope_netids: frozenset[str] | None = None,
+    prior_completions: frozenset[tuple[str, str]] = frozenset(),
+) -> ExamImport:
+    """Import Exam 1 and reuse only finalized positive results for current students."""
     if rule is None:
         return _unavailable(netids, "Exam 1 is not configured")
+    current_roster = (
+        frozenset(netids) if current_gradescope_netids is None else current_gradescope_netids
+    )
     try:
-        return parse_exam_scores_csv(source.exam_scores_csv(), rule, netids)
+        result = parse_exam_scores_csv(source.exam_scores_csv(), rule, netids)
     except (GradescopeAdapterError, csv.Error, UnicodeError, ValueError):
-        return _unavailable(netids, "Exam 1 scores are not normalized or available yet")
+        result = _unavailable(netids, "Exam 1 scores are not normalized or available yet")
+    return _apply_positive_cache(result, rule, current_roster, prior_completions)

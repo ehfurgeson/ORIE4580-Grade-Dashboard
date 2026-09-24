@@ -51,11 +51,13 @@ class FakeSource:
     def __init__(self, histories, members=None):
         self.histories = histories
         self.members = members or [MemberRef("member-1", "abc123@cornell.edu", "0")]
+        self.calls = []
 
     def list_members(self):
         return self.members
 
     def submissions(self, member_id, assignment_id):
+        self.calls.append((member_id, assignment_id))
         values = self.histories.get((member_id, assignment_id), [])
         return SubmissionBatch(len(values), iter(values))
 
@@ -311,8 +313,13 @@ def test_submission_html_requires_exactly_one_valid_viewer_payload():
 def test_load_config_is_explicit_and_decimal_exact(tmp_path):
     config_path = tmp_path / "gradescope.toml"
     config_path.write_text('''
-        schema_version = 1
+        schema_version = 2
         course_id = 1379687
+        [cache]
+        enabled = false
+        lab_contract_canary_each_run = true
+        google_conditional_requests = false
+        exam_conditional_requests = false
         [roles]
         student = ["0"]
         non_student = ["1", "2"]
@@ -517,3 +524,97 @@ def test_transport_streams_response_limit_and_counts_every_retry(monkeypatch):
     response = session.get(retry)
     assert response.status_code == 500
     assert source._request_count - before_requests == 3
+
+
+def test_completion_cache_skips_histories_but_runs_one_contract_canary():
+    members = [
+        MemberRef("member-b", "xy99@cornell.edu", "0"),
+        MemberRef("member-a", "abc123@cornell.edu", "0"),
+    ]
+    source = FakeSource({
+        ("member-a", RULE.assignment_id): [payload((1, 0, 1))],
+        ("member-b", RULE.assignment_id): [payload()],
+    }, members=members)
+    metrics = {}
+    snapshot = build_snapshot(
+        source, CONFIG, generated_at=NOW,
+        prior_passes=frozenset({("abc123", RULE.opportunity_id), ("xy99", RULE.opportunity_id)}),
+        metrics=metrics,
+    )
+    assert source.calls == [("member-a", RULE.assignment_id)]
+    assert metrics == {
+        "lab_cache_candidates": 2, "lab_cache_hits": 2,
+        "lab_source_checks": 1, "lab_canary_checks": 1,
+    }
+    results = [student["autograders"][0] for student in snapshot["students"]]
+    assert all(result["status"] == "passed" for result in results)
+    assert all(result["pass_evidence"] == "completion_cache" for result in results)
+    assert all(result["submissions_checked"] == 0 for result in results)
+    assert validate_snapshot(snapshot) == []
+
+
+def test_force_full_checks_every_pair_but_keeps_verified_pass_monotone():
+    source = FakeSource({("member-1", RULE.assignment_id): [payload((1, 0, 1))]})
+    metrics = {}
+    snapshot = build_snapshot(
+        source, CONFIG, generated_at=NOW,
+        prior_passes=frozenset({("abc123", RULE.opportunity_id)}),
+        force_full_revalidation=True, metrics=metrics,
+    )
+    result = snapshot["students"][0]["autograders"][0]
+    assert source.calls == [("member-1", RULE.assignment_id)]
+    assert result["status"] == "passed"
+    assert result["pass_evidence"] == "completion_cache"
+    assert result["submissions_checked"] == 1
+    assert metrics["lab_cache_hits"] == 0
+    assert metrics["lab_source_checks"] == 1
+    assert metrics["lab_canary_checks"] == 0
+
+
+def test_cached_contract_canary_still_fails_closed_on_drift():
+    source = FakeSource({("member-1", RULE.assignment_id): [payload((1, 1))]})
+    with pytest.raises(GradescopeSchemaError, match="matched no processed submissions"):
+        build_snapshot(
+            source, CONFIG, generated_at=NOW,
+            prior_passes=frozenset({("abc123", RULE.opportunity_id)}),
+        )
+
+
+def test_cache_entry_for_absent_roster_student_is_not_a_candidate():
+    source = FakeSource({("member-1", RULE.assignment_id): [payload((1, 0, 1))]})
+    metrics = {}
+    snapshot = build_snapshot(
+        source, CONFIG, generated_at=NOW,
+        prior_passes=frozenset({("xy99", RULE.opportunity_id)}), metrics=metrics,
+    )
+    assert snapshot["students"][0]["autograders"][0]["status"] == "failed"
+    assert metrics["lab_cache_candidates"] == 0
+    assert metrics["lab_cache_hits"] == 0
+
+
+def test_checked_in_config_enables_versioned_finalized_cache():
+    config = load_config("deployment/gradescope.toml.example")
+    assert config.cache.enabled
+    assert config.cache.lab_contract_canary_each_run
+    assert not config.cache.google_conditional_requests
+    assert not config.cache.exam_conditional_requests
+    assert config.exam is not None
+    assert config.exam.title == "Exam 1"
+    assert config.exam.rubric_version == "exam1-final-v1"
+    assert config.exam.rubric_finalized
+
+
+def test_schema_one_config_requires_explicit_cache_migration(tmp_path):
+    path = tmp_path / "old.toml"
+    path.write_text("schema_version=1\ncourse_id=1\n")
+    with pytest.raises(ValueError):
+        load_config(path)
+
+
+def test_enabled_cache_requires_contract_canaries(tmp_path):
+    from pathlib import Path
+    text = Path("deployment/gradescope.toml.example").read_text()
+    path = tmp_path / "unsafe-cache.toml"
+    path.write_text(text.replace("lab_contract_canary_each_run = true", "lab_contract_canary_each_run = false"))
+    with pytest.raises(ValueError, match="requires Lab contract canaries"):
+        load_config(path)

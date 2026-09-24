@@ -1,6 +1,6 @@
-# Lab-only Gradescope configuration. Exam 1 is intentionally not enabled here.
+# Gradescope Lab and finalized Exam 1 configuration.
 # Install outside the checkout as /etc/orie4580-dashboard/gradescope.toml.
-schema_version = 1
+schema_version = 2
 course_id = 1379687
 
 [roles]
@@ -16,9 +16,17 @@ minimum_roster_members = 150
 maximum_roster_members = 2000
 maximum_submissions_per_student = 500
 
+[cache]
+enabled = true
+lab_contract_canary_each_run = true
+google_conditional_requests = false
+exam_conditional_requests = false
+
 [exam]
 assignment_id = 8667062
 title = "Exam 1"
+rubric_version = "exam1-final-v1"
+rubric_finalized = true
 expected_question_count = 6
 expected_question_score = "1"
 earn_threshold = "0.8"
