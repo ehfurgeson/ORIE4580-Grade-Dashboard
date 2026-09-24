@@ -103,6 +103,7 @@ def test_publisher_creates_exact_netid_authorization(tmp_path):
     assert "<RequireAny>" in rule
     assert "Require shib-user abc123" in rule
     assert "Require shib-user zivscully" in rule
+    assert "Require shib-user ehf38" in rule
     assert "Require shib-attr groups EN-OR-or4580-ta" in rule
     assert "valid-user" not in rule
     assert "EN-OR-or4580-students" not in rule
@@ -164,6 +165,7 @@ def test_generated_staff_access_is_narrow_and_consistent(tmp_path):
         rule = (output / netid / ".htaccess").read_text()
         assert rule.count("<RequireAny>") == 1
         assert rule.count("Require shib-user zivscully") == 1
+        assert rule.count("Require shib-user ehf38") == 1
         assert rule.count("Require shib-attr groups EN-OR-or4580-ta") == 1
         assert f"Require shib-user {netid}" in rule
         assert "Require valid-user" not in rule

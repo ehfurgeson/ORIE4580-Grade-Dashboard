@@ -20,7 +20,7 @@ import requests
 import tempfile
 import time
 import tomllib
-from typing import Any, Protocol
+from typing import Any, Callable, Protocol
 from urllib.parse import urljoin, urlparse
 
 from .checkoff_mappings import opportunity_from_assignment_title
@@ -414,6 +414,7 @@ def build_snapshot(
     *,
     generated_at: str | None = None,
     only_netid: str | None = None,
+    progress: Callable[[int, int], None] | None = None,
 ) -> dict[str, Any]:
     """Read and normalize a complete snapshot in memory before any write."""
     members, unmatched = _normalize_members(source.list_members(), config)
@@ -437,7 +438,8 @@ def build_snapshot(
     students: list[dict[str, Any]] = []
     contract_matches = {rule.assignment_id: 0 for rule in config.assignments}
     contract_mismatches = {rule.assignment_id: 0 for rule in config.assignments}
-    for netid, member in sorted(members.items()):
+    total_members = len(members)
+    for member_index, (netid, member) in enumerate(sorted(members.items()), start=1):
         results: list[dict[str, Any]] = []
         for rule in config.assignments:
             batch = source.submissions(member.member_id, rule.assignment_id)
@@ -462,6 +464,8 @@ def build_snapshot(
                 "submissions_checked": checked,
             })
         students.append({"netid": netid, "autograders": results})
+        if progress is not None:
+            progress(member_index, total_members)
 
     drifted = [
         assignment_id

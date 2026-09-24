@@ -7,6 +7,7 @@ import json
 import os
 from pathlib import Path
 import shutil
+import time
 
 from dotenv import load_dotenv
 
@@ -114,6 +115,7 @@ def main() -> None:
         _require_private_snapshot(args.snapshot, args.output, args.copy_assets_to)
         config = load_config(args.config)
 
+        print("[1/6] Reading and validating the Google worksheet...", flush=True)
         title, rows = fetch_first_worksheet_rows(args.spreadsheet_id, args.worksheet_id)
         timestamp = datetime.now(timezone.utc).isoformat().replace("+00:00", "Z")
         if selected_netid is not None:
@@ -131,8 +133,30 @@ def main() -> None:
         else:
             records = rows_to_simple_records(rows, updated_at=timestamp, worksheet=title)
 
+        print(
+            f"[1/6] Google worksheet validated: rows={len(rows)}, selected records={len(records)}",
+            flush=True,
+        )
+        print("[2/6] Connecting to the allowlisted Gradescope course...", flush=True)
         source = PrivateWebGradescopeSource(email, password, config)
-        snapshot = build_snapshot(source, config, only_netid=selected_netid)
+        print("[3/6] Reading Lab autograder histories...", flush=True)
+        crawl_started = time.monotonic()
+
+        def report_progress(completed: int, total: int) -> None:
+            if completed == 1 or completed % 10 == 0 or completed == total:
+                elapsed = int(time.monotonic() - crawl_started)
+                print(
+                    f"[3/6] Gradescope students processed: {completed}/{total} "
+                    f"(elapsed {elapsed}s)",
+                    flush=True,
+                )
+
+        snapshot = build_snapshot(
+            source,
+            config,
+            only_netid=selected_netid,
+            progress=report_progress,
+        )
         if args.all_students and args.snapshot.exists():
             previous = json.loads(args.snapshot.read_text(encoding="utf-8"))
             previous_errors = validate_snapshot(previous)
@@ -147,17 +171,25 @@ def main() -> None:
             gradescope_netids,
             args.allow_missing_gradescope_students,
         )
+        print(
+            f"[4/6] Merging Lab sources: Gradescope students={len(gradescope_netids)}, "
+            f"Google-only students={len(missing_gradescope)}",
+            flush=True,
+        )
         combined = merge_checkoffs_with_autograders(
             records,
             snapshot,
             allow_missing_students=bool(missing_gradescope),
         )
+        print("[5/6] Reading optional Exam 1 results...", flush=True)
         exam = import_exam_soft(
             source,
             config.exam,
             [record["student"]["netid"] for record in combined],
         )
         combined = merge_exam_checkmarks(combined, exam)
+        print(f"[5/6] {exam.message}", flush=True)
+        print("[6/6] Validating and atomically publishing the new release...", flush=True)
 
         # All remote reads, normalization, and cross-source validation finish before
         # either persistent artifact changes. The snapshot is private recovery state;
@@ -172,7 +204,7 @@ def main() -> None:
     except (GradescopeAdapterError, KeyError, OSError, RuntimeError, ValueError, json.JSONDecodeError) as error:
         parser.error(str(error))
 
-    mode = "all students" if args.all_students else selected_netid
+    mode = "all students" if args.all_students else "selected student"
     print(
         f"published combined lab dashboards for {mode}: {len(paths)} protected record(s), "
         f"{len(config.assignments)} lab assignment(s); "

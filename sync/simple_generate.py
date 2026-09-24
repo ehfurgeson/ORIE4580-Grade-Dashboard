@@ -21,6 +21,7 @@ ShibRequestSetting requireSession 1
 <RequireAny>
     Require shib-user {netid}
     Require shib-user zivscully
+    Require shib-user ehf38
     Require shib-attr groups EN-OR-or4580-ta
 </RequireAny>
 Options -Indexes

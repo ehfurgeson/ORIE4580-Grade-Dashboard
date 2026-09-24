@@ -177,6 +177,16 @@ def test_netid_identity_is_exact_and_duplicates_abort():
         build_snapshot(source, CONFIG, generated_at=NOW)
 
 
+def test_snapshot_reports_aggregate_progress_without_identity_values():
+    events = []
+    source = FakeSource({}, members=[
+        MemberRef("1", "abc123@cornell.edu", "0"),
+        MemberRef("2", "xy99@cornell.edu", "0"),
+    ])
+    build_snapshot(source, CONFIG, generated_at=NOW, progress=lambda done, total: events.append((done, total)))
+    assert events == [(1, 2), (2, 2)]
+
+
 def test_unmatched_members_are_counted_but_not_emitted():
     source = FakeSource({}, members=[
         MemberRef("1", "abc123@cornell.edu", "0"),

@@ -68,3 +68,14 @@ def test_service_allows_google_students_missing_from_gradescope():
     unit = Path("deployment/orie4580-checkoffs.service").read_text()
     assert "--allow-missing-gradescope-students" in unit
     assert "--maximum-missing-gradescope-students" not in unit
+
+
+def test_refresh_progress_is_aggregate_and_journal_ready():
+    from pathlib import Path
+    script = Path("scripts/refresh_combined_dashboard.py").read_text()
+    unit = Path("deployment/orie4580-checkoffs.service").read_text()
+    assert "Gradescope students processed: {completed}/{total}" in script
+    assert 'else "selected student"' in script
+    assert "flush=True" in script
+    assert "StandardOutput=journal" in unit
+    assert "SyslogIdentifier=orie4580-checkoffs" in unit

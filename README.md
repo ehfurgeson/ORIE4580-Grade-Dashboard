@@ -2,7 +2,7 @@
 
 A small Zola frontend and Python publishing pipeline for the Fall 2026 standards-based grade dashboard. The UI allocates green, purple, and shiny-purple checkmarks to the syllabus checkbox system and shows the first currently satisfied grading threshold.
 
-> **Deployment status:** the combined Google Sheets + Gradescope + Exam 1 dashboard works for the fake local student. The live sheet now validates with 174 unique NetIDs. Run one class-scale staging refresh and the same-user/cross-user Shibboleth access matrix before enabling the production timer.
+> **Deployment status:** the combined Google Sheets + Gradescope + Exam 1 pipeline passed a class-scale staging refresh for 174 unique NetIDs and all generated schema-v4 records validated. Deploy one manual Ubuntu refresh and pass the owner/cross-user/TA/`zivscully`/`ehf38` Shibboleth authorization matrix before enabling the production timer.
 
 ## Requirements
 
@@ -144,13 +144,13 @@ The protected worksheet dashboard maps each known checkoff column to the standar
 
 The handouts’ displayed `S1`/`S2`/`S3` labels conflict with the older tentative category IDs in `sync/standards.py`. The live pipeline therefore joins on stable semantic keys (`uniform_samplers`, `general_1d_sampler`, and `simulation_output_variability`) and uses the handout IDs only for display. See §17 of `notes.md` for the full mapping and the Lab 3 wording note.
 
-Each generated NetID directory contains its own HTML, JSON, and authorization rule. Access is granted to the student owner, the explicit instructor account `zivscully`, or a released `EN-OR-or4580-ta` group value. There is no student-group or `valid-user` fallback:
+Each generated NetID directory contains its own HTML, JSON, and authorization rule. Access is granted to the student owner, the explicit instructor account `zivscully`, the explicit staff account `ehf38`, or a released `EN-OR-or4580-ta` group value. There is no student-group or `valid-user` fallback:
 
 ```text
 students/ehf38/
 ├── index.html
 ├── checkoffs.json
-└── .htaccess   # owner OR zivscully OR EN-OR-or4580-ta
+└── .htaccess   # owner OR zivscully OR ehf38 OR EN-OR-or4580-ta
 ```
 
 Generate only the authorized bottom-row test account from the real `Lab Checkoffs` worksheet:
@@ -227,12 +227,20 @@ sudo install -o root -g root -m 0644 deployment/orie4580-checkoffs.service \
 sudo install -o root -g root -m 0644 deployment/orie4580-checkoffs.timer \
   /etc/systemd/system/orie4580-checkoffs.timer
 sudo systemctl daemon-reload
-sudo systemctl start orie4580-checkoffs.service
-sudo systemctl status orie4580-checkoffs.service
-sudo journalctl -u orie4580-checkoffs.service --since today
+sudo systemctl start --no-block orie4580-checkoffs.service
+sudo journalctl -fu orie4580-checkoffs.service
 ```
 
-Inspect one owner page and repeat the authorization matrix: owner allowed; another student denied; a member of `EN-OR-or4580-ta` allowed; `zivscully` allowed; and an authenticated user in neither category denied. The TA test also confirms that Shibboleth is actually releasing the `groups` attribute to this service provider. Only then enable the schedule:
+`--no-block` returns control immediately. The journal reports each phase, then aggregate progress after student 1, every 10 students, and the final student. It never logs NetIDs, emails, scores, or submission identifiers. Press `Ctrl-C` to stop following the journal; this does not stop the service. In another shell, check the current state with:
+
+```sh
+sudo systemctl status orie4580-checkoffs.service
+sudo systemctl show orie4580-checkoffs.service -p ActiveState -p SubState -p Result -p ExecMainStatus
+```
+
+A full run can take several minutes because requests are paced and historical submissions are checked. `activating (start)` is normal during the crawl. Success ends as an inactive oneshot with `Result=success` and `ExecMainStatus=0`.
+
+Inspect one owner page and repeat the authorization matrix: owner allowed; another student denied; a member of `EN-OR-or4580-ta` allowed; `zivscully` allowed; `ehf38` allowed; and an authenticated user in none of those categories denied. The TA test also confirms that Shibboleth is actually releasing the `groups` attribute to this service provider. Only then enable the schedule:
 
 ```sh
 sudo systemctl enable --now orie4580-checkoffs.timer
@@ -247,7 +255,7 @@ deployment/orie4580-checkoffs.service
 deployment/orie4580-checkoffs.timer
 ```
 
-The timer runs every three hours with a randomized delay and persistent catch-up after downtime. The service uses `--all-students`, so do not enable it during the initial `ehf38`-only test. There is no NetID-entry landing page. Install `apache/course-root-redirect.conf` inside the active HTTPS virtual host so Shibboleth authenticates the course-root request and Apache redirects from trusted `REMOTE_USER` to the matching generated student directory. Keep the per-student `.htaccess` authorization in place.
+The timer runs every three hours with a randomized delay and persistent catch-up after downtime. The service uses `--all-students --allow-missing-gradescope-students`; enable it only after the successful manual run and authorization matrix. There is no NetID-entry landing page. Install `apache/course-root-redirect.conf` inside the active HTTPS virtual host so Shibboleth authenticates the course-root request and Apache redirects from trusted `REMOTE_USER` to the matching generated student directory. Keep the per-student `.htaccess` authorization in place.
 
 The importer fetches and validates the complete sheet before replacing the generated tree. A fetch or validation failure leaves the previous release intact. Check runs with:
 

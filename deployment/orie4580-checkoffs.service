@@ -18,6 +18,9 @@ Environment=GOOGLE_APPLICATION_CREDENTIALS=%d/google-service-account
 Environment=GOOGLE_SHEET_ID=1e_5BQpysMUWfKrNw4MS7qg--2TySAno8rCBmuKapiME
 Environment=PYTHONUNBUFFERED=1
 Environment=PYTHONDONTWRITEBYTECODE=1
+StandardOutput=journal
+StandardError=journal
+SyslogIdentifier=orie4580-checkoffs
 UMask=0027
 StateDirectory=orie4580-dashboard
 StateDirectoryMode=0700
