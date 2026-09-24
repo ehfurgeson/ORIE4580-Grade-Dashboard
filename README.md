@@ -144,13 +144,13 @@ The protected worksheet dashboard maps each known checkoff column to the standar
 
 The handouts’ displayed `S1`/`S2`/`S3` labels conflict with the older tentative category IDs in `sync/standards.py`. The live pipeline therefore joins on stable semantic keys (`uniform_samplers`, `general_1d_sampler`, and `simulation_output_variability`) and uses the handout IDs only for display. See §17 of `notes.md` for the full mapping and the Lab 3 wording note.
 
-Each generated NetID directory contains its own HTML, JSON, and authorization rule. Access is granted to the student owner, the explicit instructor account `zivscully`, the explicit staff account `ehf38`, or a released `EN-OR-or4580-ta` group value. There is no student-group or `valid-user` fallback:
+Each generated NetID directory contains its own HTML, JSON, and authorization rule. Access is granted to the student owner, the explicit staff users.
 
 ```text
 students/ehf38/
 ├── index.html
 ├── checkoffs.json
-└── .htaccess   # owner OR zivscully OR ehf38 OR EN-OR-or4580-ta
+└── .htaccess   # owner OR explicit staff list OR EN-OR-or4580-ta
 ```
 
 Generate only the authorized bottom-row test account from the real `Lab Checkoffs` worksheet:
@@ -240,11 +240,24 @@ sudo systemctl show orie4580-checkoffs.service -p ActiveState -p SubState -p Res
 
 A full run can take several minutes because requests are paced and historical submissions are checked. `activating (start)` is normal during the crawl. Success ends as an inactive oneshot with `Result=success` and `ExecMainStatus=0`.
 
-Inspect one owner page and repeat the authorization matrix: owner allowed; another student denied; a member of `EN-OR-or4580-ta` allowed; `zivscully` allowed; `ehf38` allowed; and an authenticated user in none of those categories denied. The TA test also confirms that Shibboleth is actually releasing the `groups` attribute to this service provider. Only then enable the schedule:
+Inspect one owner page and repeat the authorization matrix: owner allowed; another student denied; a member of `EN-OR-or4580-ta` allowed; each explicit staff user (`zivscully`, `ehf38`, `jrf298`, `tm693`, `as4268`, `mw2244`, and `zds22`) allowed; and an authenticated user in none of those categories denied. The TA test also confirms that Shibboleth is actually releasing the `groups` attribute to this service provider. Only then enable the schedule:
 
 ```sh
 sudo systemctl enable --now orie4580-checkoffs.timer
 ```
+
+### Authorization-only update
+
+Staff authorization can be updated without fetching Google Sheets or Gradescope and without changing any HTML or JSON:
+
+```sh
+sudo -u orie4580-dashboard \
+  /opt/orie4580-grade-dashboard/.venv/bin/python \
+  -m scripts.update_dashboard_authorization \
+  /var/www/html/orie4580_fa26/students
+```
+
+The command validates all student directory names before writing, atomically replaces each per-student `.htaccess`, and updates the protected parent index rule last. It is intended for narrow authorization changes; normal refreshes continue to generate the same rules automatically.
 
 ### Scheduled refresh
 

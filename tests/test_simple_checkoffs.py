@@ -3,7 +3,7 @@ from pathlib import Path
 import pytest
 
 from sync.simple_checkoffs import rows_to_simple_records, validate_simple_record
-from sync.simple_generate import write_simple_release
+from sync.simple_generate import STAFF_USERS, update_authorization_files, write_simple_release
 
 
 UPDATED_AT = "2026-09-17T12:00:00Z"
@@ -97,13 +97,18 @@ def test_publisher_creates_exact_netid_authorization(tmp_path):
     paths = write_simple_release(records, output)
     student_dir = output / "abc123"
     assert paths == [student_dir / "checkoffs.json"]
-    assert "Options -Indexes" in (output / ".htaccess").read_text()
+    parent_rule = (output / ".htaccess").read_text()
+    assert "Options -Indexes" in parent_rule
+    assert "<RequireAny>" in parent_rule
+    for staff_netid in STAFF_USERS:
+        assert f"Require shib-user {staff_netid}" in parent_rule
     assert (student_dir / "index.html").exists()
     rule = (student_dir / ".htaccess").read_text()
     assert "<RequireAny>" in rule
+    assert "AuthMerging Off" in rule
     assert "Require shib-user abc123" in rule
-    assert "Require shib-user zivscully" in rule
-    assert "Require shib-user ehf38" in rule
+    for staff_netid in STAFF_USERS:
+        assert f"Require shib-user {staff_netid}" in rule
     assert "Require shib-attr groups EN-OR-or4580-ta" in rule
     assert "valid-user" not in rule
     assert "EN-OR-or4580-students" not in rule
@@ -164,8 +169,44 @@ def test_generated_staff_access_is_narrow_and_consistent(tmp_path):
     for netid in ("abc123", "xy99"):
         rule = (output / netid / ".htaccess").read_text()
         assert rule.count("<RequireAny>") == 1
-        assert rule.count("Require shib-user zivscully") == 1
-        assert rule.count("Require shib-user ehf38") == 1
+        for staff_netid in STAFF_USERS:
+            assert rule.count(f"Require shib-user {staff_netid}") == 1
         assert rule.count("Require shib-attr groups EN-OR-or4580-ta") == 1
         assert f"Require shib-user {netid}" in rule
         assert "Require valid-user" not in rule
+
+
+def test_authorization_only_update_does_not_touch_dashboard_data(tmp_path):
+    records = rows_to_simple_records(make_rows(), updated_at=UPDATED_AT, worksheet="Lab Checkoffs")
+    output = tmp_path / "students"
+    paths = write_simple_release(records, output)
+    before_json = {path: path.read_bytes() for path in paths}
+    before_html = {
+        student_dir.name: (student_dir / "index.html").read_bytes()
+        for student_dir in output.iterdir() if student_dir.is_dir()
+    }
+
+    written = update_authorization_files(output)
+
+    assert len(written) == len(records) + 1
+    assert {path: path.read_bytes() for path in paths} == before_json
+    assert {
+        student_dir.name: (student_dir / "index.html").read_bytes()
+        for student_dir in output.iterdir() if student_dir.is_dir()
+    } == before_html
+    for path in written:
+        rule = path.read_text()
+        for staff_netid in STAFF_USERS:
+            assert f"Require shib-user {staff_netid}" in rule
+        assert "Require valid-user" not in rule
+
+
+def test_authorization_only_update_rejects_unsafe_directory_before_writing(tmp_path):
+    output = tmp_path / "students"
+    records = rows_to_simple_records(make_rows()[:1], updated_at=UPDATED_AT, worksheet="Lab Checkoffs")
+    write_simple_release(records, output)
+    original = (output / "abc123" / ".htaccess").read_text()
+    (output / "not-a-netid").mkdir()
+    with pytest.raises(ValueError, match="unsafe directory"):
+        update_authorization_files(output)
+    assert (output / "abc123" / ".htaccess").read_text() == original
