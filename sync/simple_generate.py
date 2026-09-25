@@ -12,7 +12,6 @@ from .simple_checkoffs import NETID_PATTERN, validate_simple_record
 
 
 STAFF_USERS = (
-    "zivscully",
     "ehf38",
     "jrf298",
     "tm693",
@@ -29,7 +28,6 @@ AuthType shibboleth
 ShibRequestSetting requireSession 1
 <RequireAny>
 {STAFF_REQUIRE_LINES}
-    Require shib-attr groups EN-OR-or4580-ta
 </RequireAny>
 Options -Indexes
 
@@ -46,7 +44,6 @@ AuthMerging Off
 <RequireAny>
     Require shib-user {{netid}}
 {STAFF_REQUIRE_LINES}
-    Require shib-attr groups EN-OR-or4580-ta
 </RequireAny>
 Options -Indexes
 

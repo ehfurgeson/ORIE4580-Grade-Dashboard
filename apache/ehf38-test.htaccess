@@ -1,11 +1,8 @@
-# TEST ONLY: protects the temporary ehf38 record and permits the TA group.
+# TEST ONLY: protects the temporary ehf38 record.
 AuthType shibboleth
 ShibRequestSetting requireSession 1
 
-<RequireAny>
-    Require shib-user ehf38
-    Require shib-attr groups EN-OR-or4580-ta
-</RequireAny>
+Require shib-user ehf38
 
 <IfModule mod_headers.c>
     Header always set Cache-Control "private, no-store"

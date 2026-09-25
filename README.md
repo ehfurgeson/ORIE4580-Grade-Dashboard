@@ -2,7 +2,7 @@
 
 A small Zola frontend and Python publishing pipeline for the Fall 2026 standards-based grade dashboard. The UI allocates green, purple, and shiny-purple checkmarks to the syllabus checkbox system and shows the first currently satisfied grading threshold.
 
-> **Deployment status:** the combined Google Sheets + Gradescope + Exam 1 pipeline passed a class-scale staging refresh for 174 unique NetIDs and all generated schema-v4 records validated. Deploy one manual Ubuntu refresh and pass the owner/cross-user/TA/`zivscully`/`ehf38` Shibboleth authorization matrix before enabling the production timer.
+> **Deployment status:** the combined Google Sheets + Gradescope + Exam 1 pipeline passed a class-scale staging refresh for 174 unique NetIDs and all generated schema-v4 records validated. Deploy one manual Ubuntu refresh and pass the owner/cross-user/explicit-staff Shibboleth authorization matrix before enabling the production timer.
 
 ## Requirements
 
@@ -159,7 +159,7 @@ Each generated NetID directory contains its own HTML, JSON, and authorization ru
 students/ehf38/
 ├── index.html
 ├── checkoffs.json
-└── .htaccess   # owner OR explicit staff list OR EN-OR-or4580-ta
+└── .htaccess   # owner OR explicit staff list
 ```
 
 Generate only the authorized bottom-row test account from the real `Lab Checkoffs` worksheet:
@@ -249,7 +249,7 @@ sudo systemctl show orie4580-checkoffs.service -p ActiveState -p SubState -p Res
 
 A full run can take several minutes because requests are paced and historical submissions are checked. `activating (start)` is normal during the crawl. Success ends as an inactive oneshot with `Result=success` and `ExecMainStatus=0`.
 
-Inspect one owner page and repeat the authorization matrix: owner allowed; another student denied; a member of `EN-OR-or4580-ta` allowed; each explicit staff user (`zivscully`, `ehf38`, `jrf298`, `tm693`, `as4268`, `mw2244`, and `zds22`) allowed; and an authenticated user in none of those categories denied. The TA test also confirms that Shibboleth is actually releasing the `groups` attribute to this service provider. Only then enable the schedule:
+Inspect one owner page and repeat the authorization matrix: owner allowed; another student denied; each explicit staff user (`ehf38`, `jrf298`, `tm693`, `as4268`, `mw2244`, and `zds22`) allowed; and an authenticated user in none of those categories denied. Only then enable the schedule:
 
 ```sh
 sudo systemctl enable --now orie4580-checkoffs.timer

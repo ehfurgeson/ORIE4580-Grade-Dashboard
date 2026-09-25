@@ -1,4 +1,5 @@
 # TEST ONLY: proves that either populated course group is received from Shibboleth.
+# (Note from Ziv: we aren't using groups anymore because they don't seem to be working reliably.)
 AuthType shibboleth
 ShibRequestSetting requireSession 1
 

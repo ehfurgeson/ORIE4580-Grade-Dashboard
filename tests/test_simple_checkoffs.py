@@ -116,7 +116,8 @@ def test_publisher_creates_exact_netid_authorization(tmp_path):
     assert "Require shib-user abc123" in rule
     for staff_netid in STAFF_USERS:
         assert f"Require shib-user {staff_netid}" in rule
-    assert "Require shib-attr groups EN-OR-or4580-ta" in rule
+    # (Note from Ziv: we aren't using groups anymore because they don't seem to be working reliably.)
+    assert "Require shib-attr groups" not in rule
     assert "valid-user" not in rule
     assert "EN-OR-or4580-students" not in rule
     assert "Options -Indexes" in rule
@@ -178,7 +179,7 @@ def test_generated_staff_access_is_narrow_and_consistent(tmp_path):
         assert rule.count("<RequireAny>") == 1
         for staff_netid in STAFF_USERS:
             assert rule.count(f"Require shib-user {staff_netid}") == 1
-        assert rule.count("Require shib-attr groups EN-OR-or4580-ta") == 1
+        assert "Require shib-attr groups" not in rule
         assert f"Require shib-user {netid}" in rule
         assert "Require valid-user" not in rule
 
