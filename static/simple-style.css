@@ -121,9 +121,15 @@ header > p:last-child { margin: .4rem 0 0; color: var(--muted); }
   font-weight: 800;
 }
 
-.checkmark.green { color: #fff; border-color: var(--green); background: var(--green); }
+.checkmark.green { color: var(--green); background: color-mix(in srgb, var(--green) 10%, white); }
 .checkmark.purple,
-.checkmark.shiny_purple { color: #fff; border-color: var(--purple); background: var(--purple); }
+.checkmark.shiny_purple { color: var(--purple); background: color-mix(in srgb, var(--purple) 10%, white); }
+.checkmark.shiny_purple {
+  display: inline-block;
+  text-align: center;
+  font-size: 1.2rem;
+  line-height: 1rem;
+}
 
 .standard { padding: 1rem 0; border-bottom: 1px solid var(--line); }
 
@@ -147,9 +153,9 @@ header > p:last-child { margin: .4rem 0 0; color: var(--muted); }
   font-weight: 650;
 }
 
-.linked-box.green { color: var(--green); }
+.linked-box.green { color: #fff; border-color: var(--green); background: var(--green); }
 .linked-box.purple,
-.linked-box.shiny_purple { color: var(--purple); }
+.linked-box.shiny_purple { color: #fff; border-color: var(--purple); background: var(--purple); }
 .linked-box.empty-box { color: var(--muted); border-style: dashed; font-weight: 400; }
 
 .mapped-checkoffs { margin: 0; padding: 0; list-style: none; }
@@ -190,8 +196,8 @@ header > p:last-child { margin: .4rem 0 0; color: var(--muted); }
 .source-requirements {
   grid-column: 1 / -1;
   display: grid;
-  grid-template-columns: repeat(2, minmax(0, 1fr));
-  gap: .35rem 1.25rem;
+  grid-template-columns: minmax(0, max-content);
+  gap: .35rem;
   margin: .25rem 0 0;
   padding: 0;
   list-style: none;
@@ -199,10 +205,9 @@ header > p:last-child { margin: .4rem 0 0; color: var(--muted); }
 
 .source-requirement {
   display: grid;
-  grid-template-columns: 1fr auto;
+  grid-template-columns: 9rem minmax(0, 1fr);
+  align-items: baseline;
   gap: .2rem .75rem;
-  padding-top: .35rem;
-  border-top: 1px dotted var(--line);
 }
 
 .source-requirement-name {
