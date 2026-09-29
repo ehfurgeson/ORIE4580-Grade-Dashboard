@@ -94,3 +94,19 @@ expected_score = "1"
 expected_test_count = 1
 expected_test_maxima = ["1"]
 title_mapping_override = false
+
+[assignments."8757792"]
+opportunity_id = "lab4-q2"
+contract_version = "lab4-q2-v1"
+expected_score = "3"
+expected_test_count = 3
+expected_test_maxima = ["1", "1", "1"]
+title_mapping_override = false
+
+[assignments."8758286"]
+opportunity_id = "lab4-q3"
+contract_version = "lab4-q3-v1"
+expected_score = "2"
+expected_test_count = 2
+expected_test_maxima = ["1", "1"]
+title_mapping_override = false

@@ -140,6 +140,20 @@ def test_loader_rejects_invalid_json_duplicate_keys_and_nonfinite(tmp_path: Path
     assert load_completion_cache(tmp_path / "missing") is None
 
 
+def test_manual_only_lab_cannot_be_used_as_an_autograder_cache_contract() -> None:
+    config = _config()
+    manual_only = AssignmentRule(
+        assignment_id=404,
+        opportunity_id="lab4-q1",
+        contract_version="lab4-q1-v1",
+        expected_score=Decimal("1"),
+        expected_test_count=1,
+        expected_test_maxima=(Decimal("1"),),
+    )
+    with pytest.raises(ValueError, match="unknown"):
+        lab_contract(config, manual_only)
+
+
 def test_decimal_contract_is_normalized_and_exam_name_keeps_spaces() -> None:
     config = _config()
     lab = lab_contract(config, config.assignments[0])

@@ -31,8 +31,10 @@
         if (data.schema_version >= 3 && checkmark.kind === 'green') {
           const manual = checkmark.requirements.find(item => item && item.id === 'manual');
           const autograder = checkmark.requirements.find(item => item && item.id === 'autograder');
-          if (checkmark.requirements.length !== 2 || !manual || !autograder ||
-              !allowedStatuses.has(manual.status) || !autograderStatuses.has(autograder.status) ||
+          const manualOnly = checkmark.requirements.length === 1 && manual && !autograder;
+          const manualAndAutograder = checkmark.requirements.length === 2 && manual && autograder &&
+            autograderStatuses.has(autograder.status);
+          if ((!manualOnly && !manualAndAutograder) || !allowedStatuses.has(manual.status) ||
               !Array.isArray(manual.details)) {
             throw new Error(`The requirements in ${checkmark.label} are malformed.`);
           }
@@ -145,8 +147,8 @@
           : 'Your manual lab checkoffs and Gradescope autograder results, mapped to the standards they demonstrate.';
       document.querySelector('#completion-note').textContent =
         data.schema_version === 4
-          ? 'Lab green checkmarks require both Lab sources. Exam 1 scores over 0.8 earn their mapped purple or shiny-purple checkmark. Unavailable exam scores do not earn a mark.'
-          : 'A lab green checkmark is earned only when both its manual checkoff and Gradescope autograder requirement are complete. Each standard has two linked boxes; future purple and shiny purple marks take priority under the syllabus rules.';
+          ? 'Lab green checkmarks require the listed Lab sources. Lab 4 Q1 has no autograded component. Exam 1 scores over 0.8 earn their mapped purple or shiny-purple checkmark. Unavailable exam scores do not earn a mark.'
+          : 'A lab green checkmark is earned when all listed requirements are complete. Lab 4 Q1 has no autograded component. Each standard has two linked boxes; future purple and shiny purple marks take priority under the syllabus rules.';
     }
     document.querySelector('#student-netid').textContent = data.student.netid;
     document.querySelector('#worksheet').textContent = data.worksheet;

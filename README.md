@@ -4,6 +4,8 @@ A small Zola frontend and Python publishing pipeline for the Fall 2026 standards
 
 > **Deployment status:** the combined Google Sheets + Gradescope + Exam 1 pipeline passed a class-scale staging refresh for 174 unique NetIDs and all generated schema-v4 records validated. Deploy one manual Ubuntu refresh and pass the owner/cross-user/explicit-staff Shibboleth authorization matrix before enabling the production timer.
 
+See [`docs/deployment.md`](docs/deployment.md) for the shortest safe Ubuntu release procedure. See [`docs/maintenance.md`](docs/maintenance.md) for adding labs, exams, checkmark kinds, or data sources. [`docs/standards.md`](docs/standards.md) is the source of truth for rubric wording and opportunity mappings.
+
 ## Requirements
 
 - Python 3.11 or newer
@@ -83,7 +85,7 @@ The client discovers the worksheet title from worksheet ID `0`, never logs cell 
 
 A read-only, local-only adapter is implemented in `sync/gradescope.py` and `scripts/import_gradescope.py`. It uses pinned `gradescope-tool==0.1.4` to authenticate to Gradescope's unofficial private web interface, then validates the structured `AssignmentSubmissionViewer` properties for every current and historical submission. It does not use free-form autograder output or the package's broken `scores.csv` parser.
 
-Copy `deployment/gradescope.toml.example` to an ignored path such as `imports/gradescope/config.toml`, then configure an explicit course allowlist and one assignment rule per checkmark opportunity. Every rule contains a contract version, expected full score, exact test count, and exact ordered test-maxima vector. The role allowlists and roster minimum must also be confirmed from a live structural probe; the observed student role is `"0"`. Credentials stay in the ignored `.env` file:
+Copy `deployment/gradescope.toml.example` to an ignored path such as `imports/gradescope/config.toml`, then configure an explicit course allowlist and one assignment rule per autograded checkmark opportunity. Manual-only opportunities, including Lab 4 Q1, must not have a Gradescope rule. Every rule contains a contract version, expected full score, exact test count, and exact ordered test-maxima vector. The role allowlists and roster minimum must also be confirmed from a live structural probe; the observed student role is `"0"`. Credentials stay in the ignored `.env` file:
 
 ```dotenv
 GRADESCOPE_EMAIL=staff-account@example.edu
@@ -106,7 +108,7 @@ Normal repeated runs should omit `--no-carry-forward`. A prior verified pass is 
 
 ### Local combined dashboard canary
 
-Schema version 3 combines the normalized Gradescope snapshot with the existing Google Sheet opportunities. Each opportunity displays two independent requirements: **Manual checkoff** and **Autograder**. A green checkmark is complete only when the aggregated manual sheet status is complete and at least one full historical Gradescope submission passed.
+Schema version 3 combines the normalized Gradescope snapshot with the existing Google Sheet opportunities. Autograded opportunities display two independent requirements: **Manual checkoff** and **Autograder**, and require both to complete. Lab 4 Q1 is manual-only: its green checkmark depends on the recorded checkoff and does not display or require an autograder.
 
 Gradescope Lab titles are mapped by the reviewed convention `Lab N, QN` or `Lab N, QN-N`. In particular, `Lab 1, Q1-2` maps to the one `lab1-q1-2` opportunity that aggregates the three sheet columns `Lab 1 - Q1.3`, `Lab 1 - Q2.3`, and `Lab 1 - Q2.4`. Other recognized titles map one-to-one. Non-Lab assignments are ignored because they are not allowlisted. Malformed, unknown, duplicate, or conflicting Lab mappings fail closed. A reviewed config can set `title_mapping_override = true` as an explicit fallback; there is no fuzzy matching.
 
@@ -125,9 +127,9 @@ python -m scripts.refresh_combined_dashboard \
 python -m http.server 8000 --bind 127.0.0.1 --directory generated/combined-env-preview
 ```
 
-Open `http://localhost:8000/students/<fake-netid>/`. This path is strict: every current sheet opportunity must have exactly one configured Lab assignment, the selected student must occur in both sources, and any fetch, contract, mapping, or validation error prevents publication. `scripts.build_combined_canary` remains available only for diagnostics where unconfigured opportunities need to be displayed explicitly.
+Open `http://localhost:8000/students/<fake-netid>/`. This path is strict: every current autograded sheet opportunity must have exactly one configured Lab assignment; manual-only Lab 4 Q1 must have none. The selected student must occur in both sources, and any fetch, contract, mapping, or validation error prevents publication. `scripts.build_combined_canary` remains available only for diagnostics where unconfigured opportunities need to be displayed explicitly.
 
-For production, the same command uses `--all-students --allow-missing-gradescope-students`. Google Sheets is the authoritative dashboard roster. Any Google student absent from Gradescope still receives a protected dashboard, but every autograder requirement is `not_found` and earns no checkmark. This one-way mismatch is unbounded so later Gradescope roster removals do not block refreshes. A Gradescope student absent from Google still aborts. The configured minimum canonical Gradescope roster size also remains a separate guard against a severely truncated response.
+For production, the same command uses `--all-students --allow-missing-gradescope-students`. Google Sheets is the authoritative dashboard roster. Any Google student absent from Gradescope still receives a protected dashboard, but every listed autograder requirement is `not_found` and earns no checkmark. Manual-only Lab 4 Q1 is unaffected. This one-way mismatch is unbounded so later Gradescope roster removals do not block refreshes. A Gradescope student absent from Google still aborts. The configured minimum canonical Gradescope roster size also remains a separate guard against a severely truncated response.
 
 The supplied systemd service receives the Gradescope login, Google service-account key, and Gradescope config through systemd's per-service credential directory. It keeps normalized pass-history state under `/var/lib/orie4580-dashboard/` and atomically replaces the protected `students/` tree only after the strict Lab sources and merge validate. It retains one hidden previous student tree for manual rollback. systemd prevents concurrent starts of the same oneshot service.
 
@@ -149,9 +151,9 @@ Google Sheets still performs one complete read per refresh. Exam 1 still perform
 
 ## Simple NetID-protected checkoff dashboard
 
-The protected worksheet dashboard maps each known checkoff column to the standard named in the Lab 1–3 handouts. The mapping lives in `sync/checkoff_mappings.py`; unknown columns fail closed so a new lab cannot be silently assigned to the wrong standard. Multi-column opportunities are aggregated explicitly: the three recorded Lab 1 Q1–2 milestones produce one S1 green checkmark and all must be complete. Generated schema-version-2 records retain the source requirements for auditability.
+The protected worksheet dashboard maps each known checkoff column to the standard named in the Lab 1–4 handouts. The mapping lives in `sync/checkoff_mappings.py`; unknown columns fail closed so a new lab cannot be silently assigned to the wrong standard. Multi-column opportunities are aggregated explicitly: the three recorded Lab 1 Q1–2 milestones produce one S1 green checkmark and all must be complete. Generated schema-version-2 records retain the source requirements for auditability.
 
-The handouts’ displayed `S1`/`S2`/`S3` labels conflict with the older tentative category IDs in `sync/standards.py`. The live pipeline therefore joins on stable semantic keys (`uniform_samplers`, `general_1d_sampler`, and `simulation_output_variability`) and uses the handout IDs only for display. See §17 of `notes.md` for the full mapping and the Lab 3 wording note.
+The handouts’ displayed `S1` through `S5` labels conflict with the older tentative category IDs in `sync/standards.py`. The live pipeline therefore joins on stable semantic keys (`uniform_samplers`, `general_1d_sampler`, `simulation_output_variability`, `histogram_parameters`, and `confidence_interval_procedures`) and uses the handout IDs only for display. See [`docs/standards.md`](docs/standards.md) for the authoritative rubric crosswalk, full opportunity mapping, and Lab 3 wording note.
 
 Each generated NetID directory contains its own HTML, JSON, and authorization rule. Access is granted to the student owner, the explicit staff users.
 

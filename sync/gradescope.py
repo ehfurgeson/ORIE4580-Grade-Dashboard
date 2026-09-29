@@ -23,7 +23,7 @@ import tomllib
 from typing import Any, Callable, Protocol
 from urllib.parse import urljoin, urlparse
 
-from .checkoff_mappings import opportunity_from_assignment_title
+from .checkoff_mappings import AUTOGRADER_OPPORTUNITY_IDS, opportunity_from_assignment_title
 
 SCHEMA_VERSION = 1
 CONFIG_SCHEMA_VERSION = 2
@@ -220,6 +220,8 @@ def load_config(path: str | Path) -> AdapterConfig:
         opportunity_id = value["opportunity_id"]
         if not isinstance(opportunity_id, str) or not re.fullmatch(r"[a-z][a-z0-9-]{1,63}", opportunity_id):
             raise ValueError(f"assignment {assignment_id} opportunity_id is invalid")
+        if opportunity_id not in AUTOGRADER_OPPORTUNITY_IDS:
+            raise ValueError(f"assignment {assignment_id} opportunity_id is not an autograded Lab opportunity")
         if opportunity_id in opportunities:
             raise ValueError(f"duplicate opportunity_id: {opportunity_id}")
         opportunities.add(opportunity_id)

@@ -1,9 +1,9 @@
-"""Explicit syllabus mapping from Google Sheet columns to green checkmarks."""
+"""Executable Lab mapping mirrored from the reviewed ``docs/standards.md`` tables."""
 from __future__ import annotations
 
 import re
 
-LAB_MAPPING_VERSION = "lab-mapping-v1"
+LAB_MAPPING_VERSION = "lab-mapping-v2"
 MANUAL_SCHEMA_VERSION = 2
 
 STANDARDS = {
@@ -18,6 +18,14 @@ STANDARDS = {
     "simulation_output_variability": {
         "id": "S3",
         "name": "I can use probabilistic concepts to qualitatively and quantitatively explain the sort of variability one should expect from a simulation's output.",
+    },
+    "histogram_parameters": {
+        "id": "S4",
+        "name": "I can explain how different histogram parameters impact the resulting plot and choose appropriate parameters for a given dataset.",
+    },
+    "confidence_interval_procedures": {
+        "id": "S5",
+        "name": "I can apply the formal definition of confidence intervals to derive confidence interval procedures for both traditional and novel parameter estimation tasks.",
     },
 }
 
@@ -38,10 +46,15 @@ COLUMN_MAPPINGS = {
     "Lab 3 - Q2.3": ("simulation_output_variability", "lab3-q2", "Lab 3 · Q2.1–2.4"),
     "Lab 3 - Q2.4": ("simulation_output_variability", "lab3-q2", "Lab 3 · Q2.1–2.4"),
     "Lab 3 - Q3": ("simulation_output_variability", "lab3-q3", "Lab 3 · Q3"),
+    "Lab 4 - Q1": ("simulation_output_variability", "lab4-q1", "Lab 4 · Q1"),
+    "Lab 4 - Q2": ("histogram_parameters", "lab4-q2", "Lab 4 · Q2"),
+    "Lab 4 - Q3": ("confidence_interval_procedures", "lab4-q3", "Lab 4 · Q3"),
 }
 
 
 OPPORTUNITY_IDS = frozenset(mapping[1] for mapping in COLUMN_MAPPINGS.values())
+MANUAL_ONLY_OPPORTUNITY_IDS = frozenset({"lab4-q1"})
+AUTOGRADER_OPPORTUNITY_IDS = OPPORTUNITY_IDS - MANUAL_ONLY_OPPORTUNITY_IDS
 LAB_ASSIGNMENT_PATTERN = re.compile(
     r"^\s*Lab\s*(?P<lab>[0-9]+)\s*[,;:\-]\s*Q\s*"
     r"(?P<start>[0-9]+)(?:\s*[-–—]\s*(?P<end>[0-9]+))?\s*$",

@@ -1,5 +1,6 @@
 """Optional Exam 1 score adapter.
 
+The executable opportunity table mirrors the reviewed ``docs/standards.md`` mapping.
 Exam rubric drift is deliberately soft-failing while the rubric is finalized:
 Lab publication continues and all exam opportunities become ``not_graded``.
 No raw scores are persisted in dashboard records.

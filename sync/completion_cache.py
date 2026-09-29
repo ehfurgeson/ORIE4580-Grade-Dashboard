@@ -16,7 +16,7 @@ import stat
 import tempfile
 from typing import Any, TypeAlias
 
-from .checkoff_mappings import COLUMN_MAPPINGS, LAB_MAPPING_VERSION, OPPORTUNITY_IDS
+from .checkoff_mappings import AUTOGRADER_OPPORTUNITY_IDS, COLUMN_MAPPINGS, LAB_MAPPING_VERSION
 from .gradescope_exam import EXAM_MAPPING_VERSION, EXAM_OPPORTUNITIES
 
 CompletionCache: TypeAlias = dict[str, Any]
@@ -193,7 +193,7 @@ def _validate_lab_contract(value: object, errors: list[str], where: str) -> None
         return
     assert isinstance(value, dict)
     if not _positive_int(value["assignment_id"]): errors.append(f"{where}.assignment_id is invalid")
-    if value["opportunity_id"] not in OPPORTUNITY_IDS: errors.append(f"{where}.opportunity_id is unknown")
+    if value["opportunity_id"] not in AUTOGRADER_OPPORTUNITY_IDS: errors.append(f"{where}.opportunity_id is unknown")
     if not isinstance(value["contract_version"], str) or not _IDENTIFIER.fullmatch(value["contract_version"]): errors.append(f"{where}.contract_version is invalid")
     if not _canonical_decimal(value["expected_score"]): errors.append(f"{where}.expected_score is not canonical")
     if not _positive_int(value["expected_test_count"]): errors.append(f"{where}.expected_test_count is invalid")
@@ -257,7 +257,7 @@ def validate_completion_cache(
         errors.append("cache written_at is in the future")
 
     contracts = value["lab_contracts"]
-    allowed_labs = set(OPPORTUNITY_IDS)
+    allowed_labs = set(AUTOGRADER_OPPORTUNITY_IDS)
     if config is not None:
         allowed_labs = {getattr(rule, "opportunity_id", None) for rule in getattr(config, "assignments", ())}
     if not isinstance(contracts, dict): errors.append("cache.lab_contracts must be an object")

@@ -40,7 +40,7 @@ def test_wide_rows_map_headers_to_standards_and_aggregate_lab_1():
     records = rows_to_simple_records(make_rows(), updated_at=UPDATED_AT, worksheet="Lab Checkoffs")
     record = records[0]
     assert record["schema_version"] == 2
-    assert [standard["id"] for standard in record["standards"]] == ["S1", "S2", "S3"]
+    assert [standard["id"] for standard in record["standards"]] == ["S1", "S2", "S3", "S4", "S5"]
     s1 = record["standards"][0]
     assert s1["key"] == "uniform_samplers"
     assert [(item["id"], item["status"]) for item in s1["checkmarks"]] == [
@@ -77,6 +77,23 @@ def test_lab_3_maps_to_updated_handout_standards():
     ]
 
 
+def test_lab_4_maps_to_three_standards():
+    rows = [{
+        "NetID": "abc123",
+        "Lab 4 - Q1": True,
+        "Lab 4 - Q2": False,
+        "Lab 4 - Q3": True,
+    }]
+    record = rows_to_simple_records(rows, updated_at=UPDATED_AT, worksheet="Lab Checkoffs")[0]
+    mapped = {
+        standard["id"]: [(item["id"], item["status"]) for item in standard["checkmarks"]]
+        for standard in record["standards"]
+    }
+    assert mapped["S3"] == [("lab4-q1", "complete")]
+    assert mapped["S4"] == [("lab4-q2", "incomplete")]
+    assert mapped["S5"] == [("lab4-q3", "complete")]
+
+
 @pytest.mark.parametrize(
     "rows,message",
     [
@@ -85,7 +102,7 @@ def test_lab_3_maps_to_updated_handout_standards():
         ([{"NetID": "abc123", "Lab 2 - Q1": "maybe"}], "True/False"),
         ([{"NetID": "ABC123", "Lab 2 - Q1": "True"}, {"NetID": "abc123", "Lab 2 - Q1": "False"}], "duplicate"),
         ([{"NetID": "abc123"}], "at least one"),
-        ([{"NetID": "abc123", "Lab 4 - Q1": "True"}], "unmapped checkoff"),
+        ([{"NetID": "abc123", "Lab 5 - Q1": "True"}], "unmapped checkoff"),
     ],
 )
 def test_wide_rows_reject_unsafe_or_ambiguous_input(rows, message):

@@ -230,6 +230,9 @@ def test_assignment_title_mapping_matches_sheet_opportunities():
     assert opportunity_from_assignment_title("Lab 1, Q1-2") == "lab1-q1-2"
     assert opportunity_from_assignment_title("Lab 1, Q3") == "lab1-q3"
     assert opportunity_from_assignment_title("Lab 3 - Q2") == "lab3-q2"
+    assert opportunity_from_assignment_title("Lab 4, Q1") == "lab4-q1"
+    assert opportunity_from_assignment_title("Lab 4, Q2") == "lab4-q2"
+    assert opportunity_from_assignment_title("Lab 4, Q3") == "lab4-q3"
     assert opportunity_from_assignment_title("Prelim 1") is None
     with pytest.raises(ValueError, match="required convention"):
         opportunity_from_assignment_title("Lab One Question Three")
@@ -342,6 +345,11 @@ def test_load_config_is_explicit_and_decimal_exact(tmp_path):
     config = load_config(config_path)
     assert config.assignments[0].expected_score == Decimal("3.0")
     assert config.maximum_submissions_per_student == 500
+
+    manual_only = config_path.read_text().replace("lab3-q1", "lab4-q1")
+    config_path.write_text(manual_only)
+    with pytest.raises(ValueError, match="not an autograded Lab opportunity"):
+        load_config(config_path)
 
 
 def test_unknown_config_fields_fail_closed(tmp_path):

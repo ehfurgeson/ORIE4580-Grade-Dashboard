@@ -4,7 +4,7 @@ from pathlib import Path
 import pytest
 
 from sync.combined_checkoffs import merge_checkoffs_with_autograders, validate_combined_record
-from sync.checkoff_mappings import COLUMN_MAPPINGS, OPPORTUNITY_IDS
+from sync.checkoff_mappings import AUTOGRADER_OPPORTUNITY_IDS, COLUMN_MAPPINGS, OPPORTUNITY_IDS
 from sync.simple_checkoffs import rows_to_simple_records, validate_simple_record
 from sync.simple_generate import write_simple_release
 
@@ -128,6 +128,34 @@ def test_strict_merge_rejects_missing_assignment_or_student_mapping():
         )
 
 
+def test_lab_4_q1_is_manual_only_and_strict_merge_does_not_require_an_assignment():
+    row = {
+        "NetID": "abc123",
+        "Lab 1 - Q1.3": True,
+        "Lab 1 - Q2.3": True,
+        "Lab 1 - Q2.4": True,
+        "Lab 4 - Q1": True,
+    }
+    google = rows_to_simple_records([row], updated_at=NOW, worksheet="Lab Checkoffs")[0]
+    record = merge_checkoffs_with_autograders([google], snapshot())[0]
+    q1 = find_checkmark(record, "lab4-q1")
+    assert q1["status"] == "complete"
+    assert [(item["id"], item["status"]) for item in q1["requirements"]] == [
+        ("manual", "complete")
+    ]
+    assert validate_combined_record(record) == []
+
+
+def test_manual_only_opportunity_rejects_an_autograder_mapping():
+    configured = snapshot()
+    configured["assignments"][0]["opportunity_id"] = "lab4-q1"
+    configured["students"][0]["autograders"][0]["opportunity_id"] = "lab4-q1"
+    row = {"NetID": "abc123", "Lab 4 - Q1": True}
+    google = rows_to_simple_records([row], updated_at=NOW, worksheet="Lab Checkoffs")[0]
+    with pytest.raises(ValueError, match="manual-only"):
+        merge_checkoffs_with_autograders([google], configured)
+
+
 def test_combined_schema_validation_and_publisher(tmp_path):
     record = merge_checkoffs_with_autograders(
         [google_record()], snapshot(), allow_unconfigured=True
@@ -160,7 +188,7 @@ def test_frontend_displays_both_requirement_sources_safely():
 def test_strict_merge_covers_every_configured_lab_opportunity():
     row = {"NetID": "abc123", **{column: True for column in COLUMN_MAPPINGS}}
     record = rows_to_simple_records([row], updated_at=NOW, worksheet="Lab Checkoffs")[0]
-    opportunities = sorted(OPPORTUNITY_IDS)
+    opportunities = sorted(AUTOGRADER_OPPORTUNITY_IDS)
     full_snapshot = {
         "schema_version": 1,
         "source": "gradescope_unofficial_read_only",

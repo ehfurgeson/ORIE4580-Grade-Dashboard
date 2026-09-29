@@ -6,7 +6,7 @@ from datetime import datetime
 import json
 from typing import Any
 
-from .checkoff_mappings import STANDARDS
+from .checkoff_mappings import MANUAL_ONLY_OPPORTUNITY_IDS, STANDARDS
 from .gradescope import validate_snapshot
 from .gradescope_exam import EXAM_OPPORTUNITIES, ExamImport
 from .simple_checkoffs import NETID_PATTERN, STATUSES as MANUAL_STATUSES, validate_simple_record
@@ -63,8 +63,12 @@ def merge_checkoffs_with_autograders(
     unknown = set(configured) - available_opportunities
     if unknown:
         raise ValueError("Gradescope assignments map to opportunities absent from the Google Sheet")
+    manual_only_configured = set(configured) & MANUAL_ONLY_OPPORTUNITY_IDS
+    if manual_only_configured:
+        raise ValueError("manual-only opportunities must not have Gradescope assignment mappings")
     if not allow_unconfigured:
-        missing = available_opportunities - set(configured)
+        autograded_opportunities = available_opportunities - MANUAL_ONLY_OPPORTUNITY_IDS
+        missing = autograded_opportunities - set(configured)
         if missing:
             raise ValueError("manual opportunities are missing Gradescope assignment mappings")
 
@@ -92,27 +96,32 @@ def merge_checkoffs_with_autograders(
                     autograder_status = "not_configured"
                 else:
                     autograder_status = "not_found"
-                checkmark["requirements"] = [
-                    {
-                        "id": "manual",
-                        "label": "Manual checkoff",
-                        "source": "google_sheets",
-                        "status": manual_status,
-                        "details": manual_details,
-                    },
-                    {
-                        "id": "autograder",
-                        "label": "Autograder",
-                        "source": "gradescope",
-                        "status": autograder_status,
-                        "details": [],
-                    },
-                ]
-                checkmark["status"] = (
-                    "complete"
-                    if manual_status == "complete" and autograder_status == "passed"
-                    else "incomplete"
-                )
+                manual_requirement = {
+                    "id": "manual",
+                    "label": "Manual checkoff",
+                    "source": "google_sheets",
+                    "status": manual_status,
+                    "details": manual_details,
+                }
+                if checkmark["id"] in MANUAL_ONLY_OPPORTUNITY_IDS:
+                    checkmark["requirements"] = [manual_requirement]
+                    checkmark["status"] = manual_status
+                else:
+                    checkmark["requirements"] = [
+                        manual_requirement,
+                        {
+                            "id": "autograder",
+                            "label": "Autograder",
+                            "source": "gradescope",
+                            "status": autograder_status,
+                            "details": [],
+                        },
+                    ]
+                    checkmark["status"] = (
+                        "complete"
+                        if manual_status == "complete" and autograder_status == "passed"
+                        else "incomplete"
+                    )
         errors = validate_combined_record(record)
         if errors:
             raise ValueError(f"combined record for {netid} is invalid: {'; '.join(errors)}")
@@ -178,19 +187,21 @@ def validate_combined_record(record: Any) -> list[str]:
                 if checkmark["kind"] == "green":
                     if checkmark["status"] not in MANUAL_STATUSES:
                         errors.append("lab checkmark status is invalid")
-                    if not isinstance(requirements, list) or len(requirements) != 2:
-                        errors.append("lab checkmark must have manual and autograder requirements")
+                    manual_only = opportunity in MANUAL_ONLY_OPPORTUNITY_IDS
+                    expected_requirement_ids = {"manual"} if manual_only else {"manual", "autograder"}
+                    expected_requirement_count = len(expected_requirement_ids)
+                    if not isinstance(requirements, list) or len(requirements) != expected_requirement_count:
+                        errors.append("lab checkmark has the wrong requirements")
                         continue
                     by_id = {
                         item.get("id"): item for item in requirements
                         if isinstance(item, dict) and isinstance(item.get("id"), str)
                     }
-                    if set(by_id) != {"manual", "autograder"}:
+                    if set(by_id) != expected_requirement_ids:
                         errors.append("checkmark requirement IDs are invalid")
                         continue
                     manual = by_id["manual"]
-                    auto = by_id["autograder"]
-                    if set(manual) != requirement_fields or set(auto) != requirement_fields:
+                    if set(manual) != requirement_fields:
                         errors.append("a checkmark requirement is malformed")
                         continue
                     if manual["source"] != "google_sheets" or manual["status"] not in MANUAL_STATUSES:
@@ -208,15 +219,22 @@ def validate_combined_record(record: Any) -> list[str]:
                         "complete" if all(item["status"] == "complete" for item in details) else "incomplete"
                     ):
                         errors.append("manual requirement does not match its details")
-                    if auto["source"] != "gradescope" or auto["status"] not in AUTOGRADER_STATUSES or auto["details"] != []:
-                        errors.append("autograder requirement is invalid")
-                    expected_status = (
-                        "complete"
-                        if manual["status"] == "complete" and auto["status"] == "passed"
-                        else "incomplete"
-                    )
+                    if manual_only:
+                        expected_status = manual["status"]
+                    else:
+                        auto = by_id["autograder"]
+                        if set(auto) != requirement_fields:
+                            errors.append("a checkmark requirement is malformed")
+                            continue
+                        if auto["source"] != "gradescope" or auto["status"] not in AUTOGRADER_STATUSES or auto["details"] != []:
+                            errors.append("autograder requirement is invalid")
+                        expected_status = (
+                            "complete"
+                            if manual["status"] == "complete" and auto["status"] == "passed"
+                            else "incomplete"
+                        )
                     if checkmark["status"] != expected_status:
-                        errors.append("checkmark status does not match both requirements")
+                        errors.append("checkmark status does not match its requirements")
                 elif checkmark["kind"] in {"purple", "shiny_purple"}:
                     if record.get("schema_version") != EXAM_SCHEMA_VERSION:
                         errors.append("exam checkmarks require schema version 4")

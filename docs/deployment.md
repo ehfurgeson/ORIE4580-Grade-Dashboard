@@ -1,0 +1,135 @@
+# Ubuntu Deployment
+
+This guide covers the shortest safe release procedure for the existing ORIE 4580 Ubuntu server. For source mappings and future dashboard changes, see [`maintenance.md`](maintenance.md).
+
+## 1. Current production layout
+
+| Purpose | Path or unit |
+|---|---|
+| Application checkout | `/opt/orie4580-grade-dashboard` |
+| Protected web root | `/var/www/html/orie4580_fa26` |
+| Private Gradescope config | `/etc/orie4580-dashboard/gradescope.toml` |
+| Other private credentials | `/etc/orie4580-dashboard/` |
+| Private snapshot and positive cache | `/var/lib/orie4580-dashboard/` |
+| Refresh service | `orie4580-checkoffs.service` |
+| Three-hour timer | `orie4580-checkoffs.timer` |
+
+Real student JSON must never be copied into Git, `static/`, or `public/`.
+
+## 2. Minimal deployment for an existing server
+
+The normal release path is Git plus one production refresh. The publisher builds the full replacement first and swaps it into place only after validation, so a failed refresh preserves the current student tree.
+
+### 2.1 Before connecting to Ubuntu
+
+On the development machine:
+
+```sh
+.venv/bin/pytest -q
+node --check static/simple-dashboard.js
+zola check
+git diff --check
+git status --short
+```
+
+Review, commit, and push the tracked changes:
+
+```sh
+git add README.md docs deployment static sync templates tests
+git commit -m "Add Lab 4 dashboard mappings"
+git push origin main
+```
+
+### 2.2 Update Ubuntu
+
+Connect to the server:
+
+```sh
+ssh en-or-scully.orie.cornell.edu
+```
+
+Stop only the timer. This prevents it from starting a refresh halfway through the update:
+
+```sh
+sudo systemctl stop orie4580-checkoffs.timer
+cd /opt/orie4580-grade-dashboard
+git status --short
+git pull --ff-only origin main
+```
+
+Do not continue if the checkout has unexpected local changes or the pull is not fast-forward.
+
+No dependency changed for Lab 4. For a future release that changes `requirements.txt`, run:
+
+```sh
+.venv/bin/python -m pip install -r requirements.txt
+```
+
+Install the reviewed Gradescope allowlist and the browser JavaScript. The JavaScript copy is required because student pages load it from the web root; the refresh service replaces `students/` but does not copy root assets.
+
+```sh
+sudo install -o root -g root -m 0600 \
+  deployment/gradescope.toml.example \
+  /etc/orie4580-dashboard/gradescope.toml
+sudo install -o root -g www-data -m 0644 \
+  static/simple-dashboard.js \
+  /var/www/html/orie4580_fa26/simple-dashboard.js
+```
+
+Validate the checked-in configuration and source on Ubuntu:
+
+```sh
+.venv/bin/python -c \
+  'from sync.gradescope import load_config; print(len(load_config("deployment/gradescope.toml.example").assignments))'
+.venv/bin/pytest -q
+```
+
+For the Lab 4 release, the first command must print `10`.
+
+Start one full atomic refresh and follow its progress. Lab 4 bumps the Lab mapping fingerprint, so this first run revalidates Lab pass history and can take longer than later cached runs:
+
+```sh
+sudo systemctl reset-failed orie4580-checkoffs.service
+sudo systemctl start --no-block orie4580-checkoffs.service
+sudo journalctl -fu orie4580-checkoffs.service
+```
+
+Press `Ctrl-C` after the completion message. This does not stop the service. Confirm success:
+
+```sh
+sudo systemctl show orie4580-checkoffs.service \
+  -p ActiveState -p SubState -p Result -p ExecMainStatus
+```
+
+A successful oneshot ends with `ActiveState=inactive`, `Result=success`, and `ExecMainStatus=0`.
+
+Check an owner page in the browser. Confirm that Lab 4 Q1 lists only **Manual checkoff**, while Q2 and Q3 list **Manual checkoff** and **Autograder**. Also check that a different student cannot open that page.
+
+Re-enable the schedule only after those checks pass:
+
+```sh
+sudo systemctl enable --now orie4580-checkoffs.timer
+systemctl list-timers orie4580-checkoffs.timer
+```
+
+### 2.3 If the refresh fails
+
+Read the last service log:
+
+```sh
+sudo journalctl -u orie4580-checkoffs.service -n 200 --no-pager
+```
+
+Do not weaken a mapping or validation rule to make publication continue. The old student release remains active after a source, contract, validation, or publication failure. Fix the cause, rerun the tests, and start the service again. Re-enable the timer only after a successful manual run.
+
+
+## 3. Deployment checklist
+
+- [ ] Local tests, JavaScript syntax, Zola, and `git diff --check` pass.
+- [ ] Tracked changes are committed and pushed.
+- [ ] The server checkout is clean and updated with a fast-forward pull.
+- [ ] The reviewed Gradescope config and root JavaScript are installed.
+- [ ] The manual production service run succeeds.
+- [ ] Lab requirements render correctly.
+- [ ] Owner, cross-user, and staff authorization checks pass.
+- [ ] The timer is active only after validation.
