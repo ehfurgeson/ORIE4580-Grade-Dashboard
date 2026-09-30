@@ -142,6 +142,29 @@ def test_pending_and_autograder_error_are_known_student_states():
     assert evaluate_submission(without_results, RULE) == "error"
 
 
+def test_failed_submission_with_output_only_results_is_error():
+    """Gradescope runner crashes omit error_code and expose only output fields."""
+    failed_output_only = {
+        "assignment_submission": {"status": "failed"},
+        "autograder_results": {
+            "output": "runner crashed",
+            "stdout": "",
+            "stdout_shown_to_students": False,
+        },
+    }
+    assert evaluate_submission(failed_output_only, RULE) == "error"
+    processed_output_only = {
+        "assignment_submission": {"status": "processed"},
+        "autograder_results": {
+            "output": "runner crashed",
+            "stdout": "",
+            "stdout_shown_to_students": False,
+        },
+    }
+    with pytest.raises(GradescopeSchemaError, match="error_code is missing"):
+        evaluate_submission(processed_output_only, RULE)
+
+
 @pytest.mark.parametrize(
     "bad_payload,message",
     [

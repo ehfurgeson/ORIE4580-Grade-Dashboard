@@ -376,14 +376,17 @@ def evaluate_submission(payload: Any, rule: AssignmentRule) -> str:
         return "pending" if submission_status in PENDING_SUBMISSION_STATUSES else "error"
     if not isinstance(results, dict):
         raise GradescopeSchemaError("autograder_results must be an object")
+    # Gradescope marks some runner crashes as status "failed" and returns only
+    # output fields (no error_code / tests / score). Treat that as error before
+    # requiring the scored-results schema used for processed submissions.
+    if submission_status in FAILED_SUBMISSION_STATUSES:
+        return "error"
     if "error_code" not in results:
         raise GradescopeSchemaError("autograder_results.error_code is missing")
     if results.get("error_code") not in (None, "", 0, False):
         return "error"
     if submission_status in PENDING_SUBMISSION_STATUSES:
         return "pending"
-    if submission_status in FAILED_SUBMISSION_STATUSES:
-        return "error"
 
     tests = results.get("tests")
     if not isinstance(tests, list):
