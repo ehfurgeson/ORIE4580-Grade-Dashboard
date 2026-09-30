@@ -86,7 +86,14 @@ Validate the checked-in configuration and source on Ubuntu:
 
 For the Lab 4 release, the first command must print `10`.
 
-Start one full atomic refresh and follow its progress. Lab 4 bumps the Lab mapping fingerprint, so this first run revalidates Lab pass history and can take longer than later cached runs:
+When this release changes the Gradescope assignment contract — a new autograded assignment, or a bumped contract version — retire the previous private snapshot before the first refresh. A manual-only column does not change that contract. The completion cache is invalid after a contract change, so the refresh falls back to `/var/lib/orie4580-dashboard/gradescope-snapshot.json` and aborts with `cannot carry pass evidence across a changed course or assignment contract` if that file still describes the previous contract. Moving it aside lets the full crawl become the new baseline and seed the cache:
+
+```sh
+sudo mv /var/lib/orie4580-dashboard/gradescope-snapshot.json \
+  /var/lib/orie4580-dashboard/gradescope-snapshot.json.pre-contract-change
+```
+
+Lab 4 adds autograded Q2 and Q3, so it needs this step. The first run also revalidates Lab pass history and can take longer than later cached runs. Start one full atomic refresh and follow its progress:
 
 ```sh
 sudo systemctl reset-failed orie4580-checkoffs.service
@@ -122,6 +129,8 @@ sudo journalctl -u orie4580-checkoffs.service -n 200 --no-pager
 
 Do not weaken a mapping or validation rule to make publication continue. The old student release remains active after a source, contract, validation, or publication failure. Fix the cause, rerun the tests, and start the service again. Re-enable the timer only after a successful manual run.
 
+If the log ends with `cannot carry pass evidence across a changed course or assignment contract` after a full student crawl, the Gradescope crawl succeeded and the old snapshot still has the previous assignment contract. Retire that snapshot as in [2.2](#22-update-ubuntu), then start the service again.
+
 
 ## 3. Deployment checklist
 
@@ -129,6 +138,7 @@ Do not weaken a mapping or validation rule to make publication continue. The old
 - [ ] Tracked changes are committed and pushed.
 - [ ] The server checkout is clean and updated with a fast-forward pull.
 - [ ] The reviewed Gradescope config and root JavaScript are installed.
+- [ ] If the Gradescope assignment contract changed, the previous private snapshot was retired before the first refresh.
 - [ ] The manual production service run succeeds.
 - [ ] Lab requirements render correctly.
 - [ ] Owner, cross-user, and staff authorization checks pass.
