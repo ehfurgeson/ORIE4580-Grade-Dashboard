@@ -111,7 +111,89 @@
     body.append(details);
   }
 
-  function renderCheckmark(checkmark) {
+  function allocateStandard(checkmarks) {
+    const priority = { purple: 0, shiny_purple: 1, green: 2 };
+    const earned = checkmarks.filter(item => item.status === 'complete');
+    const linked = [...earned].sort((a, b) => priority[a.kind] - priority[b.kind]).slice(0, 2);
+    const shiny = earned.filter(item => item.kind === 'shiny_purple' && !linked.includes(item));
+    return { earned, linked, shiny };
+  }
+
+  function allocationLabel(checkmark, allocation) {
+    if (allocation.linked.includes(checkmark)) return 'Counts in standard-linked box';
+    if (allocation.shiny.includes(checkmark)) return 'Counts in shiny pool (overflow)';
+    return 'Extra checkmark — does not count toward grade';
+  }
+
+  function checkmarkKindLabel(kind) {
+    return { green: 'Green', purple: 'Purple', shiny_purple: 'Shiny purple' }[kind];
+  }
+
+  function renderCompactCheckmark(checkmark, label) {
+    const color = checkmarkKindLabel(checkmark.kind);
+    const mark = make(
+      'span', `checkmark ${checkmark.kind}`,
+      checkmark.kind === 'shiny_purple' ? '✦' : '✓'
+    );
+    const description = `${color}: ${checkmark.label}. ${label}`;
+    mark.title = description;
+    mark.setAttribute('role', 'img');
+    mark.setAttribute('aria-label', description);
+    return mark;
+  }
+
+  function renderLinkedBoxes(allocation, compact = false) {
+    const boxes = make('div', 'linked-boxes');
+    if (!compact) boxes.append(make('strong', '', 'Standard-linked boxes'));
+    for (let index = 0; index < 2; index += 1) {
+      const linked = allocation.linked[index];
+      const box = linked
+        ? renderCompactCheckmark(linked, 'Counts in standard-linked box')
+        : make('span', 'checkmark empty-box', '–');
+      if (!linked) box.setAttribute('aria-label', 'Empty standard-linked box');
+      if (!compact) {
+        box.className = `linked-box ${linked ? linked.kind : 'empty-box'}`;
+        box.textContent = linked ? checkmarkKindLabel(linked.kind) : 'Empty';
+      }
+      boxes.append(box);
+    }
+    return boxes;
+  }
+
+  function renderOverview(data, allocations) {
+    const overview = document.querySelector('#checkmark-overview');
+    const headings = make('div', 'overview-row overview-heading');
+    headings.append(
+      make('strong', '', 'Standard'),
+      make('strong', '', 'Linked boxes'),
+      make('strong', '', 'All earned checkmarks')
+    );
+    overview.append(headings);
+    const pool = make('div', 'shiny-pool');
+    let shinyCount = 0;
+    for (const [index, standard] of data.standards.entries()) {
+      const allocation = allocations[index];
+      const row = make('div', 'overview-row');
+      const link = make('a', '', standard.id);
+      link.href = `#standard-${standard.id}`;
+      const marks = make('div', 'compact-marks');
+      for (const item of allocation.earned) {
+        marks.append(renderCompactCheckmark(item, allocationLabel(item, allocation)));
+      }
+      if (allocation.earned.length === 0) marks.append(make('span', 'note', 'None yet'));
+      row.append(link, renderLinkedBoxes(allocation, true), marks);
+      overview.append(row);
+      for (const item of allocation.shiny) {
+        pool.append(renderCompactCheckmark(item, `${standard.id}: Counts in shiny pool (overflow)`));
+        shinyCount += 1;
+      }
+    }
+    pool.prepend(make('strong', '', `Shiny pool (overflow): ${shinyCount}`));
+    if (shinyCount === 0) pool.append(make('span', 'note', 'No overflow yet'));
+    overview.append(pool);
+  }
+
+  function renderCheckmark(checkmark, allocation) {
     const item = make('li', `mapped-checkoff ${checkmark.kind} ${checkmark.status}`);
     const earnedSymbol = checkmark.kind === 'shiny_purple' ? '✦' : '✓';
     const mark = make(
@@ -125,9 +207,12 @@
       'span',
       'checkoff-status',
       checkmark.status === 'complete'
-        ? `${checkmark.kind === 'green' ? 'Green' : checkmark.kind === 'purple' ? 'Purple' : 'Shiny purple'} checkmark earned`
+        ? `${checkmarkKindLabel(checkmark.kind)} checkmark earned`
         : checkmark.status === 'not_graded' ? 'Score not available yet' : 'Checkmark not earned'
     ));
+    if (checkmark.status === 'complete') {
+      body.append(make('span', 'checkoff-allocation', allocationLabel(checkmark, allocation)));
+    }
 
     if (checkmark.requirements.some(item => item && item.source)) {
       renderCombinedRequirements(checkmark.requirements, body);
@@ -158,41 +243,31 @@
 
     let earned = 0;
     let available = 0;
+    const allocations = data.standards.map(standard => allocateStandard(standard.checkmarks));
+    renderOverview(data, allocations);
     const standards = document.querySelector('#standards');
-    for (const standard of data.standards) {
+    for (const [standardIndex, standard] of data.standards.entries()) {
+      const allocation = allocations[standardIndex];
       const article = make('article', 'standard');
+      article.id = `standard-${standard.id}`;
       article.append(make('p', 'standard-id', standard.id));
       article.append(make('h3', '', standard.name));
-      const linkedBoxes = make('div', 'linked-boxes');
-      linkedBoxes.append(make('strong', '', 'Standard-linked boxes'));
-      const priority = { purple: 0, shiny_purple: 1, green: 2 };
-      const completed = standard.checkmarks
-        .map((item, index) => ({ item, index }))
-        .filter(entry => entry.item.status === 'complete')
-        .sort((a, b) => priority[a.item.kind] - priority[b.item.kind] || a.index - b.index)
-        .slice(0, 2)
-        .map(entry => entry.item);
-      for (let index = 0; index < 2; index += 1) {
-        const linked = completed[index];
-        const label = linked
-          ? linked.kind === 'shiny_purple' ? 'Shiny purple' : linked.kind[0].toUpperCase() + linked.kind.slice(1)
-          : 'Empty';
-        linkedBoxes.append(make(
-          'span',
-          `linked-box ${linked ? linked.kind : 'empty-box'}`,
-          label
-        ));
+      article.append(renderLinkedBoxes(allocation));
+      const overflow = make('div', 'shiny-pool');
+      overflow.append(make('strong', '', `Shiny overflow: ${allocation.shiny.length}`));
+      for (const item of allocation.shiny) {
+        overflow.append(renderCompactCheckmark(item, 'Counts in shiny pool (overflow)'));
       }
-      article.append(linkedBoxes);
+      article.append(overflow);
       const list = make('ul', 'mapped-checkoffs');
       if (standard.checkmarks.length === 0) {
         list.append(make('li', 'empty', 'No mapped checkoff opportunities are in the sheet yet.'));
       } else {
-        for (const checkmark of standard.checkmarks) list.append(renderCheckmark(checkmark));
+        for (const checkmark of standard.checkmarks) list.append(renderCheckmark(checkmark, allocation));
       }
       article.append(list);
       standards.append(article);
-      earned += standard.checkmarks.filter(item => item.status === 'complete').length;
+      earned += allocation.earned.length;
       available += standard.checkmarks.length;
     }
     document.querySelector('#earned-total').textContent = `${earned} of ${available}`;

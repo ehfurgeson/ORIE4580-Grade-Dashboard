@@ -21,11 +21,11 @@ STANDARDS = {
     },
     "histogram_parameters": {
         "id": "S4",
-        "name": "I can explain how different histogram parameters impact the resulting plot and choose appropriate parameters for a given dataset.",
+        "name": "I can apply the formal definition of confidence intervals to derive confidence interval procedures for both traditional and novel parameter estimation tasks.",
     },
     "confidence_interval_procedures": {
         "id": "S5",
-        "name": "I can apply the formal definition of confidence intervals to derive confidence interval procedures for both traditional and novel parameter estimation tasks.",
+        "name": "I can apply confidence intervals in practical situations, handling concerns such as non-independence, multiple hypotheses, and multiple stages of study.",
     },
 }
 

@@ -9,7 +9,7 @@ The course materials currently contain two different identifier systems:
 1. The rubric catalog uses category IDs such as `P1`, `S1`, and `M1`.
 2. The Lab handouts use one sequential display namespace, currently `S1` through `S5`.
 
-These IDs are not interchangeable. For example, handout **S1** is rubric **P1**, while rubric **S1** appears as handout **S4**. The dashboard therefore joins records with stable semantic keys and uses the sequential handout ID only for display.
+These IDs are not interchangeable. For example, handout **S1** is rubric **P1**, while rubric **S2** appears as dashboard **S4**. The dashboard therefore joins records with stable semantic keys and uses the sequential handout ID only for display.
 
 Never join data using a bare display ID such as `S1`. Use the semantic key.
 
@@ -22,9 +22,9 @@ Never join data using a bare display ID such as `S1`. Use the semantic key.
 | P3 | Probability | I can state the defining features of Gaussian samplers, use them to construct new samplers, and use them to check if a given sampler is valid. | Not mapped yet |
 | P4 | Probability | I can create a sampler for a general one-dimensional probability distribution given its CDF or PDF. | S2 / `general_1d_sampler` |
 | P5 | Probability | I can list different ways in which a stochastic process might be unstable and assess whether each is occurring in a given simulation. | Not mapped exactly; do not substitute for handout S3 |
-| S1 | Statistics | I can explain how different histogram parameters impact the resulting plot and choose appropriate parameters for a given dataset. | S4 / `histogram_parameters` |
-| S2 | Statistics | I can apply the formal definition of confidence intervals to derive confidence interval procedures for both traditional and novel parameter estimation tasks. | S5 / `confidence_interval_procedures` |
-| S3 | Statistics | I can apply confidence intervals in practical situations, handling concerns such as non-independence, multiple hypotheses, and multiple stages of study. | Not mapped yet |
+| S1 | Statistics | I can explain how different histogram parameters impact the resulting plot and choose appropriate parameters for a given dataset. | Not mapped yet |
+| S2 | Statistics | I can apply the formal definition of confidence intervals to derive confidence interval procedures for both traditional and novel parameter estimation tasks. | S4 / `histogram_parameters` |
+| S3 | Statistics | I can apply confidence intervals in practical situations, handling concerns such as non-independence, multiple hypotheses, and multiple stages of study. | S5 / `confidence_interval_procedures` |
 | S4 | Statistics | I can write an expression for the log-likelihood of a candidate parameterized model. | Not mapped yet |
 | S5 | Statistics | I can implement a variance reduction technique, explain in what sense it reduces variance, and explain the tradeoffs of the technique. | Not mapped yet |
 | M1 | Modeling | I can model a scenario as a Markov chain or event-driven simulation by specifying what the system state is and how the state changes over time. | Not mapped yet |
@@ -39,10 +39,10 @@ Only standards with a confirmed dashboard opportunity belong in this active tabl
 | S1 | `uniform_samplers` | I can state the defining features of uniform samplers, use them to construct new samplers, and use them to check if a given sampler is valid. | P1 |
 | S2 | `general_1d_sampler` | I can create a sampler for a general one-dimensional probability distribution given its CDF or PDF. | P4 |
 | S3 | `simulation_output_variability` | I can use probabilistic concepts to qualitatively and quantitatively explain the sort of variability one should expect from a simulation's output. | No exact rubric equivalent |
-| S4 | `histogram_parameters` | I can explain how different histogram parameters impact the resulting plot and choose appropriate parameters for a given dataset. | Rubric S1 |
-| S5 | `confidence_interval_procedures` | I can apply the formal definition of confidence intervals to derive confidence interval procedures for both traditional and novel parameter estimation tasks. | Rubric S2 |
+| S4 | `histogram_parameters` | I can apply the formal definition of confidence intervals to derive confidence interval procedures for both traditional and novel parameter estimation tasks. | Rubric S2 |
+| S5 | `confidence_interval_procedures` | I can apply confidence intervals in practical situations, handling concerns such as non-independence, multiple hypotheses, and multiple stages of study. | Rubric S3 |
 
-The Lab 3 handout supplies the S3 wording. It is related to rubric P5, but it is not equivalent. Do not silently replace one with the other.
+The active display wording reflects the course staff update of October 1, 2026. S3 is related to rubric P5, but is not equivalent. The existing S4 and S5 keys are retained for compatibility with stored records and opportunity mappings; their names reflect earlier wording. Use the authoritative display wording above.
 
 ## 4. Green Lab mappings
 
@@ -98,6 +98,8 @@ The opportunity mapping does not alter the rubric allocation rules:
 - A shiny-purple mark counts toward both purple and shiny totals while occupying only one box.
 - “Missing” is the number of empty standard-linked boxes.
 - Grade thresholds are minimums except `missing`, which is a maximum.
+
+Student pages show both linked boxes and all earned checkmarks in a compact overview. The shiny pool includes only earned shiny-purple marks left over after linked-box allocation. Each standard also shows its own shiny overflow, and each earned opportunity states whether it fills a linked box, fills the shiny pool, or is an extra mark that does not count toward the grade.
 
 ## 7. Change-control rules
 
