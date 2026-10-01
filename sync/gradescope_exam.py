@@ -16,14 +16,14 @@ from typing import Protocol
 
 from .gradescope import ExamRule, GradescopeAdapterError, netid_from_email
 
-EXAM_MAPPING_VERSION = "exam1-mapping-v1"
+EXAM_MAPPING_VERSION = "exam1-mapping-v2"
 EXAM_OPPORTUNITIES = (
-    {"id": "exam1-q1", "question": 1, "standard_key": "general_1d_sampler", "label": "Exam 1 · Question 1", "kind": "purple"},
-    {"id": "exam1-q2", "question": 2, "standard_key": "general_1d_sampler", "label": "Exam 1 · Question 2", "kind": "purple"},
-    {"id": "exam1-q3", "question": 3, "standard_key": "uniform_samplers", "label": "Exam 1 · Question 3", "kind": "purple"},
-    {"id": "exam1-q4", "question": 4, "standard_key": "uniform_samplers", "label": "Exam 1 · Question 4", "kind": "purple"},
-    {"id": "exam1-q5", "question": 5, "standard_key": "uniform_samplers", "label": "Exam 1 · Question 5", "kind": "shiny_purple"},
-    {"id": "exam1-q6", "question": 6, "standard_key": "general_1d_sampler", "label": "Exam 1 · Question 6", "kind": "shiny_purple"},
+    {"id": "exam1-q1", "question": 1, "standard_id": 'S2', "label": "Exam 1 · Question 1", "kind": "purple"},
+    {"id": "exam1-q2", "question": 2, "standard_id": 'S2', "label": "Exam 1 · Question 2", "kind": "purple"},
+    {"id": "exam1-q3", "question": 3, "standard_id": 'S1', "label": "Exam 1 · Question 3", "kind": "purple"},
+    {"id": "exam1-q4", "question": 4, "standard_id": 'S1', "label": "Exam 1 · Question 4", "kind": "purple"},
+    {"id": "exam1-q5", "question": 5, "standard_id": 'S1', "label": "Exam 1 · Question 5", "kind": "shiny_purple"},
+    {"id": "exam1-q6", "question": 6, "standard_id": 'S2', "label": "Exam 1 · Question 6", "kind": "shiny_purple"},
 )
 QUESTION_HEADER = re.compile(
     r"^\s*(?P<number>[1-9][0-9]*)\s*:.*\((?P<points>[0-9]+(?:\.[0-9]+)?)\s+pts?\)\s*$",

@@ -127,7 +127,6 @@
         }).join('')
         : '<li class="empty">No opportunities recorded yet.</li>';
       return `<article class="standard">
-        <p class="category">${escapeHtml(standard.category)}</p>
         <h3>${escapeHtml(standard.id)}: ${escapeHtml(standard.name)}</h3>
         <div class="linked-boxes"><strong>Standard-linked boxes:</strong>${linkedBoxes}</div>
         <ul class="opportunities">${opportunities}</ul>

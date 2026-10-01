@@ -122,6 +122,8 @@ def test_atomic_failure_preserves_prior_file(tmp_path: Path, monkeypatch: pytest
         lambda value: value["lab_passes"].append(deepcopy(value["lab_passes"][0])),
         lambda value: value["lab_contracts"]["lab1-q1-2"]["contract"].update(raw_score=3),
         lambda value: value["exam_completions"][0].update(email="abc123@cornell.edu"),
+        lambda value: value['lab_contracts']['lab1-q1-2']['contract'].update(title_mapping_version='lab-mapping-v2'),
+        lambda value: value['exam_contract']['contract'].update(mapping_version='exam1-mapping-v1'),
         lambda value: value["google"].update(normalized_records=[]),
     ],
 )

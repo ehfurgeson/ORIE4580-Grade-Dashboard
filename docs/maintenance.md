@@ -15,8 +15,9 @@ The main files are:
 
 | File | Responsibility |
 |---|---|
-| [`standards.md`](standards.md) | Authoritative standard wording, rubric crosswalk, and opportunity mappings |
-| `sync/checkoff_mappings.py` | Executable mirror of standards, Sheet columns, opportunity IDs, labels, manual-only set, and mapping version |
+| `sync/standards.py` | Shared standard IDs and wording |
+| [`standards.md`](standards.md) | Reviewed opportunity mappings and import migration rules |
+| `sync/checkoff_mappings.py` | Sheet columns, opportunity IDs, labels, manual-only set, and mapping version |
 | `deployment/gradescope.toml.example` | Executable production course and exact autograder contracts |
 | `sync/gradescope.py` | Strict Gradescope configuration and submission validation |
 | `sync/combined_checkoffs.py` | Merge manual and autograder requirements |
@@ -27,7 +28,7 @@ The main files are:
 
 ### 1.1 Lab 4 worked example
 
-The authoritative Lab 4 standards, Sheet columns, requirement policies, and Gradescope contracts are recorded in [`standards.md`](standards.md#4-green-lab-mappings). The implementation work was:
+The standards are defined in `sync/standards.py`. The Lab 4 Sheet columns, requirement policies, and Gradescope contracts are recorded in [`standards.md`](standards.md#3-green-lab-mappings). The implementation work was:
 
 - Added the S4 and S5 display text and all three exact Sheet headers.
 - Added `MANUAL_ONLY_OPPORTUNITY_IDS` and derived the autograded set from it.
@@ -45,7 +46,6 @@ For every green checkmark, record all of the following before editing code:
 
 - Exact Google Sheet column header.
 - Display standard ID and authoritative standard wording.
-- A stable semantic key, such as `histogram_parameters`.
 - A stable opportunity ID, such as `lab4-q2`.
 - Whether it is manual-only or manual plus autograder.
 - Exact Gradescope title and assignment ID when autograded.
@@ -53,13 +53,13 @@ For every green checkmark, record all of the following before editing code:
 
 Never guess a standard, assignment ID, or autograder contract. The pipeline intentionally fails closed when one changes.
 
-Record the approved wording, crosswalk, policy, and contract in [`standards.md`](standards.md) first. That reviewed document is the mapping authority.
+Put new or revised standard wording in `sync/standards.py`. Record the approved opportunity mapping, policy, and contract in [`standards.md`](standards.md) first. That reviewed document is the opportunity-mapping authority.
 
 ### 2.2 Update the source mapping
 
 Mirror the approved mapping from `standards.md` into `sync/checkoff_mappings.py`:
 
-1. Add a new `STANDARDS` entry only if the standard is new.
+1. Add new standards to `sync/standards.py` only; mappings use their S IDs directly.
 2. Add each exact Sheet header to `COLUMN_MAPPINGS`.
 3. Use the same opportunity ID for multiple Sheet columns that jointly form one checkmark.
 4. Add manual-only IDs to `MANUAL_ONLY_OPPORTUNITY_IDS`.
@@ -71,14 +71,14 @@ Example shapes:
 ```python
 COLUMN_MAPPINGS = {
     # One checkbox, no autograder.
-    "Lab 4 - Q1": ("simulation_output_variability", "lab4-q1", "Lab 4 · Q1"),
+    "Lab 4 - Q1": ("S3", "lab4-q1", "Lab 4 · Q1"),
 
     # One checkbox plus one configured Gradescope assignment.
-    "Lab 4 - Q2": ("histogram_parameters", "lab4-q2", "Lab 4 · Q2"),
+    "Lab 4 - Q2": ("S4", "lab4-q2", "Lab 4 · Q2"),
 
     # Several checkboxes jointly produce one opportunity.
-    "Lab 5 - Q2.1": ("some_standard", "lab5-q2", "Lab 5 · Q2"),
-    "Lab 5 - Q2.2": ("some_standard", "lab5-q2", "Lab 5 · Q2"),
+    "Lab 5 - Q2.1": ("S6", "lab5-q2", "Lab 5 · Q2"),
+    "Lab 5 - Q2.2": ("S6", "lab5-q2", "Lab 5 · Q2"),
 }
 
 MANUAL_ONLY_OPPORTUNITY_IDS = frozenset({"lab4-q1"})
@@ -112,7 +112,7 @@ At minimum:
 - Test manual-only and two-source behavior in `tests/test_combined_checkoffs.py`.
 - Test title/config behavior in `tests/test_gradescope.py`.
 - Test cache eligibility in `tests/test_completion_cache.py`.
-- Confirm the executable mapping still matches [`standards.md`](standards.md).
+- Confirm the opportunity mapping still matches [`standards.md`](standards.md) and references IDs in the shared catalog.
 - Update user-facing copy only if the requirement types or policy changed.
 
 Run the complete preflight checks in [`deployment.md`](deployment.md#21-before-connecting-to-ubuntu). Then perform a one-student live preview before production:
@@ -139,7 +139,7 @@ For an Exam 1 mapping change:
 
 1. Update the authoritative exam mapping and earning rule in [`standards.md`](standards.md).
 2. Mirror it in `EXAM_OPPORTUNITIES` in `sync/gradescope_exam.py`.
-3. Set each opportunity ID, question number, semantic standard key, label, and kind (`purple` or `shiny_purple`).
+3. Set each opportunity ID, question number, standard ID, label, and kind (`purple` or `shiny_purple`).
 4. Increment `EXAM_MAPPING_VERSION`.
 5. Update `[exam]` in `deployment/gradescope.toml.example` with the exact assignment ID, human-readable title, rubric version, question count, question maximum, and threshold.
 6. Increment `rubric_version` whenever the rubric or earning rule changes.
@@ -148,7 +148,7 @@ For an Exam 1 mapping change:
 For Exam 2 or a different exam format, first generalize the singular `[exam]` config and `EXAM_OPPORTUNITIES` model into a list of versioned exam rules. Do not copy Exam 1 and silently reuse its IDs or six-question assumptions. Preserve these properties:
 
 - Raw scores are never written to student dashboard JSON.
-- Each question maps explicitly to one semantic standard.
+- Each question maps explicitly to one catalog standard.
 - Purple versus shiny-purple is explicit.
 - Threshold comparison is explicit, including equality behavior.
 - Rubric drift invalidates cached evidence.

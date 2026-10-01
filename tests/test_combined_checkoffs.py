@@ -160,13 +160,13 @@ def test_combined_schema_validation_and_publisher(tmp_path):
     record = merge_checkoffs_with_autograders(
         [google_record()], snapshot(), allow_unconfigured=True
     )[0]
-    assert record["schema_version"] == 3
+    assert record["schema_version"] == 6
     assert validate_combined_record(record) == []
     assert validate_simple_record(record) == []
     paths = write_simple_release([record], tmp_path / "students")
     assert len(paths) == 1
     saved = json.loads(paths[0].read_text())
-    assert saved["schema_version"] == 3
+    assert saved["schema_version"] == 6
 
 
 def test_tampered_combined_status_fails_validation():

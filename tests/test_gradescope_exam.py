@@ -67,13 +67,13 @@ def test_exam_threshold_is_strictly_over_point_eight():
 
 
 def test_exam_mapping_has_the_reviewed_standard_and_color_contract():
-    assert [(item["question"], item["standard_key"], item["kind"]) for item in EXAM_OPPORTUNITIES] == [
-        (1, "general_1d_sampler", "purple"),
-        (2, "general_1d_sampler", "purple"),
-        (3, "uniform_samplers", "purple"),
-        (4, "uniform_samplers", "purple"),
-        (5, "uniform_samplers", "shiny_purple"),
-        (6, "general_1d_sampler", "shiny_purple"),
+    assert [(item["question"], item["standard_id"], item["kind"]) for item in EXAM_OPPORTUNITIES] == [
+        (1, 'S2', "purple"),
+        (2, 'S2', "purple"),
+        (3, 'S1', "purple"),
+        (4, 'S1', "purple"),
+        (5, 'S1', "shiny_purple"),
+        (6, 'S2', "shiny_purple"),
     ]
 
 
@@ -88,7 +88,7 @@ def test_rubric_drift_soft_fails_to_not_graded_without_blocking_labs():
 
     labs = merge_checkoffs_with_autograders([lab_record()], lab_snapshot())
     combined = merge_exam_checkmarks(labs, exam)[0]
-    assert combined["schema_version"] == 4
+    assert combined["schema_version"] == 7
     assert validate_combined_record(combined) == []
     lab = next(item for standard in combined["standards"] for item in standard["checkmarks"] if item["kind"] == "green")
     assert lab["status"] == "complete"

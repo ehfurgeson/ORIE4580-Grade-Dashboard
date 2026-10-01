@@ -8,13 +8,13 @@ import json
 import re
 from typing import Any
 
-from .checkoff_mappings import COLUMN_MAPPINGS, STANDARDS
+from .checkoff_mappings import COLUMN_MAPPINGS, MANUAL_SCHEMA_VERSION as SCHEMA_VERSION
+from .standards import STANDARDS
 
 NETID_COLUMN = "NetID"
 NETID_PATTERN = re.compile(r"[a-z]{2,3}[0-9]+\Z")
 STATUSES = {"complete", "incomplete"}
 MAX_LABEL_LENGTH = 200
-SCHEMA_VERSION = 2
 
 
 def normalize_checkbox(value: Any, *, row_number: int, column: str) -> str:
@@ -29,8 +29,8 @@ def normalize_checkbox(value: Any, *, row_number: int, column: str) -> str:
 def _mapped_standards(row: dict[str, Any], item_headers: list[str], row_number: int) -> list[dict[str, Any]]:
     grouped: OrderedDict[tuple[str, str], dict[str, Any]] = OrderedDict()
     for header in item_headers:
-        standard_key, opportunity_id, label = COLUMN_MAPPINGS[header]
-        key = (standard_key, opportunity_id)
+        standard_id, opportunity_id, label = COLUMN_MAPPINGS[header]
+        key = (standard_id, opportunity_id)
         opportunity = grouped.setdefault(key, {
             "id": opportunity_id,
             "label": label,
@@ -44,23 +44,22 @@ def _mapped_standards(row: dict[str, Any], item_headers: list[str], row_number: 
             "status": normalize_checkbox(row[header], row_number=row_number, column=header),
         })
 
-    by_standard: dict[str, list[dict[str, Any]]] = {standard_key: [] for standard_key in STANDARDS}
-    for (standard_key, _), opportunity in grouped.items():
+    by_standard: dict[str, list[dict[str, Any]]] = {standard_id: [] for standard_id in STANDARDS}
+    for (standard_id, _), opportunity in grouped.items():
         opportunity["status"] = (
             "complete"
             if all(item["status"] == "complete" for item in opportunity["requirements"])
             else "incomplete"
         )
-        by_standard[standard_key].append(opportunity)
+        by_standard[standard_id].append(opportunity)
 
     return [
         {
-            "key": standard_key,
-            "id": standard["id"],
-            "name": standard["name"],
-            "checkmarks": by_standard[standard_key],
+            "id": standard_id,
+            "name": name,
+            "checkmarks": by_standard[standard_id],
         }
-        for standard_key, standard in STANDARDS.items()
+        for standard_id, name in STANDARDS.items()
     ]
 
 
@@ -117,7 +116,7 @@ def rows_to_simple_records(
 
 def validate_simple_record(record: Any) -> list[str]:
     """Validate either the manual-only or combined protected record schema."""
-    if isinstance(record, dict) and record.get("schema_version") in {3, 4}:
+    if isinstance(record, dict) and record.get("schema_version") in {6, 7}:
         from .combined_checkoffs import validate_combined_record
         return validate_combined_record(record)
     errors: list[str] = []
@@ -148,16 +147,17 @@ def validate_simple_record(record: Any) -> list[str]:
         ids: set[str] = set()
         opportunity_ids: set[str] = set()
         for s_index, standard in enumerate(standards):
-            if not isinstance(standard, dict) or set(standard) != {"key", "id", "name", "checkmarks"}:
+            if not isinstance(standard, dict) or set(standard) != {"id", "name", "checkmarks"}:
                 errors.append(f"standards[{s_index}] is invalid")
                 continue
-            standard_key = standard["key"]
-            definition = STANDARDS.get(standard_key)
-            if not definition or standard["id"] != definition["id"] or standard["name"] != definition["name"]:
+            standard_id = standard["id"]
+            name = STANDARDS.get(standard_id) if isinstance(standard_id, str) else None
+            if not name or standard["name"] != name:
                 errors.append(f"standards[{s_index}] does not match the syllabus mapping")
-            elif standard_key in ids:
-                errors.append(f"duplicate standard: {standard_key}")
-            ids.add(standard_key)
+            elif standard_id in ids:
+                errors.append(f"duplicate standard: {standard_id}")
+            if isinstance(standard_id, str):
+                ids.add(standard_id)
             if not isinstance(standard["checkmarks"], list):
                 errors.append(f"standards[{s_index}].checkmarks must be a list")
                 continue

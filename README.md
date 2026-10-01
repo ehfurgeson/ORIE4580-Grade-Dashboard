@@ -4,7 +4,7 @@ A small Zola frontend and Python publishing pipeline for the Fall 2026 standards
 
 > **Deployment status:** the combined Google Sheets + Gradescope + Exam 1 pipeline passed a class-scale staging refresh for 174 unique NetIDs and all generated schema-v4 records validated. Deploy one manual Ubuntu refresh and pass the owner/cross-user/explicit-staff Shibboleth authorization matrix before enabling the production timer.
 
-See [`docs/deployment.md`](docs/deployment.md) for the shortest safe Ubuntu release procedure. See [`docs/maintenance.md`](docs/maintenance.md) for adding labs, exams, checkmark kinds, or data sources. [`docs/standards.md`](docs/standards.md) is the source of truth for rubric wording and opportunity mappings.
+See [`docs/deployment.md`](docs/deployment.md) for the shortest safe Ubuntu release procedure. See [`docs/maintenance.md`](docs/maintenance.md) for adding labs, exams, checkmark kinds, or data sources. [`sync/standards.py`](sync/standards.py) is the shared standards catalog; [`docs/standards.md`](docs/standards.md) records the opportunity mappings and import migration rules.
 
 ## Requirements
 
@@ -43,7 +43,7 @@ The browser requests the relative URL `students/me/grades.json`, so local and st
 `fixtures/grades.json` is the canonical example. `fixtures/ehf38-grades.fake.json` is clearly labeled fake data for the first authenticated server test. Each record contains:
 
 - `course`: `ORIE 4580`, `ORIE 5580`, or `ORIE 5581`.
-- `standards`: all 12 syllabus standards for 4580/5580, or an evaluated subset for 5581.
+- `standards`: all currently defined standards (S1–S5) for 4580/5580, or an evaluated subset for 5581.
 - `kind`: `green` for a lab, `purple` for an exam/exam-like opportunity, or `shiny_purple` for a challenging purple problem.
 - `status`: `complete`, `incomplete`, `not_graded`, or `excused`.
 
@@ -61,7 +61,7 @@ The command validates and serializes the whole input batch before it writes. A m
 
 ### Google Sheets adapter
 
-`sync.google_sheets.rows_to_records` accepts one standard per row. The required columns are `updated_at`, `course`, `student_id`, `student_name`, and `standard_id`. Rows with an opportunity also use `opportunity_id`, `opportunity_label`, `source`, `kind`, and `status`. Use additional rows when one standard has multiple opportunities; a standard with no opportunity still needs one row with the opportunity columns empty.
+`sync.google_sheets.rows_to_records` accepts one standard per row. The required columns are `updated_at`, `course`, `student_id`, `student_name`, and `standard_id` (a current S1–S5 ID). Rows with an opportunity also use `opportunity_id`, `opportunity_label`, `source`, `kind`, and `status`. Use additional rows when one standard has multiple opportunities; a standard with no opportunity still needs one row with the opportunity columns empty.
 
 Test the complete CSV-export path with fake data:
 
@@ -137,7 +137,7 @@ Use the dedicated, non-login `orie4580-dashboard` system account from the unit. 
 
 ### Optional Exam 1 results
 
-Schema version 4 adds the six Exam 1 question results to the same protected dashboard. The checked-in Gradescope config names the allowlisted assignment `Exam 1`; title matching treats spaces and upstream underscore separators as equivalent. Each question must appear in the Gradescope CSV export as exactly 1 point. A numeric score strictly greater than `0.8` earns its configured purple or shiny-purple checkmark; exactly `0.8` does not. Questions 1, 2, and 6 map to S2. Questions 3, 4, and 5 map to S1. Questions 5 and 6 are shiny purple.
+Schema version 7 includes the six Exam 1 question results to the same protected dashboard. The checked-in Gradescope config names the allowlisted assignment `Exam 1`; title matching treats spaces and upstream underscore separators as equivalent. Each question must appear in the Gradescope CSV export as exactly 1 point. A numeric score strictly greater than `0.8` earns its configured purple or shiny-purple checkmark; exactly `0.8` does not. Questions 1, 2, and 6 map to S2. Questions 3, 4, and 5 map to S1. Questions 5 and 6 are shiny purple.
 
 Exam ingestion remains deliberately soft-failing to isolate the optional source, although the rubric is finalized and versioned. A missing assignment, changed title, missing or non-1-point question column, nonnumeric/out-of-range score, duplicate student, or unavailable export converts all Exam 1 entries to **Not available yet** and does not block the strict Lab refresh. Raw question scores are never written to student JSON. Lab source, contract, roster, and merge errors still fail closed and preserve the prior release.
 
@@ -151,9 +151,9 @@ Google Sheets still performs one complete read per refresh. Exam 1 still perform
 
 ## Simple NetID-protected checkoff dashboard
 
-The protected worksheet dashboard maps each known checkoff column to the standard named in the Lab 1–4 handouts. The mapping lives in `sync/checkoff_mappings.py`; unknown columns fail closed so a new lab cannot be silently assigned to the wrong standard. Multi-column opportunities are aggregated explicitly: the three recorded Lab 1 Q1–2 milestones produce one S1 green checkmark and all must be complete. Generated schema-version-2 records retain the source requirements for auditability.
+The protected worksheet dashboard maps each known checkoff column to the standard named in the Lab 1–4 handouts. The mapping lives in `sync/checkoff_mappings.py`; unknown columns fail closed so a new lab cannot be silently assigned to the wrong standard. Multi-column opportunities are aggregated explicitly: the three recorded Lab 1 Q1–2 milestones produce one S1 green checkmark and all must be complete. Generated schema-version-5 records retain the source requirements for auditability.
 
-The handouts’ displayed `S1` through `S5` labels conflict with the older tentative category IDs in `sync/standards.py`. The live pipeline therefore joins on stable semantic keys (`uniform_samplers`, `general_1d_sampler`, `simulation_output_variability`, `histogram_parameters`, and `confidence_interval_procedures`) and uses the handout IDs only for display. See [`docs/standards.md`](docs/standards.md) for the authoritative rubric crosswalk, full opportunity mapping, and Lab 3 wording note.
+All importers and validators read the S1–S5 catalog in `sync/standards.py`. Lab and Exam mappings use those IDs directly. Categories and separate descriptive keys have been removed. See [`docs/standards.md`](docs/standards.md) for the opportunity mappings and how to replace imports from the retired tentative catalog.
 
 Each generated NetID directory contains its own HTML, JSON, and authorization rule. Access is granted to the student owner, the explicit staff users.
 

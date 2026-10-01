@@ -47,9 +47,18 @@ def test_malformed_ids_return_errors_instead_of_crashing(valid):
     assert len(errors) >= 3
 
 
-def test_full_courses_require_all_twelve_standards(valid):
+def test_full_courses_require_all_current_standards(valid):
     valid["standards"].pop()
-    assert any("12-standard" in error for error in validate_record(valid))
+    assert any("current syllabus catalog" in error for error in validate_record(valid))
+
+
+def test_mismatched_standard_wording_does_not_replace_published_data(valid, tmp_path):
+    path = write_record(valid, tmp_path)
+    before = path.read_bytes()
+    valid['standards'][0]['name'] += " (incorrect wording)"
+    with pytest.raises(ValueError, match="name does not match"):
+        write_record(valid, tmp_path)
+    assert path.read_bytes() == before
 
 
 def test_5581_may_use_a_syllabus_subset(valid):

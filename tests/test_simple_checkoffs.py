@@ -6,6 +6,7 @@ from sync.simple_checkoffs import rows_to_simple_records, validate_simple_record
 from sync.simple_generate import (
     STAFF_USERS, render_staff_index, update_authorization_files, write_simple_release,
 )
+from sync.standards import STANDARDS
 
 
 UPDATED_AT = "2026-09-17T12:00:00Z"
@@ -39,10 +40,9 @@ def make_rows():
 def test_wide_rows_map_headers_to_standards_and_aggregate_lab_1():
     records = rows_to_simple_records(make_rows(), updated_at=UPDATED_AT, worksheet="Lab Checkoffs")
     record = records[0]
-    assert record["schema_version"] == 2
-    assert [standard["id"] for standard in record["standards"]] == ["S1", "S2", "S3", "S4", "S5"]
+    assert record["schema_version"] == 5
+    assert [standard['id'] for standard in record['standards']] == list(STANDARDS)
     s1 = record["standards"][0]
-    assert s1["key"] == "uniform_samplers"
     assert [(item["id"], item["status"]) for item in s1["checkmarks"]] == [
         ("lab1-q1-2", "complete"),
         ("lab1-q3", "incomplete"),

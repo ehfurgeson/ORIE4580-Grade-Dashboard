@@ -75,7 +75,7 @@ def _fingerprint(value: object) -> str:
 
 def _lab_mapping(opportunity_id: str) -> list[dict[str, str]]:
     rows = [
-        {"column": column, "standard_key": mapping[0], "label": mapping[2]}
+        {"column": column, "standard_id": mapping[0], "label": mapping[2]}
         for column, mapping in COLUMN_MAPPINGS.items()
         if mapping[1] == opportunity_id
     ]
@@ -86,7 +86,7 @@ def _exam_mapping() -> list[dict[str, object]]:
     return [
         {
             "id": item["id"], "question": item["question"],
-            "standard_key": item["standard_key"], "label": item["label"],
+            "standard_id": item["standard_id"], "label": item["label"],
             "kind": item["kind"],
         }
         for item in EXAM_OPPORTUNITIES

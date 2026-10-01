@@ -9,7 +9,6 @@ from typing import Any
 from .standards import COURSES, FULL_STANDARD_COURSES, STANDARDS
 
 STATUSES = {"complete", "incomplete", "not_graded", "excused"}
-CATEGORIES = {"Probability", "Statistics", "Modeling"}
 SOURCES_BY_KIND = {
     "green": {"lab"},
     "purple": {"exam", "exam_like"},
@@ -75,16 +74,10 @@ def validate_record(record: Any) -> list[str]:
                 standard_ids.add(standard_id)
             if not _nonempty_string(standard.get("name")):
                 errors.append(f"{prefix}.name is required")
-            category = standard.get("category")
-            if category not in CATEGORIES:
-                errors.append(f"{prefix}.category is invalid")
             if _nonempty_string(standard_id) and standard_id not in STANDARDS:
                 errors.append(f"{prefix}.id is not in the syllabus standards catalog")
             elif _nonempty_string(standard_id) and standard_id in STANDARDS:
-                expected_category, expected_name = STANDARDS[standard_id]
-                if category != expected_category:
-                    errors.append(f"{prefix}.category does not match the syllabus catalog")
-                if standard.get("name") != expected_name:
+                if standard.get("name") != STANDARDS[standard_id]:
                     errors.append(f"{prefix}.name does not match the syllabus catalog")
 
             opportunities = standard.get("opportunities")
@@ -126,7 +119,7 @@ def validate_record(record: Any) -> list[str]:
                 detail.append("missing " + ", ".join(missing))
             if extra:
                 detail.append("unexpected " + ", ".join(extra))
-            errors.append("standards must match the 12-standard syllabus catalog (" + "; ".join(detail) + ")")
+            errors.append("standards must match the current syllabus catalog (" + "; ".join(detail) + ")")
 
     try:
         json.dumps(record, allow_nan=False)

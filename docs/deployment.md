@@ -35,7 +35,7 @@ git status --short
 Review, commit, and push the tracked changes:
 
 ```sh
-git add README.md docs deployment static sync templates tests
+git add README.md docs deployment fixtures scripts static sync templates tests
 git commit -m "Add Lab 4 dashboard mappings"
 git push origin main
 ```
@@ -118,6 +118,43 @@ Re-enable the schedule only after those checks pass:
 sudo systemctl enable --now orie4580-checkoffs.timer
 systemctl list-timers orie4580-checkoffs.timer
 ```
+
+### One-time standard-ID cache migration
+
+For the removal of descriptive standard keys and categories, the Google Sheet,
+Gradescope assignments, production TOML config, and `gradescope-snapshot.json`
+need no changes. Keep the snapshot in place. Install the updated
+`static/simple-dashboard.js` and `static/simple-style.css` at the web root before
+the first refresh so the browser can read the new record schemas.
+
+After stopping the timer and waiting for any running refresh to finish, update
+the checkout and run this migration before starting the service. Use new output
+and backup filenames if these already exist:
+
+```sh
+cd /opt/orie4580-grade-dashboard
+sudo .venv/bin/python -m scripts.migrate_completion_cache \
+  /etc/orie4580-dashboard/gradescope.toml \
+  /var/lib/orie4580-dashboard/completion-cache.json \
+  /var/lib/orie4580-dashboard/completion-cache.migrated.json
+sudo cp -p /var/lib/orie4580-dashboard/completion-cache.json \
+  /var/lib/orie4580-dashboard/completion-cache.pre-standard-ids.json
+sudo install -o orie4580-dashboard -g www-data -m 0600 \
+  /var/lib/orie4580-dashboard/completion-cache.migrated.json \
+  /var/lib/orie4580-dashboard/completion-cache.json
+```
+
+The script makes no network requests. It accepts only the old
+`lab-mapping-v2` / `exam1-mapping-v1` format, verifies its fingerprints and exact
+contracts against the configured assignments, and writes a separate mode-0600
+file. Completions and verification timestamps stay unchanged. If migration
+fails, leave the original cache in place and inspect the mismatch before
+installing anything.
+
+Then perform the manual refresh and checks above before re-enabling the timer.
+Cached positive Lab results avoid repeated submission-history reads; current
+roster checks, uncached submissions, assignment canaries, Google Sheet reads,
+and the Exam export still run normally.
 
 ### 2.3 If the refresh fails
 

@@ -1,3 +1,5 @@
+import pytest
+
 from sync.generate import write_records
 from sync.google_sheets import load_csv, rows_to_records
 from sync.grading import summarize
@@ -22,13 +24,13 @@ def test_adapter_emits_valid_standards_schema():
     })
     records = rows_to_records(rows)
     assert validate_all(records) == []
-    assert len(records[0]["standards"]) == 12
+    assert len(records[0]["standards"]) == len(STANDARDS)
 
 
 def test_adapter_rejects_inconsistent_student_metadata():
     rows = [
-        {"updated_at": "2026-09-14T12:00:00Z", "course": "ORIE 5581", "student_id": "abc123", "student_name": "A", "standard_id": "P1"},
-        {"updated_at": "2026-09-14T12:00:00Z", "course": "ORIE 5581", "student_id": "abc123", "student_name": "B", "standard_id": "P2"},
+        {"updated_at": "2026-09-14T12:00:00Z", "course": "ORIE 5581", "student_id": "abc123", "student_name": "A", "standard_id": "S1"},
+        {"updated_at": "2026-09-14T12:00:00Z", "course": "ORIE 5581", "student_id": "abc123", "student_name": "B", "standard_id": "S2"},
     ]
     try:
         rows_to_records(rows)
@@ -38,12 +40,24 @@ def test_adapter_rejects_inconsistent_student_metadata():
         raise AssertionError("expected inconsistent metadata to fail")
 
 
+def test_adapter_rejects_unknown_standard():
+    row = {
+        'updated_at': '2026-10-01T12:00:00Z',
+        'course': 'ORIE 5581',
+        'student_id': 'abc123',
+        'student_name': "Example Student",
+        'standard_id': 'unknown-standard',
+    }
+    with pytest.raises(ValueError, match="unknown standard"):
+        rows_to_records([row])
+
+
 def test_fake_csv_runs_end_to_end(tmp_path):
     rows = load_csv("fixtures/google-sheet.fake.csv")
     records = rows_to_records(rows)
     assert validate_all(records) == []
-    assert len(rows) == 27
-    assert summarize(records[0])["estimated_grade"] == "B"
+    assert len(rows) == 11
+    assert summarize(records[0])["estimated_grade"] == "A−"
     paths = write_records(records, tmp_path)
     assert paths == [tmp_path / "ehf38" / "grades.json"]
     assert paths[0].exists()

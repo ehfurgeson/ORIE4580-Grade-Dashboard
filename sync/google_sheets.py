@@ -58,11 +58,11 @@ def rows_to_records(rows: Iterable[dict[str, Any]]) -> list[dict[str, Any]]:
         standard_id = str(row["standard_id"]).strip()
         if standard_id not in STANDARDS:
             raise ValueError(f"row {row_number} has unknown standard: {standard_id}")
-        category, name = STANDARDS[standard_id]
+        name = STANDARDS[standard_id]
         standard = standards_by_student[student_id].get(standard_id)
         if standard is None:
             standard = standards_by_student[student_id][standard_id] = {
-                "id": standard_id, "name": name, "category": category, "opportunities": [],
+                'id': standard_id, 'name': name, 'opportunities': [],
             }
             record["standards"].append(standard)
         opportunity_id = str(row.get("opportunity_id", "")).strip()

@@ -1,26 +1,18 @@
 from pathlib import Path
 
-from sync.checkoff_mappings import COLUMN_MAPPINGS, MANUAL_ONLY_OPPORTUNITY_IDS, STANDARDS
+from sync.checkoff_mappings import COLUMN_MAPPINGS, MANUAL_ONLY_OPPORTUNITY_IDS
 from sync.gradescope import load_config
 from sync.gradescope_exam import EXAM_OPPORTUNITIES
-from sync.standards import STANDARDS as RUBRIC_STANDARDS
 
 
-def test_standards_document_contains_the_rubric_and_executable_mappings():
+def test_standards_document_links_the_catalog_and_contains_opportunity_mappings():
     document = Path("docs/standards.md").read_text()
 
-    for rubric_id, (_category, wording) in RUBRIC_STANDARDS.items():
-        assert f"| {rubric_id} |" in document
-        assert wording in document
+    assert '(../sync/standards.py)' in document
 
-    for semantic_key, standard in STANDARDS.items():
-        assert f"`{semantic_key}`" in document
-        assert standard["id"] in document
-        assert standard["name"] in document
-
-    for column, (semantic_key, opportunity_id, _label) in COLUMN_MAPPINGS.items():
+    for column, (standard_id, opportunity_id, _label) in COLUMN_MAPPINGS.items():
         assert f"`{column}`" in document
-        assert f"`{semantic_key}`" in document
+        assert f"`{standard_id}`" in document
         assert f"`{opportunity_id}`" in document
 
     for opportunity_id in MANUAL_ONLY_OPPORTUNITY_IDS:
@@ -34,7 +26,7 @@ def test_standards_document_contains_the_rubric_and_executable_mappings():
 
     for opportunity in EXAM_OPPORTUNITIES:
         assert f"`{opportunity['id']}`" in document
-        assert f"`{opportunity['standard_key']}`" in document
+        assert f"`{opportunity['standard_id']}`" in document
         assert opportunity["kind"].replace("_", " ").casefold() in document.casefold()
 
 

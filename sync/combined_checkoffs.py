@@ -6,13 +6,17 @@ from datetime import datetime
 import json
 from typing import Any
 
-from .checkoff_mappings import MANUAL_ONLY_OPPORTUNITY_IDS, STANDARDS
+from .checkoff_mappings import MANUAL_ONLY_OPPORTUNITY_IDS
 from .gradescope import validate_snapshot
 from .gradescope_exam import EXAM_OPPORTUNITIES, ExamImport
-from .simple_checkoffs import NETID_PATTERN, STATUSES as MANUAL_STATUSES, validate_simple_record
+from .simple_checkoffs import (
+    NETID_PATTERN, SCHEMA_VERSION as MANUAL_SCHEMA_VERSION,
+    STATUSES as MANUAL_STATUSES, validate_simple_record,
+)
+from .standards import STANDARDS
 
-COMBINED_SCHEMA_VERSION = 3
-EXAM_SCHEMA_VERSION = 4
+COMBINED_SCHEMA_VERSION = 6
+EXAM_SCHEMA_VERSION = 7
 AUTOGRADER_STATUSES = {
     "passed", "failed", "pending", "error", "not_submitted",
     "not_configured", "not_found",
@@ -32,7 +36,7 @@ def merge_checkoffs_with_autograders(
     allow_unconfigured: bool = False,
     allow_missing_students: bool = False,
 ) -> list[dict[str, Any]]:
-    """Return schema-v3 records; inputs are not mutated.
+    """Return schema-v6 records; inputs are not mutated.
 
     Strict mode requires each manual opportunity to have one configured
     Gradescope assignment and every Google student to exist in the Gradescope
@@ -42,7 +46,7 @@ def merge_checkoffs_with_autograders(
         raise ValueError("Google checkoff records must be a nonempty list")
     for index, record in enumerate(records):
         errors = validate_simple_record(record)
-        if errors or record.get("schema_version") != 2:
+        if errors or record.get("schema_version") != MANUAL_SCHEMA_VERSION:
             raise ValueError(f"Google record {index} is invalid: {'; '.join(errors)}")
     snapshot_errors = validate_snapshot(snapshot)
     if snapshot_errors:
@@ -151,23 +155,23 @@ def validate_combined_record(record: Any) -> list[str]:
         errors.append("student.netid is invalid")
 
     standards = record.get("standards")
-    standard_keys: set[str] = set()
+    standard_ids: set[str] = set()
     opportunity_ids: set[str] = set()
     if not isinstance(standards, list) or not standards:
         errors.append("standards must be a nonempty list")
     else:
         for standard in standards:
-            if not isinstance(standard, dict) or set(standard) != {"key", "id", "name", "checkmarks"}:
+            if not isinstance(standard, dict) or set(standard) != {"id", "name", "checkmarks"}:
                 errors.append("a standard is malformed")
                 continue
-            key = standard["key"]
-            definition = STANDARDS.get(key) if isinstance(key, str) else None
-            if not definition or standard["id"] != definition["id"] or standard["name"] != definition["name"]:
+            standard_id = standard["id"]
+            name = STANDARDS.get(standard_id) if isinstance(standard_id, str) else None
+            if not name or standard["name"] != name:
                 errors.append("a standard does not match the syllabus mapping")
-            elif key in standard_keys:
+            elif standard_id in standard_ids:
                 errors.append("duplicate standard")
             else:
-                standard_keys.add(key)
+                standard_ids.add(standard_id)
             checkmarks = standard["checkmarks"]
             if not isinstance(checkmarks, list):
                 errors.append("standard checkmarks must be a list")
@@ -237,7 +241,7 @@ def validate_combined_record(record: Any) -> list[str]:
                         errors.append("checkmark status does not match its requirements")
                 elif checkmark["kind"] in {"purple", "shiny_purple"}:
                     if record.get("schema_version") != EXAM_SCHEMA_VERSION:
-                        errors.append("exam checkmarks require schema version 4")
+                        errors.append(f"exam checkmarks require schema version {EXAM_SCHEMA_VERSION}")
                     if checkmark["status"] not in {"complete", "incomplete", "not_graded"}:
                         errors.append("exam checkmark status is invalid")
                     if not isinstance(requirements, list) or len(requirements) != 1:
@@ -255,7 +259,7 @@ def validate_combined_record(record: Any) -> list[str]:
                         errors.append("exam score requirement is invalid")
                 else:
                     errors.append("checkmark kind is invalid")
-    if standard_keys != set(STANDARDS):
+    if standard_ids != set(STANDARDS):
         errors.append("record must contain every currently defined standard")
     try:
         json.dumps(record, allow_nan=False)
@@ -267,7 +271,7 @@ def validate_combined_record(record: Any) -> list[str]:
 def merge_exam_checkmarks(
     records: list[dict[str, Any]], exam: ExamImport
 ) -> list[dict[str, Any]]:
-    """Add optional Exam 1 marks to valid schema-v3 Lab records."""
+    """Add optional Exam 1 marks to valid schema-v6 Lab records."""
     expected_netids = {record["student"]["netid"] for record in records}
     if set(exam.by_netid) != expected_netids:
         raise ValueError("Exam 1 student set does not match the dashboard records")
@@ -275,21 +279,21 @@ def merge_exam_checkmarks(
     definitions = {item["id"]: item for item in EXAM_OPPORTUNITIES}
     for record in merged:
         if record.get("schema_version") != COMBINED_SCHEMA_VERSION or validate_combined_record(record):
-            raise ValueError("Exam 1 can only be merged into valid schema-v3 Lab records")
+            raise ValueError("Exam 1 can only be merged into valid schema-v6 Lab records")
         netid = record["student"]["netid"]
-        standards = {standard["key"]: standard for standard in record["standards"]}
+        standards = {standard["id"]: standard for standard in record["standards"]}
         results = exam.by_netid[netid]
         if {item.get("id") for item in results} != set(definitions) or len(results) != len(definitions):
             raise ValueError("Exam 1 results do not match the configured questions")
         for result in results:
             definition = definitions[result["id"]]
-            for field in ("question", "standard_key", "label", "kind"):
+            for field in ("question", "standard_id", "label", "kind"):
                 if result.get(field) != definition[field]:
                     raise ValueError("Exam 1 result mapping was modified")
             status = result.get("status")
             if status not in {"complete", "incomplete", "not_graded"}:
                 raise ValueError("Exam 1 result status is invalid")
-            standards[definition["standard_key"]]["checkmarks"].append({
+            standards[definition["standard_id"]]["checkmarks"].append({
                 "id": definition["id"],
                 "label": definition["label"],
                 "kind": definition["kind"],
