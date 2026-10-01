@@ -5,7 +5,7 @@ import pytest
 
 from sync.combined_checkoffs import merge_checkoffs_with_autograders, validate_combined_record
 from sync.checkoff_mappings import AUTOGRADER_OPPORTUNITY_IDS, COLUMN_MAPPINGS, OPPORTUNITY_IDS
-from sync.simple_checkoffs import rows_to_simple_records, validate_simple_record
+from sync.simple_checkoffs import rows_to_simple_records
 from sync.simple_generate import write_simple_release
 
 
@@ -160,13 +160,12 @@ def test_combined_schema_validation_and_publisher(tmp_path):
     record = merge_checkoffs_with_autograders(
         [google_record()], snapshot(), allow_unconfigured=True
     )[0]
-    assert record["schema_version"] == 6
+    assert record['schema_version'] == 5
     assert validate_combined_record(record) == []
-    assert validate_simple_record(record) == []
     paths = write_simple_release([record], tmp_path / "students")
     assert len(paths) == 1
     saved = json.loads(paths[0].read_text())
-    assert saved["schema_version"] == 6
+    assert saved['schema_version'] == 5
 
 
 def test_tampered_combined_status_fails_validation():

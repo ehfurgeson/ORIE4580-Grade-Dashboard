@@ -10,13 +10,11 @@ from .checkoff_mappings import MANUAL_ONLY_OPPORTUNITY_IDS
 from .gradescope import validate_snapshot
 from .gradescope_exam import EXAM_OPPORTUNITIES, ExamImport
 from .simple_checkoffs import (
-    NETID_PATTERN, SCHEMA_VERSION as MANUAL_SCHEMA_VERSION,
-    STATUSES as MANUAL_STATUSES, validate_simple_record,
+    NETID_PATTERN, STATUSES as MANUAL_STATUSES, validate_manual_record,
 )
 from .standards import STANDARDS
 
-COMBINED_SCHEMA_VERSION = 6
-EXAM_SCHEMA_VERSION = 7
+SCHEMA_VERSION = 5
 AUTOGRADER_STATUSES = {
     "passed", "failed", "pending", "error", "not_submitted",
     "not_configured", "not_found",
@@ -36,7 +34,7 @@ def merge_checkoffs_with_autograders(
     allow_unconfigured: bool = False,
     allow_missing_students: bool = False,
 ) -> list[dict[str, Any]]:
-    """Return schema-v6 records; inputs are not mutated.
+    """Return dashboard records with verified Lab requirements; inputs are not mutated.
 
     Strict mode requires each manual opportunity to have one configured
     Gradescope assignment and every Google student to exist in the Gradescope
@@ -45,8 +43,8 @@ def merge_checkoffs_with_autograders(
     if not isinstance(records, list) or not records:
         raise ValueError("Google checkoff records must be a nonempty list")
     for index, record in enumerate(records):
-        errors = validate_simple_record(record)
-        if errors or record.get("schema_version") != MANUAL_SCHEMA_VERSION:
+        errors = validate_manual_record(record)
+        if errors:
             raise ValueError(f"Google record {index} is invalid: {'; '.join(errors)}")
     snapshot_errors = validate_snapshot(snapshot)
     if snapshot_errors:
@@ -87,7 +85,7 @@ def merge_checkoffs_with_autograders(
             result["opportunity_id"]: result
             for result in (gradescope_student or {}).get("autograders", [])
         }
-        record["schema_version"] = COMBINED_SCHEMA_VERSION
+        record['schema_version'] = SCHEMA_VERSION
         record["updated_at"] = _later_timestamp(record["updated_at"], snapshot["generated_at"])
         for standard in record["standards"]:
             for checkmark in standard["checkmarks"]:
@@ -139,8 +137,8 @@ def validate_combined_record(record: Any) -> list[str]:
     expected = {"schema_version", "updated_at", "worksheet", "student", "standards"}
     if not isinstance(record, dict) or set(record) != expected:
         return ["record fields do not match the combined schema"]
-    if record.get("schema_version") not in {COMBINED_SCHEMA_VERSION, EXAM_SCHEMA_VERSION}:
-        errors.append(f"schema_version must be {COMBINED_SCHEMA_VERSION} or {EXAM_SCHEMA_VERSION}")
+    if record.get('schema_version') != SCHEMA_VERSION:
+        errors.append(f"schema_version must be {SCHEMA_VERSION}")
     try:
         timestamp = datetime.fromisoformat(record.get("updated_at", "").replace("Z", "+00:00"))
         if timestamp.tzinfo is None:
@@ -240,8 +238,6 @@ def validate_combined_record(record: Any) -> list[str]:
                     if checkmark["status"] != expected_status:
                         errors.append("checkmark status does not match its requirements")
                 elif checkmark["kind"] in {"purple", "shiny_purple"}:
-                    if record.get("schema_version") != EXAM_SCHEMA_VERSION:
-                        errors.append(f"exam checkmarks require schema version {EXAM_SCHEMA_VERSION}")
                     if checkmark["status"] not in {"complete", "incomplete", "not_graded"}:
                         errors.append("exam checkmark status is invalid")
                     if not isinstance(requirements, list) or len(requirements) != 1:
@@ -271,15 +267,15 @@ def validate_combined_record(record: Any) -> list[str]:
 def merge_exam_checkmarks(
     records: list[dict[str, Any]], exam: ExamImport
 ) -> list[dict[str, Any]]:
-    """Add optional Exam 1 marks to valid schema-v6 Lab records."""
+    """Add optional Exam 1 marks without changing the dashboard schema."""
     expected_netids = {record["student"]["netid"] for record in records}
     if set(exam.by_netid) != expected_netids:
         raise ValueError("Exam 1 student set does not match the dashboard records")
     merged = deepcopy(records)
     definitions = {item["id"]: item for item in EXAM_OPPORTUNITIES}
     for record in merged:
-        if record.get("schema_version") != COMBINED_SCHEMA_VERSION or validate_combined_record(record):
-            raise ValueError("Exam 1 can only be merged into valid schema-v6 Lab records")
+        if validate_combined_record(record):
+            raise ValueError("Exam 1 can only be merged into valid dashboard records")
         netid = record["student"]["netid"]
         standards = {standard["id"]: standard for standard in record["standards"]}
         results = exam.by_netid[netid]
@@ -306,7 +302,6 @@ def merge_exam_checkmarks(
                     "details": [],
                 }],
             })
-        record["schema_version"] = EXAM_SCHEMA_VERSION
         errors = validate_combined_record(record)
         if errors:
             raise ValueError(f"combined Exam 1 record for {netid} is invalid: {'; '.join(errors)}")

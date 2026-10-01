@@ -2,7 +2,8 @@ from pathlib import Path
 
 import pytest
 
-from sync.simple_checkoffs import rows_to_simple_records, validate_simple_record
+from sync.combined_checkoffs import SCHEMA_VERSION
+from sync.simple_checkoffs import rows_to_simple_records, validate_manual_record
 from sync.simple_generate import (
     STAFF_USERS, render_staff_index, update_authorization_files, write_simple_release,
 )
@@ -37,10 +38,30 @@ def make_rows():
     ]
 
 
+def published_records(rows):
+    """Combined records for exercising publication and authorization."""
+    records = rows_to_simple_records(rows, updated_at=UPDATED_AT, worksheet="Lab Checkoffs")
+    for record in records:
+        record['schema_version'] = SCHEMA_VERSION
+        for standard in record['standards']:
+            for checkmark in standard['checkmarks']:
+                checkmark['requirements'] = [
+                    {
+                        'id': 'manual', 'label': "Manual checkoff", 'source': 'google_sheets',
+                        'status': checkmark['status'], 'details': checkmark['requirements'],
+                    },
+                    {
+                        'id': 'autograder', 'label': "Autograder", 'source': 'gradescope',
+                        'status': 'passed', 'details': [],
+                    },
+                ]
+    return records
+
+
 def test_wide_rows_map_headers_to_standards_and_aggregate_lab_1():
     records = rows_to_simple_records(make_rows(), updated_at=UPDATED_AT, worksheet="Lab Checkoffs")
     record = records[0]
-    assert record["schema_version"] == 5
+    assert 'schema_version' not in record
     assert [standard['id'] for standard in record['standards']] == list(STANDARDS)
     s1 = record["standards"][0]
     assert [(item["id"], item["status"]) for item in s1["checkmarks"]] == [
@@ -49,7 +70,7 @@ def test_wide_rows_map_headers_to_standards_and_aggregate_lab_1():
         ("lab2-q1", "complete"),
     ]
     assert len(s1["checkmarks"][0]["requirements"]) == 3
-    assert validate_simple_record(record) == []
+    assert validate_manual_record(record) == []
 
 
 def test_grouped_checkmark_requires_every_recorded_requirement():
@@ -111,7 +132,7 @@ def test_wide_rows_reject_unsafe_or_ambiguous_input(rows, message):
 
 
 def test_publisher_creates_exact_netid_authorization(tmp_path):
-    records = rows_to_simple_records(make_rows()[:1], updated_at=UPDATED_AT, worksheet="Lab Checkoffs")
+    records = published_records(make_rows()[:1])
     output = tmp_path / "students"
     paths = write_simple_release(records, output)
     student_dir = output / "abc123"
@@ -143,7 +164,7 @@ def test_publisher_creates_exact_netid_authorization(tmp_path):
 
 def test_new_release_removes_students_not_in_selected_batch(tmp_path):
     output = tmp_path / "students"
-    records = rows_to_simple_records(make_rows(), updated_at=UPDATED_AT, worksheet="Lab Checkoffs")
+    records = published_records(make_rows())
     write_simple_release(records, output)
     assert (output / "xy99").exists()
     write_simple_release(records[:1], output)
@@ -153,12 +174,23 @@ def test_new_release_removes_students_not_in_selected_batch(tmp_path):
 
 def test_invalid_batch_does_not_replace_previous_release(tmp_path):
     output = tmp_path / "students"
-    valid = rows_to_simple_records(make_rows()[:1], updated_at=UPDATED_AT, worksheet="Lab Checkoffs")
+    valid = published_records(make_rows()[:1])
     write_simple_release(valid, output)
     invalid = [{**valid[0], "schema_version": 999}]
     with pytest.raises(ValueError, match="invalid simple records"):
         write_simple_release(invalid, output)
     assert (output / "abc123" / "checkoffs.json").exists()
+
+
+@pytest.mark.parametrize('add_version', [False, True])
+def test_publisher_rejects_unmerged_sheet_records(tmp_path, add_version):
+    records = rows_to_simple_records(make_rows(), updated_at=UPDATED_AT, worksheet="Lab Checkoffs")
+    if add_version:
+        for record in records:
+            record['schema_version'] = SCHEMA_VERSION
+    with pytest.raises(ValueError, match="invalid simple records"):
+        write_simple_release(records, tmp_path / 'students')
+    assert not (tmp_path / 'students').exists()
 
 
 def test_frontend_renders_mapped_text_without_inner_html():
@@ -178,7 +210,7 @@ def test_flat_styles_and_shiny_shimmer_are_accessible():
 
 def test_retained_previous_release_supports_manual_rollback(tmp_path):
     output = tmp_path / "students"
-    records = rows_to_simple_records(make_rows(), updated_at=UPDATED_AT, worksheet="Lab Checkoffs")
+    records = published_records(make_rows())
     write_simple_release(records, output, retain_previous=True)
     write_simple_release(records[:1], output, retain_previous=True)
     previous = tmp_path / ".students-previous"
@@ -188,7 +220,7 @@ def test_retained_previous_release_supports_manual_rollback(tmp_path):
 
 
 def test_generated_staff_access_is_narrow_and_consistent(tmp_path):
-    records = rows_to_simple_records(make_rows(), updated_at=UPDATED_AT, worksheet="Lab Checkoffs")
+    records = published_records(make_rows())
     output = tmp_path / "students"
     write_simple_release(records, output)
     for netid in ("abc123", "xy99"):
@@ -202,7 +234,7 @@ def test_generated_staff_access_is_narrow_and_consistent(tmp_path):
 
 
 def test_authorization_only_update_does_not_touch_dashboard_data(tmp_path):
-    records = rows_to_simple_records(make_rows(), updated_at=UPDATED_AT, worksheet="Lab Checkoffs")
+    records = published_records(make_rows())
     output = tmp_path / "students"
     paths = write_simple_release(records, output)
     before_json = {path: path.read_bytes() for path in paths}
@@ -232,7 +264,7 @@ def test_authorization_only_update_does_not_touch_dashboard_data(tmp_path):
 
 def test_authorization_only_update_rejects_unsafe_directory_before_writing(tmp_path):
     output = tmp_path / "students"
-    records = rows_to_simple_records(make_rows()[:1], updated_at=UPDATED_AT, worksheet="Lab Checkoffs")
+    records = published_records(make_rows()[:1])
     write_simple_release(records, output)
     original = (output / "abc123" / ".htaccess").read_text()
     (output / "not-a-netid").mkdir()

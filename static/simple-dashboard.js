@@ -2,8 +2,6 @@
   'use strict';
 
   const allowedStatuses = new Set(['complete', 'incomplete', 'not_graded']);
-  const combinedSchemas = new Set([3, 4, 6, 7]);
-  const examSchemas = new Set([4, 7]);
   const autograderStatuses = new Set([
     'passed', 'failed', 'pending', 'error', 'not_submitted', 'not_configured', 'not_found'
   ]);
@@ -13,7 +11,7 @@
 
   function validatePayload(data) {
     if (!data || typeof data !== 'object') throw new Error('The checkoff data is not an object.');
-    if (![2, 3, 4, 5, 6, 7].includes(data.schema_version)) throw new Error('The checkoff data uses an unsupported schema.');
+    if (![3, 4, 5].includes(data.schema_version)) throw new Error('The checkoff data uses an unsupported schema.');
     if (!data.student || typeof data.student.netid !== 'string') throw new Error('Student information is missing.');
     if (typeof data.worksheet !== 'string' || !data.worksheet) throw new Error('Worksheet information is missing.');
     if (!Array.isArray(data.standards) || data.standards.length === 0) throw new Error('No standards were provided.');
@@ -30,7 +28,7 @@
             checkmark.requirements.length === 0) {
           throw new Error(`A checkmark in ${standard.id} is malformed.`);
         }
-        if (combinedSchemas.has(data.schema_version) && checkmark.kind === 'green') {
+        if (checkmark.kind === 'green') {
           const manual = checkmark.requirements.find(item => item && item.id === 'manual');
           const autograder = checkmark.requirements.find(item => item && item.id === 'autograder');
           const manualOnly = checkmark.requirements.length === 1 && manual && !autograder;
@@ -40,7 +38,7 @@
               !Array.isArray(manual.details)) {
             throw new Error(`The requirements in ${checkmark.label} are malformed.`);
           }
-        } else if (examSchemas.has(data.schema_version)) {
+        } else {
           const score = checkmark.requirements[0];
           if (checkmark.requirements.length !== 1 || !score || score.id !== 'exam_score' ||
               score.source !== 'gradescope_exam' || score.status !== checkmark.status) {
@@ -97,20 +95,6 @@
       list.append(row);
     }
     body.append(list);
-  }
-
-  function renderManualOnlyRequirements(requirements, body) {
-    if (requirements.length <= 1) return;
-    const details = document.createElement('details');
-    details.className = 'requirements';
-    details.append(make('summary', '', `${requirements.length} recorded requirements`));
-    const list = make('ul', 'requirement-list');
-    for (const requirement of requirements) {
-      const label = requirement.status === 'complete' ? 'Complete' : 'Incomplete';
-      list.append(make('li', requirement.status, `${requirement.label}: ${label}`));
-    }
-    details.append(list);
-    body.append(details);
   }
 
   function allocateStandard(checkmarks) {
@@ -216,27 +200,17 @@
       body.append(make('span', 'checkoff-allocation', allocationLabel(checkmark, allocation)));
     }
 
-    if (checkmark.requirements.some(item => item && item.source)) {
-      renderCombinedRequirements(checkmark.requirements, body);
-    } else {
-      renderManualOnlyRequirements(checkmark.requirements, body);
-    }
+    renderCombinedRequirements(checkmark.requirements, body);
     item.append(mark, body);
     return item;
   }
 
   function render(data, updatedAt) {
     document.querySelector('.summary-strip span').textContent = 'Checkmarks earned';
-    if (combinedSchemas.has(data.schema_version)) {
-      document.querySelector('#dashboard-description').textContent =
-        examSchemas.has(data.schema_version)
-          ? 'Your lab checkoffs, autograder results, and available Exam 1 checkmarks, mapped to course standards.'
-          : 'Your manual lab checkoffs and Gradescope autograder results, mapped to the standards they demonstrate.';
-      document.querySelector('#completion-note').textContent =
-        examSchemas.has(data.schema_version)
-          ? 'Lab green checkmarks require the listed Lab sources. Lab 4 Q1 has no autograded component. Exam 1 scores over 0.8 earn their mapped purple or shiny-purple checkmark. Unavailable exam scores do not earn a mark.'
-          : 'A lab green checkmark is earned when all listed requirements are complete. Lab 4 Q1 has no autograded component. Each standard has two linked boxes; future purple and shiny purple marks take priority under the syllabus rules.';
-    }
+    document.querySelector('#dashboard-description').textContent =
+      'Your lab checkoffs, autograder results, and available Exam 1 checkmarks, mapped to course standards.';
+    document.querySelector('#completion-note').textContent =
+      'Lab green checkmarks require the listed Lab sources. Lab 4 Q1 has no autograded component. Exam 1 scores over 0.8 earn their mapped purple or shiny-purple checkmark. Unavailable exam scores do not earn a mark.';
     document.querySelector('#student-netid').textContent = data.student.netid;
     document.querySelector('#worksheet').textContent = data.worksheet;
     const time = document.querySelector('#updated-at');

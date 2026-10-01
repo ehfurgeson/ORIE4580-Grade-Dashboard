@@ -8,7 +8,7 @@ import json
 import re
 from typing import Any
 
-from .checkoff_mappings import COLUMN_MAPPINGS, MANUAL_SCHEMA_VERSION as SCHEMA_VERSION
+from .checkoff_mappings import COLUMN_MAPPINGS
 from .standards import STANDARDS
 
 NETID_COLUMN = "NetID"
@@ -66,7 +66,7 @@ def _mapped_standards(row: dict[str, Any], item_headers: list[str], row_number: 
 def rows_to_simple_records(
     rows: Iterable[dict[str, Any]], *, updated_at: str, worksheet: str
 ) -> list[dict[str, Any]]:
-    """Convert one wide worksheet row per NetID to the mapped dashboard schema."""
+    """Normalize worksheet rows for merging with Gradescope results."""
     rows = list(rows)
     if not rows:
         raise ValueError("Google worksheet contains no student rows")
@@ -105,7 +105,6 @@ def rows_to_simple_records(
             raise ValueError(f"duplicate NetID in row {row_number}")
         seen.add(netid)
         records.append({
-            "schema_version": SCHEMA_VERSION,
             "updated_at": updated_at,
             "worksheet": worksheet,
             "student": {"netid": netid},
@@ -114,19 +113,14 @@ def rows_to_simple_records(
     return records
 
 
-def validate_simple_record(record: Any) -> list[str]:
-    """Validate either the manual-only or combined protected record schema."""
-    if isinstance(record, dict) and record.get("schema_version") in {6, 7}:
-        from .combined_checkoffs import validate_combined_record
-        return validate_combined_record(record)
+def validate_manual_record(record: Any) -> list[str]:
+    """Validate normalized worksheet input before the Gradescope merge."""
     errors: list[str] = []
     if not isinstance(record, dict):
         return ["record must be an object"]
-    expected = {"schema_version", "updated_at", "worksheet", "student", "standards"}
+    expected = {"updated_at", "worksheet", "student", "standards"}
     if set(record) != expected:
         errors.append("record fields do not match the mapped schema")
-    if record.get("schema_version") != SCHEMA_VERSION:
-        errors.append(f"schema_version must be {SCHEMA_VERSION}")
     try:
         parsed_time = datetime.fromisoformat(record.get("updated_at", "").replace("Z", "+00:00"))
         if parsed_time.tzinfo is None:

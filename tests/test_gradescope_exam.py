@@ -88,7 +88,7 @@ def test_rubric_drift_soft_fails_to_not_graded_without_blocking_labs():
 
     labs = merge_checkoffs_with_autograders([lab_record()], lab_snapshot())
     combined = merge_exam_checkmarks(labs, exam)[0]
-    assert combined["schema_version"] == 7
+    assert combined['schema_version'] == labs[0]['schema_version'] == 5
     assert validate_combined_record(combined) == []
     lab = next(item for standard in combined["standards"] for item in standard["checkmarks"] if item["kind"] == "green")
     assert lab["status"] == "complete"
@@ -106,6 +106,9 @@ def test_exam_results_merge_into_s1_and_s2_with_no_raw_scores():
         "exam1-q1", "exam1-q2", "exam1-q6"
     ]
     assert "0.8" not in str(record)
+    assert record['schema_version'] == labs[0]['schema_version'] == 5
+    exam_standard_ids = {item['standard_id'] for item in EXAM_OPPORTUNITIES}
+    assert all(not marks for standard_id, marks in by_standard.items() if standard_id not in exam_standard_ids)
     assert validate_combined_record(record) == []
 
 

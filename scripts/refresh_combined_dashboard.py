@@ -117,7 +117,7 @@ def _selected_netid(explicit: str | None, all_students: bool) -> str | None:
 def main() -> None:
     load_dotenv(override=False)
     parser = argparse.ArgumentParser(description=__doc__)
-    parser.add_argument("config", type=Path, help="allowlisted lab-only Gradescope TOML config")
+    parser.add_argument('config', type=Path, help="allowlisted Gradescope TOML config")
     parser.add_argument("output", type=Path, help="private students directory to replace")
     parser.add_argument("snapshot", type=Path, help="private last-known Gradescope state")
     parser.add_argument("--worksheet-id", type=int, required=True)

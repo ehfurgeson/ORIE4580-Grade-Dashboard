@@ -8,7 +8,8 @@ import shutil
 import tempfile
 from typing import Any
 
-from .simple_checkoffs import NETID_PATTERN, validate_simple_record
+from .combined_checkoffs import validate_combined_record
+from .simple_checkoffs import NETID_PATTERN
 
 
 STAFF_USERS = (
@@ -168,7 +169,7 @@ def write_simple_release(
     errors: list[str] = []
     seen: set[str] = set()
     for index, record in enumerate(records):
-        errors.extend(f"student {index}: {error}" for error in validate_simple_record(record))
+        errors.extend(f"student {index}: {error}" for error in validate_combined_record(record))
         student = record.get("student") if isinstance(record, dict) else None
         netid = student.get("netid") if isinstance(student, dict) else None
         if isinstance(netid, str):

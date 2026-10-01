@@ -4,7 +4,6 @@ from __future__ import annotations
 import re
 
 LAB_MAPPING_VERSION = "lab-mapping-v3"
-MANUAL_SCHEMA_VERSION = 5
 
 # Each worksheet column belongs to exactly one syllabus checkmark opportunity.
 # Multiple columns with the same opportunity ID must all be complete to earn it.

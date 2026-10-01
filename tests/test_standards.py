@@ -1,7 +1,7 @@
 from sync.checkoff_mappings import COLUMN_MAPPINGS
 from sync.google_sheets import rows_to_records
 from sync.gradescope_exam import EXAM_OPPORTUNITIES
-from sync.simple_checkoffs import rows_to_simple_records, validate_simple_record
+from sync.simple_checkoffs import rows_to_simple_records, validate_manual_record
 from sync.standards import STANDARDS
 from sync.validate import validate_record
 
@@ -22,7 +22,7 @@ def test_row_and_wide_importers_use_the_same_standard_ids_and_wording():
     )[0]
 
     assert validate_record(row_record) == []
-    assert validate_simple_record(wide_record) == []
+    assert validate_manual_record(wide_record) == []
     assert [(item['id'], item['name']) for item in row_record['standards']] == [
         (item['id'], item['name']) for item in wide_record['standards']
     ]

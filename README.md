@@ -108,7 +108,7 @@ Normal repeated runs should omit `--no-carry-forward`. A prior verified pass is 
 
 ### Local combined dashboard canary
 
-Schema version 3 combines the normalized Gradescope snapshot with the existing Google Sheet opportunities. Autograded opportunities display two independent requirements: **Manual checkoff** and **Autograder**, and require both to complete. Lab 4 Q1 is manual-only: its green checkmark depends on the recorded checkoff and does not display or require an autograder.
+Schema version 5 combines the normalized Gradescope snapshot with the existing Google Sheet opportunities and any available Exam marks. Autograded opportunities display two independent requirements: **Manual checkoff** and **Autograder**, and require both to complete. Lab 4 Q1 is manual-only: its green checkmark depends on the recorded checkoff and does not display or require an autograder.
 
 Gradescope Lab titles are mapped by the reviewed convention `Lab N, QN` or `Lab N, QN-N`. In particular, `Lab 1, Q1-2` maps to the one `lab1-q1-2` opportunity that aggregates the three sheet columns `Lab 1 - Q1.3`, `Lab 1 - Q2.3`, and `Lab 1 - Q2.4`. Other recognized titles map one-to-one. Non-Lab assignments are ignored because they are not allowlisted. Malformed, unknown, duplicate, or conflicting Lab mappings fail closed. A reviewed config can set `title_mapping_override = true` as an explicit fallback; there is no fuzzy matching.
 
@@ -137,7 +137,7 @@ Use the dedicated, non-login `orie4580-dashboard` system account from the unit. 
 
 ### Optional Exam 1 results
 
-Schema version 7 includes the six Exam 1 question results to the same protected dashboard. The checked-in Gradescope config names the allowlisted assignment `Exam 1`; title matching treats spaces and upstream underscore separators as equivalent. Each question must appear in the Gradescope CSV export as exactly 1 point. A numeric score strictly greater than `0.8` earns its configured purple or shiny-purple checkmark; exactly `0.8` does not. Questions 1, 2, and 6 map to S2. Questions 3, 4, and 5 map to S1. Questions 5 and 6 are shiny purple.
+The same schema-version-5 dashboard includes any available Exam 1 question results; standards without Exam opportunities remain valid. The checked-in Gradescope config names the allowlisted assignment `Exam 1`; title matching treats spaces and upstream underscore separators as equivalent. Each question must appear in the Gradescope CSV export as exactly 1 point. A numeric score strictly greater than `0.8` earns its configured purple or shiny-purple checkmark; exactly `0.8` does not. Questions 1, 2, and 6 map to S2. Questions 3, 4, and 5 map to S1. Questions 5 and 6 are shiny purple.
 
 Exam ingestion remains deliberately soft-failing to isolate the optional source, although the rubric is finalized and versioned. A missing assignment, changed title, missing or non-1-point question column, nonnumeric/out-of-range score, duplicate student, or unavailable export converts all Exam 1 entries to **Not available yet** and does not block the strict Lab refresh. Raw question scores are never written to student JSON. Lab source, contract, roster, and merge errors still fail closed and preserve the prior release.
 
@@ -164,20 +164,9 @@ students/ehf38/
 └── .htaccess   # owner OR explicit staff list
 ```
 
-Generate only the authorized bottom-row test account from the real `Lab Checkoffs` worksheet:
+Generate student pages with `scripts.refresh_combined_dashboard` as shown above. Sheet rows must be merged with Gradescope results before publication; the manual-only publisher has been removed. Unknown checkbox values, unsafe NetIDs, and duplicate NetIDs fail closed.
 
-```sh
-rm -rf generated/simple-ehf38
-python -m scripts.import_simple_google_sheet_api \
-  generated/simple-ehf38/students \
-  --spreadsheet-id 1e_5BQpysMUWfKrNw4MS7qg--2TySAno8rCBmuKapiME \
-  --worksheet-id 41104109 \
-  --student-id ehf38
-```
-
-The command validates the entire worksheet but publishes only `ehf38`. Publishing every row requires the explicit `--all-students` flag and must wait until the two-user access matrix passes. Unknown checkbox values, unsafe NetIDs, and duplicate NetIDs fail closed.
-
-For the initial server test, deploy `static/simple-dashboard.js` and `static/simple-style.css` as public assets under the course root, then copy the generated `ehf38` directory—including its dotfile—to the server's private `students/` tree. Open:
+Deploy `static/simple-dashboard.js` and `static/simple-style.css` as public assets under the course root, then publish the protected student tree. An owner page is available at:
 
 ```text
 https://zivscully.orie.cornell.edu/orie4580_fa26/students/ehf38/
