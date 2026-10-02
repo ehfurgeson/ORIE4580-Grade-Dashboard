@@ -16,7 +16,9 @@ from sync.combined_checkoffs import merge_checkoffs_with_autograders, merge_exam
 from sync.completion_cache import (
     build_completion_cache,
     filter_completion_cache,
+    lab_contract_fingerprint,
     load_completion_cache,
+    sealed_assignments_from_cache,
     write_completion_cache_atomic,
 )
 from sync.google_sheets_api import fetch_first_worksheet_rows
@@ -24,6 +26,7 @@ from sync.gradescope_exam import import_exam_soft
 from sync.gradescope import (
     GradescopeAdapterError,
     PrivateWebGradescopeSource,
+    SealedAssignment,
     build_snapshot,
     carry_forward_verified_passes,
     load_config,
@@ -227,7 +230,8 @@ def main() -> None:
                 )
 
         lab_metrics: dict[str, int] = {}
-        snapshot = build_snapshot(
+        prior_seals = sealed_assignments_from_cache(completion_cache) if cache_active else {}
+        snapshot, active_seals = build_snapshot(
             source,
             config,
             only_netid=selected_netid,
@@ -235,12 +239,14 @@ def main() -> None:
             force_full_revalidation=args.force_full_revalidation,
             metrics=lab_metrics,
             progress=report_progress,
+            sealed_assignments=prior_seals,
+            contract_fingerprint=lambda rule: lab_contract_fingerprint(config, rule),
         )
         if args.shadow_cache_comparison:
             if completion_cache is None:
                 raise ValueError("shadow comparison requires an existing valid completion cache")
             shadow_metrics: dict[str, int] = {}
-            full_snapshot = build_snapshot(
+            full_snapshot, _ = build_snapshot(
                 source,
                 config,
                 only_netid=selected_netid,
@@ -274,6 +280,13 @@ def main() -> None:
             f"hits={lab_metrics['lab_cache_hits']}, "
             f"source checks={lab_metrics['lab_source_checks']}, "
             f"canary checks={lab_metrics['lab_canary_checks']}",
+            flush=True,
+        )
+        print(
+            f"[3/6] Sealed assignments: active={lab_metrics['lab_sealed_assignments']}, "
+            f"newly sealed={lab_metrics['lab_seals_created']}, "
+            f"invalidated={lab_metrics['lab_seals_invalidated']}, "
+            f"recheck reads={lab_metrics['lab_seal_checks']}",
             flush=True,
         )
 
@@ -321,7 +334,7 @@ def main() -> None:
         write_snapshot_atomic(snapshot, args.snapshot)
         if cache_active and args.completion_cache is not None:
             next_cache = build_completion_cache(
-                config, snapshot, exam.verified_completions
+                config, snapshot, exam.verified_completions, sealed=active_seals
             )
             write_completion_cache_atomic(next_cache, args.completion_cache)
 

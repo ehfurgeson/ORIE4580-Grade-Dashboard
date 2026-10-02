@@ -82,6 +82,7 @@ def _cache(config: AdapterConfig | None = None) -> dict:
             "normalized_records": None,
         },
         "exam_export": {"etag": None},
+        "sealed_assignments": {},
     }
 
 

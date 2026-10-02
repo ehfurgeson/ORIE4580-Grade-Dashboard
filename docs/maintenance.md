@@ -131,6 +131,79 @@ rm -rf generated/combined-env-preview
 
 The selected canary comes from `GRADESCOPE_TEST_STUDENT_EMAIL` in the ignored `.env` file.
 
+### 2.5 Seal a closed assignment
+
+Once Gradescope reports that an assignment no longer accepts submissions, no new
+evidence can appear for it. The refresh can then run **one final full check**,
+record the terminal result for every roster member, and serve that record on
+every later run without reading Gradescope again.
+
+Sealing is opt-in per assignment:
+
+```toml
+[assignments."8532407"]
+opportunity_id = "lab1-q1-2"
+# ...
+seal_when_closed = true
+```
+
+Behavior once enabled:
+
+- Each run reads the course assignment table once and checks
+  `submission_window.accepting_submissions`. The installed `gradescope_tool`
+  dataclass drops that field, so `PrivateWebGradescopeSource.assignment_closure()`
+  reads it from the same page the client already requests.
+- The first run that observes the assignment closed performs a **normal full
+  read** of every roster member, then stores the result in
+  `cache["sealed_assignments"]`, keyed by the same contract fingerprint the Lab
+  cache already uses.
+- Later runs serve those results directly: **zero** Gradescope submission reads
+  and no closure probe at all for that assignment.
+- A sealed assignment skips the per-run contract canary, because sealing is the
+  stronger guarantee.
+- `seal_recheck_hours` (default 24) bounds staleness. Once a seal is older than
+  that, the next run re-reads every member once and refreshes the table, so an
+  assignment a TA reopens is noticed instead of being served stale forever.
+
+A seal is **invalidate-on-drift**: if the assignment contract changes (score,
+test count, maxima, or `contract_version`), the fingerprint no longer matches, the
+seal is discarded, and the run falls back to a full read. A changed contract can
+never inherit results graded under the old one.
+
+Two deliberate fail-closed rules:
+
+- If a roster member is absent from a sealed table, the run **aborts** rather
+  than guessing. Late-joining students therefore need one `seal_when_closed = false`
+  run (or a cleared seal) before re-enabling.
+- Sealing is off by default so nothing changes silently. Enable it per
+  assignment after a successful manual run.
+
+To verify a seal before trusting it, compare it against a forced full
+revalidation, the same pattern the Lab cache already uses:
+
+```sh
+sudo systemctl start --no-block orie4580-checkoffs.service
+sudo journalctl -u orie4580-checkoffs.service -f | grep -i sealed
+```
+
+The refresh logs `active`, `newly sealed`, `invalidated`, and `recheck reads`
+counts on every run.
+
+### 2.6 Exams: add them only after the rubric is final
+
+Exam sealing is intentionally not supported. Instead, keep the existing two-part
+rule:
+
+- An exam is **not** added to `gradescope.toml` until its rubric is finalized.
+- If it must be present earlier, set `rubric_finalized = false`.
+
+Both are safe. `rubric_finalized` is part of the Exam contract fingerprint, and
+`_apply_positive_cache` reuses a cached completion only when
+`rule.rubric_finalized` is true, so an unfinalized exam carries nothing forward.
+Flipping the flag to `true` changes the fingerprint and retires anything recorded
+under the draft rubric. Until then the exam import soft-fails to `not_graded`
+and Lab publication continues.
+
 ## 3. Adding or changing an exam
 
 Exam 1 is more specialized than labs. Its mapping is currently explicit in `sync/gradescope_exam.py`, and `sync/gradescope.py` currently validates the finalized six-question Exam 1 contract. A second exam is therefore a code change, not only a TOML addition.

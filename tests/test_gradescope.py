@@ -84,7 +84,7 @@ def test_any_historical_full_pass_wins_over_active_and_later_failures():
             payload((1, 0, 0)),
         ]
     })
-    snapshot = build_snapshot(source, CONFIG, generated_at=NOW)
+    snapshot, _ = build_snapshot(source, CONFIG, generated_at=NOW)
     result = snapshot["students"][0]["autograders"][0]
     assert result == {
         "opportunity_id": "lab3-q1",
@@ -112,7 +112,7 @@ def test_legacy_submission_is_failed_when_current_contract_is_observed_elsewhere
             MemberRef("current", "xy99@cornell.edu", "0"),
         ],
     )
-    snapshot = build_snapshot(source, CONFIG, generated_at=NOW)
+    snapshot, _ = build_snapshot(source, CONFIG, generated_at=NOW)
     statuses = {
         student["netid"]: student["autograders"][0]["status"]
         for student in snapshot["students"]
@@ -217,19 +217,19 @@ def test_unmatched_members_are_counted_but_not_emitted():
         MemberRef("1", "abc123@cornell.edu", "0"),
         MemberRef("staff", "person@example.com", "0"),
     ])
-    snapshot = build_snapshot(source, CONFIG, generated_at=NOW)
+    snapshot, _ = build_snapshot(source, CONFIG, generated_at=NOW)
     assert snapshot["unmatched_members"] == 1
     assert [student["netid"] for student in snapshot["students"]] == ["abc123"]
     assert snapshot["students"][0]["autograders"][0]["status"] == "not_submitted"
 
 
 def test_previous_verified_pass_is_monotone_for_same_contract():
-    prior = build_snapshot(
+    prior, _ = build_snapshot(
         FakeSource({("member-1", RULE.assignment_id): [payload()]}),
         CONFIG,
         generated_at=NOW,
     )
-    current = build_snapshot(
+    current, _ = build_snapshot(
         FakeSource({("member-1", RULE.assignment_id): [payload((1, 0, 0))]}),
         CONFIG,
         generated_at="2026-09-23T18:00:00Z",
@@ -241,10 +241,10 @@ def test_previous_verified_pass_is_monotone_for_same_contract():
 
 
 def test_pass_evidence_is_not_carried_across_changed_contract():
-    prior = build_snapshot(FakeSource({("member-1", RULE.assignment_id): [payload()]}), CONFIG, generated_at=NOW)
+    prior, _ = build_snapshot(FakeSource({("member-1", RULE.assignment_id): [payload()]}), CONFIG, generated_at=NOW)
     changed_rule = AssignmentRule(RULE.assignment_id, RULE.opportunity_id, "lab3-q1-v2", Decimal("4"), 4, (Decimal("1"),) * 4)
     changed = AdapterConfig(CONFIG.course_id, (changed_rule,), minimum_request_interval_seconds=0)
-    current = build_snapshot(FakeSource({}), changed, generated_at=NOW)
+    current, _ = build_snapshot(FakeSource({}), changed, generated_at=NOW)
     with pytest.raises(ValueError, match="changed course or assignment contract"):
         carry_forward_verified_passes(current, prior)
 
@@ -268,7 +268,7 @@ def test_roles_filter_staff_and_unknown_roles_fail_closed():
         MemberRef("1", "abc123@cornell.edu", "0"),
         MemberRef("2", "ta99@cornell.edu", "2"),
     ])
-    snapshot = build_snapshot(source, CONFIG, generated_at=NOW)
+    snapshot, _ = build_snapshot(source, CONFIG, generated_at=NOW)
     assert [student["netid"] for student in snapshot["students"]] == ["abc123"]
 
     unknown = FakeSource({}, members=[MemberRef("1", "abc123@cornell.edu", "new-role")])
@@ -281,8 +281,8 @@ def test_roster_removal_is_allowed_but_old_student_results_are_not_copied():
         MemberRef("1", "abc123@cornell.edu", "0"),
         MemberRef("2", "xy99@cornell.edu", "0"),
     ])
-    prior = build_snapshot(prior_source, CONFIG, generated_at=NOW)
-    current = build_snapshot(FakeSource({}), CONFIG, generated_at="2026-09-23T18:00:00Z")
+    prior, _ = build_snapshot(prior_source, CONFIG, generated_at=NOW)
+    current, _ = build_snapshot(FakeSource({}), CONFIG, generated_at="2026-09-23T18:00:00Z")
     merged = carry_forward_verified_passes(current, prior)
     assert [student["netid"] for student in merged["students"]] == ["abc123"]
 
@@ -346,6 +346,7 @@ def test_load_config_is_explicit_and_decimal_exact(tmp_path):
         lab_contract_canary_each_run = true
         google_conditional_requests = false
         exam_conditional_requests = false
+        seal_recheck_hours = 24
         [roles]
         student = ["0"]
         non_student = ["1", "2"]
@@ -364,6 +365,7 @@ def test_load_config_is_explicit_and_decimal_exact(tmp_path):
         expected_test_count = 3
         expected_test_maxima = ["1", "1", "1"]
         title_mapping_override = false
+        seal_when_closed = false
     ''')
     config = load_config(config_path)
     assert config.assignments[0].expected_score == Decimal("3.0")
@@ -383,7 +385,7 @@ def test_unknown_config_fields_fail_closed(tmp_path):
 
 
 def test_atomic_write_and_validation_preserve_previous_output(tmp_path):
-    snapshot = build_snapshot(FakeSource({}), CONFIG, generated_at=NOW)
+    snapshot, _ = build_snapshot(FakeSource({}), CONFIG, generated_at=NOW)
     output = tmp_path / "snapshot.json"
     write_snapshot_atomic(snapshot, output)
     assert output.stat().st_mode & 0o777 == 0o600
@@ -396,7 +398,7 @@ def test_atomic_write_and_validation_preserve_previous_output(tmp_path):
 
 
 def test_snapshot_contains_no_email_member_or_submission_ids():
-    snapshot = build_snapshot(
+    snapshot, _ = build_snapshot(
         FakeSource({("member-1", RULE.assignment_id): [payload()]}),
         CONFIG,
         generated_at=NOW,
@@ -419,7 +421,7 @@ def test_same_origin_validation_rejects_http_and_other_hosts():
 
 
 def test_snapshot_validator_handles_hostile_json_types_without_raising():
-    snapshot = build_snapshot(FakeSource({}), CONFIG, generated_at=NOW)
+    snapshot, _ = build_snapshot(FakeSource({}), CONFIG, generated_at=NOW)
     bad_assignment = json.loads(json.dumps(snapshot))
     bad_assignment["assignments"][0]["assignment_id"] = []
     assert validate_snapshot(bad_assignment)
@@ -567,7 +569,7 @@ def test_completion_cache_skips_histories_but_runs_one_contract_canary():
         ("member-b", RULE.assignment_id): [payload()],
     }, members=members)
     metrics = {}
-    snapshot = build_snapshot(
+    snapshot, _ = build_snapshot(
         source, CONFIG, generated_at=NOW,
         prior_passes=frozenset({("abc123", RULE.opportunity_id), ("xy99", RULE.opportunity_id)}),
         metrics=metrics,
@@ -576,6 +578,9 @@ def test_completion_cache_skips_histories_but_runs_one_contract_canary():
     assert metrics == {
         "lab_cache_candidates": 2, "lab_cache_hits": 2,
         "lab_source_checks": 1, "lab_canary_checks": 1,
+        "lab_seals_created": 0, "lab_seals_invalidated": 0,
+        "lab_seal_checks": 0, "lab_seal_partial": 0,
+        "lab_sealed_assignments": 0,
     }
     results = [student["autograders"][0] for student in snapshot["students"]]
     assert all(result["status"] == "passed" for result in results)
@@ -587,7 +592,7 @@ def test_completion_cache_skips_histories_but_runs_one_contract_canary():
 def test_force_full_checks_every_pair_but_keeps_verified_pass_monotone():
     source = FakeSource({("member-1", RULE.assignment_id): [payload((1, 0, 1))]})
     metrics = {}
-    snapshot = build_snapshot(
+    snapshot, _ = build_snapshot(
         source, CONFIG, generated_at=NOW,
         prior_passes=frozenset({("abc123", RULE.opportunity_id)}),
         force_full_revalidation=True, metrics=metrics,
@@ -614,7 +619,7 @@ def test_cached_contract_canary_still_fails_closed_on_drift():
 def test_cache_entry_for_absent_roster_student_is_not_a_candidate():
     source = FakeSource({("member-1", RULE.assignment_id): [payload((1, 0, 1))]})
     metrics = {}
-    snapshot = build_snapshot(
+    snapshot, _ = build_snapshot(
         source, CONFIG, generated_at=NOW,
         prior_passes=frozenset({("xy99", RULE.opportunity_id)}), metrics=metrics,
     )

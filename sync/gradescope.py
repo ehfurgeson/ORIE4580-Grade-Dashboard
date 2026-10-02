@@ -9,7 +9,7 @@ from __future__ import annotations
 from collections import Counter
 from collections.abc import Iterable, Iterator
 from dataclasses import dataclass
-from datetime import datetime, timezone
+from datetime import datetime, timedelta, timezone
 from decimal import Decimal, InvalidOperation
 import json
 import logging
@@ -20,7 +20,7 @@ import requests
 import tempfile
 import time
 import tomllib
-from typing import Any, Callable, Protocol
+from typing import Any, Callable, Mapping, Protocol
 from urllib.parse import urljoin, urlparse
 
 from .checkoff_mappings import AUTOGRADER_OPPORTUNITY_IDS, opportunity_from_assignment_title
@@ -58,6 +58,23 @@ class AssignmentRule:
     expected_test_count: int
     expected_test_maxima: tuple[Decimal, ...]
     title_mapping_override: bool = False
+    seal_when_closed: bool = False
+
+
+@dataclass(frozen=True)
+class SealedAssignment:
+    """Terminal per-student results for an assignment that stopped accepting work.
+
+    A sealed assignment is one that Gradescope reports as no longer accepting
+    submissions. Because no new evidence can appear, the recorded result for
+    every roster member is final and the crawler never reads it again.
+    """
+
+    opportunity_id: str
+    fingerprint: str
+    sealed_at: str
+    closure_signal: str
+    results: dict[str, str]
 
 
 @dataclass(frozen=True)
@@ -77,6 +94,7 @@ class CachePolicy:
     lab_contract_canary_each_run: bool = True
     google_conditional_requests: bool = False
     exam_conditional_requests: bool = False
+    seal_recheck_hours: int = 24
 
 
 def assignment_title_matches(actual: str, configured: str) -> bool:
@@ -214,6 +232,7 @@ def load_config(path: str | Path) -> AdapterConfig:
         expected_fields = {
             "opportunity_id", "contract_version", "expected_score",
             "expected_test_count", "expected_test_maxima", "title_mapping_override",
+            "seal_when_closed",
         }
         if not isinstance(value, dict) or set(value) != expected_fields:
             raise ValueError(f"assignment {assignment_id} config fields are invalid")
@@ -249,10 +268,14 @@ def load_config(path: str | Path) -> AdapterConfig:
         title_override = value["title_mapping_override"]
         if not isinstance(title_override, bool):
             raise ValueError(f"assignment {assignment_id} title_mapping_override must be boolean")
+        seal_when_closed = value["seal_when_closed"]
+        if not isinstance(seal_when_closed, bool):
+            raise ValueError(f"assignment {assignment_id} seal_when_closed must be boolean")
         rules.append(
             AssignmentRule(
                 assignment_id, opportunity_id, contract_version,
                 expected_score, expected_test_count, maxima, title_override,
+                seal_when_closed,
             )
         )
     rules.sort(key=lambda rule: rule.assignment_id)
@@ -303,11 +326,16 @@ def load_config(path: str | Path) -> AdapterConfig:
     cache_fields = {
         "enabled", "lab_contract_canary_each_run",
         "google_conditional_requests", "exam_conditional_requests",
+        "seal_recheck_hours",
     }
     if not isinstance(cache_raw, dict) or set(cache_raw) != cache_fields:
         raise ValueError("Gradescope cache config is invalid")
-    if any(not isinstance(cache_raw[field], bool) for field in cache_fields):
+    boolean_cache_fields = cache_fields - {"seal_recheck_hours"}
+    if any(not isinstance(cache_raw[field], bool) for field in boolean_cache_fields):
         raise ValueError("Gradescope cache settings must be boolean")
+    recheck_hours = cache_raw["seal_recheck_hours"]
+    if not isinstance(recheck_hours, int) or isinstance(recheck_hours, bool) or not 1 <= recheck_hours <= 8760:
+        raise ValueError("seal_recheck_hours must be between 1 and 8760")
     cache_policy = CachePolicy(**cache_raw)
     if cache_policy.enabled and not cache_policy.lab_contract_canary_each_run:
         raise ValueError("enabled completion caching requires Lab contract canaries")
@@ -456,6 +484,22 @@ def _normalize_members(
     return by_netid, unmatched
 
 
+def _is_closed(signal: str, now: datetime) -> bool:
+    """Decide whether an advisory closure signal means submissions have stopped."""
+    if signal == "accepting_submissions=false":
+        return True
+    if signal.startswith("window_close="):
+        raw = signal.split("=", 1)[1]
+        try:
+            closed_at = datetime.fromisoformat(raw.replace("Z", "+00:00"))
+        except ValueError:
+            return False
+        if closed_at.tzinfo is None:
+            return False
+        return closed_at <= now
+    return False
+
+
 def build_snapshot(
     source: GradescopeSource,
     config: AdapterConfig,
@@ -466,8 +510,14 @@ def build_snapshot(
     force_full_revalidation: bool = False,
     metrics: dict[str, int] | None = None,
     progress: Callable[[int, int], None] | None = None,
-) -> dict[str, Any]:
-    """Read and normalize a complete snapshot, reusing only verified passes."""
+    sealed_assignments: Mapping[str, SealedAssignment] | None = None,
+    contract_fingerprint: Callable[[AssignmentRule], str] | None = None,
+) -> tuple[dict[str, Any], dict[str, SealedAssignment]]:
+    """Read and normalize a snapshot, reusing verified passes and sealed results.
+
+    Returns the snapshot and the set of sealed assignments, which grows by one
+    entry the first time a configured assignment is observed closed.
+    """
     members, unmatched = _normalize_members(source.list_members(), config)
     if only_netid is not None:
         normalized = only_netid.strip().casefold()
@@ -500,7 +550,10 @@ def build_snapshot(
     current_candidates = sum(1 for netid, opportunity in prior_passes
                              if netid in members and opportunity in valid_opportunities)
     cache_metrics.update({"lab_cache_candidates": current_candidates, "lab_cache_hits": 0,
-                          "lab_source_checks": 0, "lab_canary_checks": 0})
+                          "lab_source_checks": 0, "lab_canary_checks": 0,
+                          "lab_seals_created": 0, "lab_seals_invalidated": 0,
+                          "lab_seal_checks": 0, "lab_seal_partial": 0,
+                          "lab_sealed_assignments": 0})
     students: list[dict[str, Any]] = []
     contract_matches = {rule.assignment_id: 0 for rule in rules}
     contract_mismatches = {rule.assignment_id: 0 for rule in rules}
@@ -528,9 +581,119 @@ def build_snapshot(
         return aggregate_status(statuses), batch.observed, checked
 
     total_members = len(members)
+    now = datetime.now(timezone.utc)
+    # Accept either SealedAssignment objects or the plain dicts restored from
+    # the on-disk cache, so callers do not have to rehydrate them by hand.
+    existing_seals: dict[str, SealedAssignment] = {}
+    for opportunity_id, raw in dict(sealed_assignments or {}).items():
+        if isinstance(raw, SealedAssignment):
+            existing_seals[opportunity_id] = raw
+            continue
+        if not isinstance(raw, dict):
+            continue
+        results = raw.get("results")
+        fingerprint = raw.get("fingerprint")
+        sealed_at = raw.get("sealed_at")
+        signal = raw.get("closure_signal")
+        if not isinstance(results, dict) or not isinstance(fingerprint, str):
+            continue
+        if not isinstance(sealed_at, str) or not isinstance(signal, str):
+            continue
+        existing_seals[opportunity_id] = SealedAssignment(
+            opportunity_id=opportunity_id,
+            fingerprint=fingerprint,
+            sealed_at=sealed_at,
+            closure_signal=signal,
+            results={
+                netid: status
+                for netid, status in results.items()
+                if isinstance(netid, str) and isinstance(status, str)
+            },
+        )
+
+    # Decide which configured assignments are already sealed. A seal is only
+    # honoured when the contract fingerprint still matches, so a score or
+    # test-count change invalidates it instead of inheriting stale passes.
+    active_seals: dict[str, SealedAssignment] = {}
+    for rule in rules:
+        seal = existing_seals.get(rule.opportunity_id)
+        if seal is None:
+            continue
+        if contract_fingerprint is None or seal.fingerprint != contract_fingerprint(rule):
+            cache_metrics["lab_seals_invalidated"] += 1
+            continue
+        if only_netid is not None and only_netid not in seal.results:
+            cache_metrics["lab_seals_invalidated"] += 1
+            continue
+        active_seals[rule.opportunity_id] = seal
+
+    def _seal_is_stale(seal: SealedAssignment) -> bool:
+        try:
+            sealed_at = datetime.fromisoformat(seal.sealed_at.replace("Z", "+00:00"))
+        except (AttributeError, ValueError):
+            return True
+        if sealed_at.tzinfo is None:
+            return True
+        return (now - sealed_at) >= timedelta(hours=config.cache.seal_recheck_hours)
+
+    # Only assignments that opt in with seal_when_closed are considered, and an
+    # already-sealed assignment is re-examined at most once per
+    # seal_recheck_hours so a reopened assignment is noticed instead of being
+    # served stale forever.
+    def _wants_seal_attention(rule: AssignmentRule) -> bool:
+        if not rule.seal_when_closed or force_full_revalidation:
+            return False
+        seal = active_seals.get(rule.opportunity_id)
+        return seal is None or _seal_is_stale(seal)
+
+    # Probe the course once, and only when at least one assignment actually
+    # needs the answer. A fully sealed course therefore costs no extra request.
+    closure_signals: dict[int, str] = {}
+    if config.cache.enabled and any(_wants_seal_attention(rule) for rule in rules):
+        probe = getattr(source, "assignment_closure", None)
+        if callable(probe):
+            try:
+                closure_signals = dict(probe())
+            except GradescopeAdapterError:
+                closure_signals = {}
+
+    newly_sealed: list[str] = []
+    for rule in rules:
+        if not _wants_seal_attention(rule):
+            continue
+        signal = closure_signals.get(rule.assignment_id)
+        if signal is None or not _is_closed(signal, now):
+            continue
+        newly_sealed.append(rule.opportunity_id)
+        active_seals.pop(rule.opportunity_id, None)
+        cache_metrics["lab_seal_checks"] += 1
+
     for member_index, (netid, member) in enumerate(sorted(members.items()), start=1):
         results: list[dict[str, Any]] = []
         for rule in rules:
+            seal = active_seals.get(rule.opportunity_id)
+            if seal is not None and netid in seal.results:
+                status = seal.results[netid]
+                results.append({
+                    "opportunity_id": rule.opportunity_id,
+                    "status": status,
+                    "pass_evidence": "sealed_assignment" if status == "passed" else None,
+                    "submissions_observed": 0,
+                    "submissions_checked": 0,
+                })
+                if status == "passed":
+                    contract_matches[rule.assignment_id] += 1
+                continue
+            if seal is not None and netid not in seal.results:
+                # A member who is absent from a sealed table cannot be served
+                # from it. Fail closed rather than guess, unless this is a
+                # single-student preview.
+                if only_netid is not None:
+                    cache_metrics["lab_seal_partial"] += 1
+                else:
+                    raise GradescopeSchemaError(
+                        f"sealed assignment {rule.opportunity_id} has no result for a roster member"
+                    )
             cache_key = (netid, rule.opportunity_id)
             if not force_full_revalidation and cache_key in prior_passes:
                 cache_metrics["lab_cache_hits"] += 1
@@ -552,8 +715,50 @@ def build_snapshot(
         if progress is not None:
             progress(member_index, total_members)
 
+    # A freshly observed-closed assignment is sealed from the results just read.
+    # This is the one final full check; every later run serves the table instead.
+    seal_results: dict[str, dict[str, str]] = {opportunity: {} for opportunity in newly_sealed}
+    for student in students:
+        for result in student["autograders"]:
+            if result["opportunity_id"] in seal_results:
+                seal_results[result["opportunity_id"]][student["netid"]] = result["status"]
+    sealed_at = datetime.now(timezone.utc).isoformat().replace("+00:00", "Z")
+    for rule in rules:
+        if rule.opportunity_id not in seal_results:
+            continue
+        missing = set(members) - set(seal_results[rule.opportunity_id])
+        if missing and only_netid is None:
+            raise GradescopeSchemaError(
+                f"refusing to seal {rule.opportunity_id} without a result for every roster member"
+            )
+        # "pending" and "error" are transient: a submission still being graded is
+        # not a final answer. Sealing one would freeze a temporary state forever,
+        # so wait for the next run instead.
+        unsettled = sorted(
+            netid for netid, status in seal_results[rule.opportunity_id].items()
+            if status in {"pending", "error"}
+        )
+        if unsettled and only_netid is None:
+            print(
+                f"[seal] {rule.opportunity_id} not sealed yet: "
+                f"{len(unsettled)} member(s) still pending or errored",
+                flush=True,
+            )
+            continue
+        active_seals[rule.opportunity_id] = SealedAssignment(
+            opportunity_id=rule.opportunity_id,
+            fingerprint=contract_fingerprint(rule) if contract_fingerprint is not None else "",
+            sealed_at=sealed_at,
+            closure_signal=closure_signals.get(rule.assignment_id, "unknown"),
+            results=dict(sorted(seal_results[rule.opportunity_id].items())),
+        )
+        cache_metrics["lab_seals_created"] += 1
+
     if config.cache.lab_contract_canary_each_run and not force_full_revalidation:
         for rule in rules:
+            if rule.opportunity_id in active_seals:
+                # Sealing supersedes the canary: the result is already final.
+                continue
             if contract_matches[rule.assignment_id] > 0:
                 continue
             for _netid, member, candidate_rule in cached_candidates[rule.assignment_id]:
@@ -594,7 +799,9 @@ def build_snapshot(
     errors = validate_snapshot(snapshot)
     if errors:
         raise GradescopeSchemaError("invalid normalized snapshot: " + "; ".join(errors))
-    return snapshot
+    cache_metrics["lab_sealed_assignments"] = len(active_seals)
+    return snapshot, active_seals
+
 
 def validate_snapshot(snapshot: Any) -> list[str]:
     """Validate normalized output without raising on hostile JSON types."""
@@ -716,7 +923,10 @@ def validate_snapshot(snapshot: Any) -> list[str]:
                     errors.append("an autograder status is invalid")
                 evidence = result["pass_evidence"]
                 if status == "passed":
-                    if evidence not in {"current_history", "previous_snapshot", "completion_cache"}:
+                    if evidence not in {
+                        "current_history", "previous_snapshot", "completion_cache",
+                        "sealed_assignment",
+                    }:
                         errors.append("passed result has invalid evidence")
                 elif evidence is not None:
                     errors.append("non-passed result cannot have pass evidence")
@@ -1045,6 +1255,54 @@ class PrivateWebGradescopeSource:
         if student_count > self.config.maximum_roster_members:
             raise GradescopeSchemaError("Gradescope roster exceeded the configured member limit")
         return result
+
+    def assignment_closure(self) -> dict[int, str]:
+        """Return a closure signal for every assignment in the course.
+
+        Gradescope renders the instructor assignment table as a React payload.
+        The installed client library projects that payload onto a dataclass that
+        keeps only a few ``submission_window`` dates, so the authoritative
+        ``accepting_submissions`` flag is read here from the same page the client
+        already requests. The signal is deliberately advisory: it reports what
+        Gradescope claims, and sealing still re-reads real submissions once.
+        """
+        response = self._get(
+            f"{BASE_URL}/courses/{self.config.course_id}/assignments",
+            content_type="text/html",
+        )
+        block = self._soup_type(response.text, "html.parser").find(
+            "div", {"data-react-class": "AssignmentsTable"}
+        )
+        if block is None or not block.get("data-react-props"):
+            raise GradescopeSchemaError("Gradescope assignment table properties are missing")
+        try:
+            document = json.loads(block["data-react-props"])
+        except (TypeError, json.JSONDecodeError) as error:
+            raise GradescopeSchemaError("Gradescope assignment table properties are invalid JSON") from error
+        rows = document.get("table_data") if isinstance(document, dict) else None
+        if not isinstance(rows, list):
+            raise GradescopeSchemaError("Gradescope assignment table is malformed")
+        signals: dict[int, str] = {}
+        for row in rows:
+            if not isinstance(row, dict):
+                raise GradescopeSchemaError("Gradescope assignment row is malformed")
+            raw_id = row.get("id")
+            assignment_id = raw_id if isinstance(raw_id, int) and not isinstance(raw_id, bool) else None
+            if assignment_id is None or assignment_id <= 0:
+                raise GradescopeSchemaError("Gradescope assignment row has an invalid id")
+            window = row.get("submission_window")
+            window = window if isinstance(window, dict) else {}
+            accepting = window.get("accepting_submissions")
+            close = window.get("close")
+            if isinstance(accepting, bool):
+                signals[assignment_id] = "accepting_submissions=false" if not accepting else "accepting_submissions=true"
+            elif isinstance(close, str) and close.strip():
+                # Older payloads omit the boolean; fall back to the window close
+                # time, which is only a hint and is reported as such.
+                signals[assignment_id] = f"window_close={close.strip()}"
+            else:
+                signals[assignment_id] = "unknown"
+        return signals
 
     def _gradebook(self, member_id: str) -> list[dict[str, Any]]:
         if member_id in self._gradebook_cache:

@@ -14,7 +14,7 @@ from pathlib import Path
 import re
 import stat
 import tempfile
-from typing import Any, TypeAlias
+from typing import Any, Mapping, TypeAlias
 
 from .checkoff_mappings import AUTOGRADER_OPPORTUNITY_IDS, COLUMN_MAPPINGS, LAB_MAPPING_VERSION
 from .gradescope_exam import EXAM_MAPPING_VERSION, EXAM_OPPORTUNITIES
@@ -31,7 +31,9 @@ _MAX_ENTRIES = 100_000
 _TOP_FIELDS = {
     "schema_version", "course_id", "written_at", "lab_contracts", "lab_passes",
     "exam_contract", "exam_completions", "google", "exam_export",
+    "sealed_assignments",
 }
+_SEALED_FIELDS = {"fingerprint", "sealed_at", "closure_signal", "results"}
 _LAB_CONTRACT_FIELDS = {
     "assignment_id", "opportunity_id", "contract_version", "expected_score",
     "expected_test_count", "expected_test_maxima", "title_mapping_override",
@@ -236,6 +238,70 @@ def _validate_contract_wrapper(value: object, errors: list[str], where: str, *, 
     elif expected is not None and fingerprint != expected: errors.append(f"{where}.fingerprint does not match its contract")
 
 
+_SEAL_STATUSES = frozenset({"passed", "failed", "pending", "error", "not_submitted"})
+
+
+def _validate_sealed_assignments(
+    value: object, config: object | None, reference_time: datetime, errors: list[str]
+) -> None:
+    """Validate frozen per-student results for closed assignments.
+
+    A seal is trusted only when its fingerprint still matches the live contract,
+    so editing a score or test count retires the table instead of letting a
+    changed assignment inherit results graded under the old contract.
+    """
+    if not isinstance(value, dict):
+        errors.append("cache.sealed_assignments must be an object")
+        return
+    rules = {
+        getattr(rule, "opportunity_id"): rule
+        for rule in getattr(config, "assignments", ()) or ()
+    }
+    if len(value) > _MAX_ENTRIES:
+        errors.append("cache.sealed_assignments has too many entries")
+    for opportunity_id, seal in value.items():
+        where = f"cache.sealed_assignments.{opportunity_id}"
+        if not isinstance(opportunity_id, str) or not _IDENTIFIER.fullmatch(opportunity_id):
+            errors.append(f"{where} has an invalid opportunity id")
+            continue
+        if not _exact_dict(seal, _SEALED_FIELDS, errors, where):
+            continue
+        assert isinstance(seal, dict)
+        fingerprint = seal["fingerprint"]
+        if not isinstance(fingerprint, str) or not _FINGERPRINT.fullmatch(fingerprint):
+            errors.append(f"{where}.fingerprint is invalid")
+        elif config is not None:
+            rule = rules.get(opportunity_id)
+            if rule is not None and fingerprint != lab_contract_fingerprint(config, rule):
+                errors.append(f"{where}.fingerprint does not match the current contract")
+        sealed_at = _parsed_timestamp(seal["sealed_at"])
+        if sealed_at is None:
+            errors.append(f"{where}.sealed_at is invalid")
+        elif sealed_at > reference_time:
+            errors.append(f"{where}.sealed_at is in the future")
+        signal = seal["closure_signal"]
+        if (
+            not isinstance(signal, str)
+            or not signal
+            or len(signal) > 200
+            or any(ord(c) < 32 for c in signal)
+        ):
+            errors.append(f"{where}.closure_signal is invalid")
+        results = seal["results"]
+        if not isinstance(results, dict):
+            errors.append(f"{where}.results must be an object")
+            continue
+        if len(results) > _MAX_ENTRIES:
+            errors.append(f"{where}.results has too many entries")
+        for netid, status in results.items():
+            if not isinstance(netid, str) or not _NETID.fullmatch(netid):
+                errors.append(f"{where}.results has an invalid NetID")
+                break
+            if status not in _SEAL_STATUSES:
+                errors.append(f"{where}.results has an invalid status")
+                break
+
+
 def validate_completion_cache(
     value: object, *, config: object | None = None, now: datetime | None = None
 ) -> list[str]:
@@ -321,6 +387,10 @@ def validate_completion_cache(
         etag = export["etag"]
         if etag is not None and (not isinstance(etag, str) or len(etag) > 512 or any(ord(c) < 32 for c in etag)): errors.append("cache.exam_export.etag is invalid")
 
+    _validate_sealed_assignments(
+        value["sealed_assignments"], config, reference_time, errors
+    )
+
     try: _canonical_json(value)
     except (TypeError, ValueError, OverflowError): errors.append("cache is not finite JSON")
     return errors
@@ -404,12 +474,21 @@ def filter_completion_cache(
     return labs, exams
 
 
+def sealed_assignments_from_cache(cache: CompletionCache | None) -> dict[str, Any]:
+    """Return validated sealed-assignment records for reuse by the crawler."""
+    if not cache:
+        return {}
+    sealed = cache.get("sealed_assignments")
+    return dict(sealed) if isinstance(sealed, dict) else {}
+
+
 def build_completion_cache(
     config: object,
     snapshot: dict[str, Any],
     exam_completions: frozenset[tuple[str, str]],
     *,
     written_at: str | None = None,
+    sealed: Mapping[str, Any] | None = None,
 ) -> CompletionCache:
     """Build the next positive-only cache from validated normalized results."""
     from .gradescope import validate_snapshot
@@ -472,6 +551,15 @@ def build_completion_cache(
             "worksheet_title": None, "normalized_records": None,
         },
         "exam_export": {"etag": None},
+        "sealed_assignments": {
+            opportunity_id: {
+                "fingerprint": seal.fingerprint,
+                "sealed_at": seal.sealed_at,
+                "closure_signal": seal.closure_signal,
+                "results": dict(sorted(seal.results.items())),
+            }
+            for opportunity_id, seal in sorted((sealed or {}).items())
+        },
     }
     errors = validate_completion_cache(cache, config=config)
     if errors:

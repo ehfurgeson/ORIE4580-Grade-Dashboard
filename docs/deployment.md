@@ -76,6 +76,12 @@ sudo install -o root -g www-data -m 0644 \
   /var/www/html/orie4580_fa26/simple-dashboard.js
 ```
 
+`load_config` is strict: a hand-edited `gradescope.toml` that omits
+`seal_when_closed` on an assignment, or `seal_recheck_hours` under `[cache]`, is
+rejected and the refresh fails closed. Re-copy the example file rather than
+patching the installed one. Sealing itself is optional and off by default; see
+[`maintenance.md`](maintenance.md#25-seal-a-closed-assignment).
+
 Validate the checked-in configuration and source on Ubuntu:
 
 ```sh

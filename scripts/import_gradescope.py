@@ -65,7 +65,7 @@ def main() -> None:
         _validate_canary_mode(args.student_netid, args.no_carry_forward, output)
         config = load_config(args.config)
         source = PrivateWebGradescopeSource(email, password, config)
-        snapshot = build_snapshot(source, config, only_netid=args.student_netid)
+        snapshot, _ = build_snapshot(source, config, only_netid=args.student_netid)
         if output.exists() and not args.no_carry_forward:
             previous = json.loads(output.read_text(encoding="utf-8"))
             previous_errors = validate_snapshot(previous)

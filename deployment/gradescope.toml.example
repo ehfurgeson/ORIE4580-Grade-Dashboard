@@ -21,6 +21,9 @@ enabled = true
 lab_contract_canary_each_run = true
 google_conditional_requests = false
 exam_conditional_requests = false
+# Re-probe a sealed (closed) assignment at most this often, so an assignment a
+# TA reopens is noticed instead of being served stale forever.
+seal_recheck_hours = 24
 
 [exam]
 assignment_id = 8667062
@@ -38,6 +41,10 @@ expected_score = "11"
 expected_test_count = 11
 expected_test_maxima = ["1", "1", "1", "1", "1", "1", "1", "1", "1", "1", "1"]
 title_mapping_override = false
+# Seal this assignment once Gradescope reports it no longer accepts submissions.
+# The first closed run performs one final full check, then the recorded result
+# for every roster member is served without any further Gradescope reads.
+seal_when_closed = false
 
 [assignments."8532445"]
 opportunity_id = "lab1-q3"
@@ -46,6 +53,10 @@ expected_score = "1"
 expected_test_count = 1
 expected_test_maxima = ["1"]
 title_mapping_override = false
+# Seal this assignment once Gradescope reports it no longer accepts submissions.
+# The first closed run performs one final full check, then the recorded result
+# for every roster member is served without any further Gradescope reads.
+seal_when_closed = false
 
 [assignments."8603427"]
 opportunity_id = "lab2-q1"
@@ -54,6 +65,10 @@ expected_score = "6"
 expected_test_count = 6
 expected_test_maxima = ["1", "1", "1", "1", "1", "1"]
 title_mapping_override = false
+# Seal this assignment once Gradescope reports it no longer accepts submissions.
+# The first closed run performs one final full check, then the recorded result
+# for every roster member is served without any further Gradescope reads.
+seal_when_closed = false
 
 [assignments."8603442"]
 opportunity_id = "lab2-q2"
@@ -62,6 +77,10 @@ expected_score = "1"
 expected_test_count = 1
 expected_test_maxima = ["1"]
 title_mapping_override = false
+# Seal this assignment once Gradescope reports it no longer accepts submissions.
+# The first closed run performs one final full check, then the recorded result
+# for every roster member is served without any further Gradescope reads.
+seal_when_closed = false
 
 [assignments."8603445"]
 opportunity_id = "lab2-q3"
@@ -70,6 +89,10 @@ expected_score = "3"
 expected_test_count = 3
 expected_test_maxima = ["1", "1", "1"]
 title_mapping_override = false
+# Seal this assignment once Gradescope reports it no longer accepts submissions.
+# The first closed run performs one final full check, then the recorded result
+# for every roster member is served without any further Gradescope reads.
+seal_when_closed = false
 
 [assignments."8693888"]
 opportunity_id = "lab3-q1"
@@ -78,6 +101,10 @@ expected_score = "1"
 expected_test_count = 1
 expected_test_maxima = ["1"]
 title_mapping_override = false
+# Seal this assignment once Gradescope reports it no longer accepts submissions.
+# The first closed run performs one final full check, then the recorded result
+# for every roster member is served without any further Gradescope reads.
+seal_when_closed = false
 
 [assignments."8693897"]
 opportunity_id = "lab3-q2"
@@ -86,6 +113,10 @@ expected_score = "2"
 expected_test_count = 2
 expected_test_maxima = ["1", "1"]
 title_mapping_override = false
+# Seal this assignment once Gradescope reports it no longer accepts submissions.
+# The first closed run performs one final full check, then the recorded result
+# for every roster member is served without any further Gradescope reads.
+seal_when_closed = false
 
 [assignments."8693907"]
 opportunity_id = "lab3-q3"
@@ -94,6 +125,10 @@ expected_score = "1"
 expected_test_count = 1
 expected_test_maxima = ["1"]
 title_mapping_override = false
+# Seal this assignment once Gradescope reports it no longer accepts submissions.
+# The first closed run performs one final full check, then the recorded result
+# for every roster member is served without any further Gradescope reads.
+seal_when_closed = false
 
 [assignments."8757792"]
 opportunity_id = "lab4-q2"
@@ -102,6 +137,10 @@ expected_score = "3"
 expected_test_count = 3
 expected_test_maxima = ["1", "1", "1"]
 title_mapping_override = false
+# Seal this assignment once Gradescope reports it no longer accepts submissions.
+# The first closed run performs one final full check, then the recorded result
+# for every roster member is served without any further Gradescope reads.
+seal_when_closed = false
 
 [assignments."8758286"]
 opportunity_id = "lab4-q3"
@@ -110,3 +149,7 @@ expected_score = "2"
 expected_test_count = 2
 expected_test_maxima = ["1", "1"]
 title_mapping_override = false
+# Seal this assignment once Gradescope reports it no longer accepts submissions.
+# The first closed run performs one final full check, then the recorded result
+# for every roster member is served without any further Gradescope reads.
+seal_when_closed = false
