@@ -115,6 +115,23 @@ def test_lab_4_maps_to_three_standards():
     assert mapped["S5"] == [("lab4-q3", "complete")]
 
 
+def test_lab_5_maps_to_three_manual_only_standards():
+    rows = [{
+        "NetID": "abc123",
+        "Lab 5 - Q1": True,
+        "Lab 5 - Q2": False,
+        "Lab 5 - Q3": True,
+    }]
+    record = rows_to_simple_records(rows, updated_at=UPDATED_AT, worksheet="Lab Checkoffs")[0]
+    mapped = {
+        standard["id"]: [(item["id"], item["status"]) for item in standard["checkmarks"]]
+        for standard in record["standards"]
+    }
+    assert mapped["S3"] == [("lab5-q1", "complete")]
+    assert mapped["S4"] == [("lab5-q2", "incomplete")]
+    assert mapped["S5"] == [("lab5-q3", "complete")]
+
+
 @pytest.mark.parametrize(
     "rows,message",
     [
@@ -123,7 +140,7 @@ def test_lab_4_maps_to_three_standards():
         ([{"NetID": "abc123", "Lab 2 - Q1": "maybe"}], "True/False"),
         ([{"NetID": "ABC123", "Lab 2 - Q1": "True"}, {"NetID": "abc123", "Lab 2 - Q1": "False"}], "duplicate"),
         ([{"NetID": "abc123"}], "at least one"),
-        ([{"NetID": "abc123", "Lab 5 - Q1": "True"}], "unmapped checkoff"),
+        ([{"NetID": "abc123", "Lab 6 - Q1": "True"}], "unmapped checkoff"),
     ],
 )
 def test_wide_rows_reject_unsafe_or_ambiguous_input(rows, message):

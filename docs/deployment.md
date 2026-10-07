@@ -36,7 +36,7 @@ Review, commit, and push the tracked changes:
 
 ```sh
 git add README.md docs deployment fixtures scripts static sync templates tests
-git commit -m "Add Lab 4 dashboard mappings"
+git commit -m "Add Lab 5 dashboard mappings"
 git push origin main
 ```
 
@@ -59,7 +59,7 @@ git pull --ff-only origin main
 
 Do not continue if the checkout has unexpected local changes or the pull is not fast-forward.
 
-No dependency changed for Lab 4. For a future release that changes `requirements.txt`, run:
+No dependency changed for Lab 5. For a future release that changes `requirements.txt`, run:
 
 ```sh
 .venv/bin/python -m pip install -r requirements.txt
@@ -90,16 +90,16 @@ Validate the checked-in configuration and source on Ubuntu:
 .venv/bin/pytest -q
 ```
 
-For the Lab 4 release, the first command must print `10`.
+For the Lab 5 release, the first command must still print `10`; Lab 5 has no Gradescope assignments.
 
-When this release changes the Gradescope assignment contract — a new autograded assignment, or a bumped contract version — retire the previous private snapshot before the first refresh. A manual-only column does not change that contract. The completion cache is invalid after a contract change, so the refresh falls back to `/var/lib/orie4580-dashboard/gradescope-snapshot.json` and aborts with `cannot carry pass evidence across a changed course or assignment contract` if that file still describes the previous contract. Moving it aside lets the full crawl become the new baseline and seed the cache:
+When a release changes the Gradescope assignment contract — a new autograded assignment, or a bumped contract version — retire the previous private snapshot before the first refresh. A manual-only column does not change that contract. The completion cache is invalid after a contract change, so the refresh falls back to `/var/lib/orie4580-dashboard/gradescope-snapshot.json` and aborts with `cannot carry pass evidence across a changed course or assignment contract` if that file still describes the previous contract. Moving it aside lets the full crawl become the new baseline and seed the cache:
 
 ```sh
 sudo mv /var/lib/orie4580-dashboard/gradescope-snapshot.json \
   /var/lib/orie4580-dashboard/gradescope-snapshot.json.pre-contract-change
 ```
 
-Lab 4 adds autograded Q2 and Q3, so it needs this step. The first run also revalidates Lab pass history and can take longer than later cached runs. Start one full atomic refresh and follow its progress:
+Lab 5 adds only manual-only columns, so the existing Gradescope snapshot remains compatible. Its mapping-version bump invalidates the positive completion cache, causing the first refresh to revalidate Lab pass history and rebuild that cache; this can take longer than later cached runs. Start one full atomic refresh and follow its progress:
 
 ```sh
 sudo systemctl reset-failed orie4580-checkoffs.service
@@ -116,7 +116,7 @@ sudo systemctl show orie4580-checkoffs.service \
 
 A successful oneshot ends with `ActiveState=inactive`, `Result=success`, and `ExecMainStatus=0`.
 
-Check an owner page in the browser. Confirm that Lab 4 Q1 lists only **Manual checkoff**, while Q2 and Q3 list **Manual checkoff** and **Autograder**. Also check that a different student cannot open that page.
+Check an owner page in the browser. Confirm that Lab 5 Q1, Q2, and Q3 each list only **Manual checkoff**, while the existing autograded opportunities still list **Manual checkoff** and **Autograder**. Also check that a different student cannot open that page.
 
 Re-enable the schedule only after those checks pass:
 
@@ -155,7 +155,10 @@ The script makes no network requests. It accepts only the old
 contracts against the configured assignments, and writes a separate mode-0600
 file. Completions and verification timestamps stay unchanged. If migration
 fails, leave the original cache in place and inspect the mismatch before
-installing anything.
+installing anything. This historical migration applies to the earlier standard-ID
+transition; do not use it for the Lab 5 mapping update. Lab 5 intentionally
+rebuilds the existing `lab-mapping-v3` cache under `lab-mapping-v4` during the
+first full refresh.
 
 Then perform the manual refresh and checks above before re-enabling the timer.
 Cached positive Lab results avoid repeated submission-history reads; current

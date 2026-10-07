@@ -85,7 +85,7 @@ The client discovers the worksheet title from worksheet ID `0`, never logs cell 
 
 A read-only, local-only adapter is implemented in `sync/gradescope.py` and `scripts/import_gradescope.py`. It uses pinned `gradescope-tool==0.1.4` to authenticate to Gradescope's unofficial private web interface, then validates the structured `AssignmentSubmissionViewer` properties for every current and historical submission. It does not use free-form autograder output or the package's broken `scores.csv` parser.
 
-Copy `deployment/gradescope.toml.example` to an ignored path such as `imports/gradescope/config.toml`, then configure an explicit course allowlist and one assignment rule per autograded checkmark opportunity. Manual-only opportunities, including Lab 4 Q1, must not have a Gradescope rule. Every rule contains a contract version, expected full score, exact test count, and exact ordered test-maxima vector. The role allowlists and roster minimum must also be confirmed from a live structural probe; the observed student role is `"0"`. Credentials stay in the ignored `.env` file:
+Copy `deployment/gradescope.toml.example` to an ignored path such as `imports/gradescope/config.toml`, then configure an explicit course allowlist and one assignment rule per autograded checkmark opportunity. Manual-only opportunities, including Lab 4 Q1 and all Lab 5 questions, must not have a Gradescope rule. Every rule contains a contract version, expected full score, exact test count, and exact ordered test-maxima vector. The role allowlists and roster minimum must also be confirmed from a live structural probe; the observed student role is `"0"`. Credentials stay in the ignored `.env` file:
 
 ```dotenv
 GRADESCOPE_EMAIL=staff-account@example.edu
@@ -108,7 +108,7 @@ Normal repeated runs should omit `--no-carry-forward`. A prior verified pass is 
 
 ### Local combined dashboard canary
 
-Schema version 5 combines the normalized Gradescope snapshot with the existing Google Sheet opportunities and any available Exam marks. Autograded opportunities display two independent requirements: **Manual checkoff** and **Autograder**, and require both to complete. Lab 4 Q1 is manual-only: its green checkmark depends on the recorded checkoff and does not display or require an autograder.
+Schema version 5 combines the normalized Gradescope snapshot with the existing Google Sheet opportunities and any available Exam marks. Autograded opportunities display two independent requirements: **Manual checkoff** and **Autograder**, and require both to complete. Lab 4 Q1 and all Lab 5 questions are manual-only: their green checkmarks depend on the recorded checkoffs and do not display or require an autograder.
 
 Gradescope Lab titles are mapped by the reviewed convention `Lab N, QN` or `Lab N, QN-N`. In particular, `Lab 1, Q1-2` maps to the one `lab1-q1-2` opportunity that aggregates the three sheet columns `Lab 1 - Q1.3`, `Lab 1 - Q2.3`, and `Lab 1 - Q2.4`. Other recognized titles map one-to-one. Non-Lab assignments are ignored because they are not allowlisted. Malformed, unknown, duplicate, or conflicting Lab mappings fail closed. A reviewed config can set `title_mapping_override = true` as an explicit fallback; there is no fuzzy matching.
 
@@ -127,9 +127,9 @@ python -m scripts.refresh_combined_dashboard \
 python -m http.server 8000 --bind 127.0.0.1 --directory generated/combined-env-preview
 ```
 
-Open `http://localhost:8000/students/<fake-netid>/`. This path is strict: every current autograded sheet opportunity must have exactly one configured Lab assignment; manual-only Lab 4 Q1 must have none. The selected student must occur in both sources, and any fetch, contract, mapping, or validation error prevents publication. `scripts.build_combined_canary` remains available only for diagnostics where unconfigured opportunities need to be displayed explicitly.
+Open `http://localhost:8000/students/<fake-netid>/`. This path is strict: every current autograded sheet opportunity must have exactly one configured Lab assignment; manual-only Lab 4 Q1 and all Lab 5 questions must have none. The selected student must occur in both sources, and any fetch, contract, mapping, or validation error prevents publication. `scripts.build_combined_canary` remains available only for diagnostics where unconfigured opportunities need to be displayed explicitly.
 
-For production, the same command uses `--all-students --allow-missing-gradescope-students`. Google Sheets is the authoritative dashboard roster. Any Google student absent from Gradescope still receives a protected dashboard, but every listed autograder requirement is `not_found` and earns no checkmark. Manual-only Lab 4 Q1 is unaffected. This one-way mismatch is unbounded so later Gradescope roster removals do not block refreshes. A Gradescope student absent from Google still aborts. The configured minimum canonical Gradescope roster size also remains a separate guard against a severely truncated response.
+For production, the same command uses `--all-students --allow-missing-gradescope-students`. Google Sheets is the authoritative dashboard roster. Any Google student absent from Gradescope still receives a protected dashboard, but every listed autograder requirement is `not_found` and earns no checkmark. Manual-only Lab 4 Q1 and all Lab 5 questions are unaffected. This one-way mismatch is unbounded so later Gradescope roster removals do not block refreshes. A Gradescope student absent from Google still aborts. The configured minimum canonical Gradescope roster size also remains a separate guard against a severely truncated response.
 
 The supplied systemd service receives the Gradescope login, Google service-account key, and Gradescope config through systemd's per-service credential directory. It keeps normalized pass-history state under `/var/lib/orie4580-dashboard/` and atomically replaces the protected `students/` tree only after the strict Lab sources and merge validate. It retains one hidden previous student tree for manual rollback. systemd prevents concurrent starts of the same oneshot service.
 
@@ -151,7 +151,7 @@ Google Sheets still performs one complete read per refresh. Exam 1 still perform
 
 ## Simple NetID-protected checkoff dashboard
 
-The protected worksheet dashboard maps each known checkoff column to the standard named in the Lab 1–4 handouts. The mapping lives in `sync/checkoff_mappings.py`; unknown columns fail closed so a new lab cannot be silently assigned to the wrong standard. Multi-column opportunities are aggregated explicitly: the three recorded Lab 1 Q1–2 milestones produce one S1 green checkmark and all must be complete. Generated schema-version-5 records retain the source requirements for auditability.
+The protected worksheet dashboard maps each known checkoff column to the standard named in the Lab 1–5 handouts. The mapping lives in `sync/checkoff_mappings.py`; unknown columns fail closed so a new lab cannot be silently assigned to the wrong standard. Multi-column opportunities are aggregated explicitly: the three recorded Lab 1 Q1–2 milestones produce one S1 green checkmark and all must be complete. Generated schema-version-5 records retain the source requirements for auditability.
 
 All importers and validators read the S1–S5 catalog in `sync/standards.py`. Lab and Exam mappings use those IDs directly. Categories and separate descriptive keys have been removed. See [`docs/standards.md`](docs/standards.md) for the opportunity mappings and how to replace imports from the retired tentative catalog.
 

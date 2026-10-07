@@ -146,6 +146,29 @@ def test_lab_4_q1_is_manual_only_and_strict_merge_does_not_require_an_assignment
     assert validate_combined_record(record) == []
 
 
+def test_lab_5_questions_are_manual_only_in_the_combined_record():
+    row = {
+        "NetID": "abc123",
+        "Lab 1 - Q1.3": True,
+        "Lab 1 - Q2.3": True,
+        "Lab 1 - Q2.4": True,
+        "Lab 5 - Q1": True,
+        "Lab 5 - Q2": False,
+        "Lab 5 - Q3": True,
+    }
+    google = rows_to_simple_records([row], updated_at=NOW, worksheet="Lab Checkoffs")[0]
+    record = merge_checkoffs_with_autograders([google], snapshot())[0]
+    for opportunity_id, expected_status in (
+        ("lab5-q1", "complete"),
+        ("lab5-q2", "incomplete"),
+        ("lab5-q3", "complete"),
+    ):
+        checkmark = find_checkmark(record, opportunity_id)
+        assert checkmark["status"] == expected_status
+        assert [item["id"] for item in checkmark["requirements"]] == ["manual"]
+    assert validate_combined_record(record) == []
+
+
 def test_manual_only_opportunity_rejects_an_autograder_mapping():
     configured = snapshot()
     configured["assignments"][0]["opportunity_id"] = "lab4-q1"

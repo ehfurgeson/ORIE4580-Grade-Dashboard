@@ -371,10 +371,12 @@ def test_load_config_is_explicit_and_decimal_exact(tmp_path):
     assert config.assignments[0].expected_score == Decimal("3.0")
     assert config.maximum_submissions_per_student == 500
 
-    manual_only = config_path.read_text().replace("lab3-q1", "lab4-q1")
-    config_path.write_text(manual_only)
-    with pytest.raises(ValueError, match="not an autograded Lab opportunity"):
-        load_config(config_path)
+    for opportunity_id in ("lab4-q1", "lab5-q1", "lab5-q2", "lab5-q3"):
+        manual_only = config_path.read_text().replace("lab3-q1", opportunity_id)
+        config_path.write_text(manual_only)
+        with pytest.raises(ValueError, match="not an autograded Lab opportunity"):
+            load_config(config_path)
+        config_path.write_text(config_path.read_text().replace(opportunity_id, "lab3-q1"))
 
 
 def test_unknown_config_fields_fail_closed(tmp_path):

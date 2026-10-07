@@ -38,6 +38,12 @@ The standards are defined in `sync/standards.py`. The Lab 4 Sheet columns, requi
 - Updated the dashboard explanation, README, authoritative [`standards.md`](standards.md) mapping tables, and regression tests.
 - Validated the current 174-row Sheet and performed a successful live one-student refresh against all 10 configured Lab assignments.
 
+### 1.2 Lab 5 worked example
+
+Lab 5 has three independent manual-only opportunities. `Lab 5 - Q1` maps to S3, `Lab 5 - Q2` maps to S4, and `Lab 5 - Q3` maps to S5. The three opportunities earn green from their Google Sheet checkboxes alone; Lab 5 has no Gradescope portion or autograding. Add the exact columns and stable opportunity IDs to `sync/checkoff_mappings.py`, add all three IDs to `MANUAL_ONLY_OPPORTUNITY_IDS`, and do not add Gradescope assignment rules.
+
+Because the effective mapping changes, increment `LAB_MAPPING_VERSION`. The Gradescope assignment snapshot contract does not change, but the positive completion cache will be rebuilt under the new mapping version during the next full refresh.
+
 ## 2. Adding a new lab
 
 ### 2.1 Collect the facts first

@@ -210,7 +210,7 @@
     document.querySelector('#dashboard-description').textContent =
       'Your lab checkoffs, autograder results, and available Exam 1 checkmarks, mapped to course standards.';
     document.querySelector('#completion-note').textContent =
-      'Lab green checkmarks require the listed Lab sources. Lab 4 Q1 has no autograded component. Exam 1 scores over 0.8 earn their mapped purple or shiny-purple checkmark. Unavailable exam scores do not earn a mark.';
+      'Lab green checkmarks require the listed Lab sources. Manual-only Lab opportunities have no autograded component. Exam 1 scores over 0.8 earn their mapped purple or shiny-purple checkmark. Unavailable exam scores do not earn a mark.';
     document.querySelector('#student-netid').textContent = data.student.netid;
     document.querySelector('#worksheet').textContent = data.worksheet;
     const time = document.querySelector('#updated-at');

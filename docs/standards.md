@@ -35,6 +35,9 @@ Every listed Lab opportunity requires its Google Sheet checkoff. An **Autograded
 | Lab 4, Q1 | `lab4-q1` | `S3` | `Lab 4 - Q1` | **Manual-only** | None |
 | Lab 4, Q2 | `lab4-q2` | `S4` | `Lab 4 - Q2` | Autograded | `8757792`; 3 points; 3 × 1-point tests |
 | Lab 4, Q3 | `lab4-q3` | `S5` | `Lab 4 - Q3` | Autograded | `8758286`; 2 points; 2 × 1-point tests |
+| Lab 5, Q1 | `lab5-q1` | `S3` | `Lab 5 - Q1` | **Manual-only** | None |
+| Lab 5, Q2 | `lab5-q2` | `S4` | `Lab 5 - Q2` | **Manual-only** | None |
+| Lab 5, Q3 | `lab5-q3` | `S5` | `Lab 5 - Q3` | **Manual-only** | None |
 
 ### Grouped manual checkoffs
 
@@ -45,6 +48,14 @@ Lab 1 Q1–2 is one green opportunity, not three. All three listed Sheet milesto
 - **S3 / Q1:** complete Q1, then ask for a checkoff. There is no autograded component.
 - **S4 / Q2:** complete Q2, pass the Q2 Gradescope autograder, then ask for a checkoff.
 - **S5 / Q3:** complete Q3, pass the Q3 Gradescope autograder, then ask for a checkoff.
+
+### Lab 5 student-facing requirements
+
+- **S3 / Q1:** complete Q1, then ask for a checkoff.
+- **S4 / Q2:** complete an **[S4]**-marked practice problem from Canvas, then ask for a checkoff.
+- **S5 / Q3:** complete an **[S5]**-marked practice problem from Canvas, then ask for a checkoff.
+
+Lab 5 has no Gradescope portion and no autograding. Its three green checkmarks depend only on the corresponding Google Sheet checkoffs.
 
 ## 4. Exam 1 mappings
 

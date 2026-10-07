@@ -3,7 +3,7 @@ from __future__ import annotations
 
 import re
 
-LAB_MAPPING_VERSION = "lab-mapping-v3"
+LAB_MAPPING_VERSION = "lab-mapping-v4"
 
 # Each worksheet column belongs to exactly one syllabus checkmark opportunity.
 # Multiple columns with the same opportunity ID must all be complete to earn it.
@@ -25,11 +25,16 @@ COLUMN_MAPPINGS = {
     "Lab 4 - Q1": ('S3', "lab4-q1", "Lab 4 · Q1"),
     "Lab 4 - Q2": ('S4', "lab4-q2", "Lab 4 · Q2"),
     "Lab 4 - Q3": ('S5', "lab4-q3", "Lab 4 · Q3"),
+    "Lab 5 - Q1": ('S3', "lab5-q1", "Lab 5 · Q1"),
+    "Lab 5 - Q2": ('S4', "lab5-q2", "Lab 5 · Q2"),
+    "Lab 5 - Q3": ('S5', "lab5-q3", "Lab 5 · Q3"),
 }
 
 
 OPPORTUNITY_IDS = frozenset(mapping[1] for mapping in COLUMN_MAPPINGS.values())
-MANUAL_ONLY_OPPORTUNITY_IDS = frozenset({"lab4-q1"})
+MANUAL_ONLY_OPPORTUNITY_IDS = frozenset({
+    "lab4-q1", "lab5-q1", "lab5-q2", "lab5-q3",
+})
 AUTOGRADER_OPPORTUNITY_IDS = OPPORTUNITY_IDS - MANUAL_ONLY_OPPORTUNITY_IDS
 LAB_ASSIGNMENT_PATTERN = re.compile(
     r"^\s*Lab\s*(?P<lab>[0-9]+)\s*[,;:\-]\s*Q\s*"
