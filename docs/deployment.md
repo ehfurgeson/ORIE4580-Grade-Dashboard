@@ -65,7 +65,7 @@ No dependency changed for Lab 5. For a future release that changes `requirements
 .venv/bin/python -m pip install -r requirements.txt
 ```
 
-Install the reviewed Gradescope allowlist and the browser JavaScript. The JavaScript copy is required because student pages load it from the web root; the refresh service replaces `students/` but does not copy root assets.
+Install the reviewed Gradescope allowlist and the browser assets. These copies are required because student pages load them from the web root; the refresh service replaces `students/` but does not copy root assets. For the schema-6 rollout, install both JavaScript and CSS before the first refresh so the active browser can validate and display `unmapped_columns`.
 
 ```sh
 sudo install -o root -g root -m 0600 \
@@ -74,7 +74,12 @@ sudo install -o root -g root -m 0600 \
 sudo install -o root -g www-data -m 0644 \
   static/simple-dashboard.js \
   /var/www/html/orie4580_fa26/simple-dashboard.js
+sudo install -o root -g www-data -m 0644 \
+  static/simple-style.css \
+  /var/www/html/orie4580_fa26/simple-style.css
 ```
+
+Forward compatibility depends on that order: install schema-6 `simple-dashboard.js` and `simple-style.css`, then run the refresh that publishes schema-6 records. The new JavaScript deliberately tolerates schema-3–5 pages whose older HTML has no pending-mapping container during this rollout window. For rollback, use the reverse dependency order: restore the previous schema-3–5 student release first, then restore the previous JavaScript and CSS, and finally roll back the checkout/config as needed. Never serve schema-6 records to an older browser validator.
 
 `load_config` is strict: a hand-edited `gradescope.toml` that omits
 `seal_when_closed` on an assignment, or `seal_recheck_hours` under `[cache]`, is
@@ -92,7 +97,7 @@ Validate the checked-in configuration and source on Ubuntu:
 
 For the Lab 5 release, the first command must still print `10`; Lab 5 has no Gradescope assignments.
 
-When a release changes the Gradescope assignment contract — a new autograded assignment, or a bumped contract version — retire the previous private snapshot before the first refresh. A manual-only column does not change that contract. The completion cache is invalid after a contract change, so the refresh falls back to `/var/lib/orie4580-dashboard/gradescope-snapshot.json` and aborts with `cannot carry pass evidence across a changed course or assignment contract` if that file still describes the previous contract. Moving it aside lets the full crawl become the new baseline and seed the cache:
+When a release changes the Gradescope assignment contract — a new autograded assignment, or a bumped contract version — retire the previous private snapshot before the first refresh. An unknown quarantined column and a mapped manual-only column do not change that contract: they need no Gradescope configuration, and the existing snapshot must not be retired merely because either appeared. The completion cache is invalid after a contract change, so the refresh falls back to `/var/lib/orie4580-dashboard/gradescope-snapshot.json` and aborts with `cannot carry pass evidence across a changed course or assignment contract` if that file still describes the previous contract. Moving it aside lets the full crawl become the new baseline and seed the cache:
 
 ```sh
 sudo mv /var/lib/orie4580-dashboard/gradescope-snapshot.json \
@@ -116,7 +121,9 @@ sudo systemctl show orie4580-checkoffs.service \
 
 A successful oneshot ends with `ActiveState=inactive`, `Result=success`, and `ExecMainStatus=0`.
 
-Check an owner page in the browser. Confirm that Lab 5 Q1, Q2, and Q3 each list only **Manual checkoff**, while the existing autograded opportunities still list **Manual checkoff** and **Autograder**. Also check that a different student cannot open that page.
+Check an owner page in the browser. Confirm that Lab 5 Q1, Q2, and Q3 each list only **Manual checkoff**, while the existing autograded opportunities still list **Manual checkoff** and **Autograder**. Review **Pending Sheet mappings** after every refresh. Pending headers must not appear under a standard, affect totals, show a checkmark, or expose raw cell values. Also check that a different student cannot open that page.
+
+Adding a valid Sheet column alone no longer blocks publication. Leave it quarantined until course staff audit and backfill its existing cells, approve the standard and stable opportunity ID, and classify it explicitly as manual-only or autograded. Activating that mapping requires the normal `LAB_MAPPING_VERSION` bump. Only an autograded activation needs a Gradescope contract and its normal contract-version procedure.
 
 Re-enable the schedule only after those checks pass:
 
@@ -183,9 +190,9 @@ If the log ends with `cannot carry pass evidence across a changed course or assi
 - [ ] Local tests, JavaScript syntax, Zola, and `git diff --check` pass.
 - [ ] Tracked changes are committed and pushed.
 - [ ] The server checkout is clean and updated with a fast-forward pull.
-- [ ] The reviewed Gradescope config and root JavaScript are installed.
-- [ ] If the Gradescope assignment contract changed, the previous private snapshot was retired before the first refresh.
+- [ ] The reviewed Gradescope config and schema-compatible root JavaScript and CSS are installed before refresh.
+- [ ] The previous private snapshot was retired only if the Gradescope assignment contract changed, not for an unknown or manual-only Sheet column.
 - [ ] The manual production service run succeeds.
-- [ ] Lab requirements render correctly.
+- [ ] Lab requirements render correctly; Pending Sheet mappings were reviewed and do not affect marks or totals.
 - [ ] Owner, cross-user, and staff authorization checks pass.
 - [ ] The timer is active only after validation.

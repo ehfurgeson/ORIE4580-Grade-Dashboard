@@ -8,13 +8,29 @@ import json
 import re
 from typing import Any
 
-from .checkoff_mappings import COLUMN_MAPPINGS
+from .checkoff_mappings import COLUMN_MAPPINGS, OPPORTUNITY_HEADER_GROUPS, OPPORTUNITY_IDS
 from .standards import STANDARDS
 
 NETID_COLUMN = "NetID"
 NETID_PATTERN = re.compile(r"[a-z]{2,3}[0-9]+\Z")
 STATUSES = {"complete", "incomplete"}
 MAX_LABEL_LENGTH = 200
+MAX_WORKSHEET_COLUMNS = 702  # The live transport reads A:ZZ.
+_BIDI_CONTROLS = frozenset(chr(value) for value in (
+    0x061C, 0x200E, 0x200F, 0x202A, 0x202B, 0x202C, 0x202D, 0x202E,
+    0x2066, 0x2067, 0x2068, 0x2069,
+))
+
+
+def valid_checkoff_header(value: Any) -> bool:
+    """Return whether a Sheet header is safe bounded display metadata."""
+    return (
+        isinstance(value, str)
+        and bool(value.strip())
+        and len(value) <= MAX_LABEL_LENGTH
+        and not any(ord(character) < 32 or ord(character) == 127 for character in value)
+        and not any(character in _BIDI_CONTROLS for character in value)
+    )
 
 
 def normalize_checkbox(value: Any, *, row_number: int, column: str) -> str:
@@ -76,13 +92,23 @@ def rows_to_simple_records(
     item_headers = [header for header in headers if header != NETID_COLUMN]
     if not item_headers:
         raise ValueError("Google worksheet must contain at least one checkoff column")
+    if len(headers) > MAX_WORKSHEET_COLUMNS:
+        raise ValueError("Google worksheet has too many columns")
     if any(not isinstance(header, str) or not header.strip() for header in item_headers):
         raise ValueError("Google worksheet has an empty checkoff header")
-    if any(len(header) > MAX_LABEL_LENGTH for header in item_headers):
+    if any(isinstance(header, str) and len(header) > MAX_LABEL_LENGTH for header in item_headers):
         raise ValueError("Google worksheet has a checkoff header that is too long")
+    if any(not valid_checkoff_header(header) for header in item_headers):
+        raise ValueError("Google worksheet has an unsafe checkoff header")
+    mapped = [header for header in item_headers if header in COLUMN_MAPPINGS]
     unmapped = [header for header in item_headers if header not in COLUMN_MAPPINGS]
-    if unmapped:
-        raise ValueError("unmapped checkoff column(s): " + ", ".join(repr(item) for item in unmapped))
+    mapped_opportunities = {COLUMN_MAPPINGS[header][1] for header in mapped}
+    for opportunity_id in mapped_opportunities:
+        actual_headers = frozenset(
+            header for header in mapped if COLUMN_MAPPINGS[header][1] == opportunity_id
+        )
+        if actual_headers not in OPPORTUNITY_HEADER_GROUPS[opportunity_id]:
+            raise ValueError(f"mapped checkoff headers for {opportunity_id!r} are incomplete or ambiguous")
     if not isinstance(worksheet, str) or not worksheet.strip():
         raise ValueError("worksheet title is required")
     try:
@@ -108,7 +134,8 @@ def rows_to_simple_records(
             "updated_at": updated_at,
             "worksheet": worksheet,
             "student": {"netid": netid},
-            "standards": _mapped_standards(row, item_headers, row_number),
+            "unmapped_columns": list(unmapped),
+            "standards": _mapped_standards(row, mapped, row_number),
         })
     return records
 
@@ -118,7 +145,7 @@ def validate_manual_record(record: Any) -> list[str]:
     errors: list[str] = []
     if not isinstance(record, dict):
         return ["record must be an object"]
-    expected = {"updated_at", "worksheet", "student", "standards"}
+    expected = {"updated_at", "worksheet", "student", "unmapped_columns", "standards"}
     if set(record) != expected:
         errors.append("record fields do not match the mapped schema")
     try:
@@ -134,7 +161,23 @@ def validate_manual_record(record: Any) -> list[str]:
     if not isinstance(netid, str) or not NETID_PATTERN.fullmatch(netid):
         errors.append("student.netid is invalid")
 
+    unmapped = record.get("unmapped_columns")
+    unmapped_names: list[str] = []
+    if not isinstance(unmapped, list):
+        errors.append("unmapped_columns must be a list")
+    else:
+        if len(unmapped) > MAX_WORKSHEET_COLUMNS - 1:
+            errors.append("unmapped_columns is too large")
+        if any(not valid_checkoff_header(item) for item in unmapped):
+            errors.append("unmapped_columns contains an invalid header")
+        unmapped_names = [item for item in unmapped if isinstance(item, str)]
+        if len(unmapped_names) != len(set(unmapped_names)):
+            errors.append("unmapped_columns contains a duplicate header")
+        if any(item in COLUMN_MAPPINGS for item in unmapped_names):
+            errors.append("unmapped_columns contains a mapped header")
+
     standards = record.get("standards")
+    detail_headers: set[str] = set()
     if not isinstance(standards, list) or not standards:
         errors.append("standards must be a nonempty list")
     else:
@@ -161,20 +204,55 @@ def validate_manual_record(record: Any) -> list[str]:
                 if not isinstance(checkmark, dict) or set(checkmark) != required:
                     errors.append(f"{prefix} is invalid")
                     continue
-                if checkmark["id"] in opportunity_ids:
-                    errors.append(f"duplicate checkmark: {checkmark['id']}")
-                opportunity_ids.add(checkmark["id"])
-                if checkmark["kind"] != "green" or checkmark["status"] not in STATUSES:
+                opportunity = checkmark["id"]
+                if not isinstance(opportunity, str) or opportunity not in OPPORTUNITY_IDS:
+                    errors.append(f"{prefix} has an unknown checkmark ID")
+                elif opportunity in opportunity_ids:
+                    errors.append(f"duplicate checkmark: {opportunity}")
+                else:
+                    opportunity_ids.add(opportunity)
+                authoritative = [
+                    (header, mapping) for header, mapping in COLUMN_MAPPINGS.items()
+                    if mapping[1] == opportunity
+                ] if isinstance(opportunity, str) else []
+                if authoritative and any(
+                    mapping[0] != standard_id or mapping[2] != checkmark["label"]
+                    for _header, mapping in authoritative
+                ):
+                    errors.append(f"{prefix} does not match the approved mapping")
+                if (
+                    checkmark["kind"] != "green"
+                    or not isinstance(checkmark["status"], str)
+                    or checkmark["status"] not in STATUSES
+                ):
                     errors.append(f"{prefix} has an invalid kind or status")
                 requirements = checkmark["requirements"]
                 if not isinstance(requirements, list) or not requirements:
                     errors.append(f"{prefix}.requirements must be a nonempty list")
-                elif any(
-                    not isinstance(item, dict)
-                    or set(item) != {"label", "status"}
-                    or item.get("status") not in STATUSES
-                    for item in requirements
-                ):
+                    continue
+                valid_requirements = True
+                local_headers: set[str] = set()
+                for item in requirements:
+                    if (
+                        not isinstance(item, dict)
+                        or set(item) != {"label", "status"}
+                        or not isinstance(item.get("status"), str)
+                        or item.get("status") not in STATUSES
+                        or not isinstance(item.get("label"), str)
+                    ):
+                        valid_requirements = False
+                        continue
+                    header = item["label"]
+                    mapping = COLUMN_MAPPINGS.get(header)
+                    if mapping is None or mapping[0] != standard_id or mapping[1] != opportunity or mapping[2] != checkmark["label"]:
+                        valid_requirements = False
+                    if header in local_headers or header in detail_headers:
+                        valid_requirements = False
+                    local_headers.add(header)
+                    detail_headers.add(header)
+                if frozenset(local_headers) not in OPPORTUNITY_HEADER_GROUPS.get(opportunity, ()):
+                    valid_requirements = False
+                if not valid_requirements:
                     errors.append(f"{prefix}.requirements is invalid")
                 elif checkmark["status"] != (
                     "complete" if all(item["status"] == "complete" for item in requirements) else "incomplete"
@@ -182,6 +260,8 @@ def validate_manual_record(record: Any) -> list[str]:
                     errors.append(f"{prefix}.status does not match its requirements")
         if ids != set(STANDARDS):
             errors.append("record must contain every currently defined standard")
+    if len(detail_headers) + len(unmapped_names) > MAX_WORKSHEET_COLUMNS - 1:
+        errors.append("record contains too many Sheet columns")
     try:
         json.dumps(record, allow_nan=False)
     except (TypeError, ValueError):

@@ -30,12 +30,55 @@ COLUMN_MAPPINGS = {
     "Lab 5 - Q3": ('S5', "lab5-q3", "Lab 5 · Q3"),
 }
 
+# Each mapped opportunity must use exactly one approved Sheet-header group.
+# Lab 3 Q2 supports either its legacy aggregate checkbox or all four milestones.
+OPPORTUNITY_HEADER_GROUPS = {
+    "lab1-q1-2": (frozenset({"Lab 1 - Q1.3", "Lab 1 - Q2.3", "Lab 1 - Q2.4"}),),
+    "lab1-q3": (frozenset({"Lab 1 - Q3"}),),
+    "lab2-q1": (frozenset({"Lab 2 - Q1"}),),
+    "lab2-q2": (frozenset({"Lab 2 - Q2"}),),
+    "lab2-q3": (frozenset({"Lab 2 - Q3"}),),
+    "lab3-q1": (frozenset({"Lab 3 - Q1"}),),
+    "lab3-q2": (
+        frozenset({"Lab 3 - Q2"}),
+        frozenset({"Lab 3 - Q2.1", "Lab 3 - Q2.2", "Lab 3 - Q2.3", "Lab 3 - Q2.4"}),
+        frozenset({
+            "Lab 3 - Q2", "Lab 3 - Q2.1", "Lab 3 - Q2.2",
+            "Lab 3 - Q2.3", "Lab 3 - Q2.4",
+        }),
+    ),
+    "lab3-q3": (frozenset({"Lab 3 - Q3"}),),
+    "lab4-q1": (frozenset({"Lab 4 - Q1"}),),
+    "lab4-q2": (frozenset({"Lab 4 - Q2"}),),
+    "lab4-q3": (frozenset({"Lab 4 - Q3"}),),
+    "lab5-q1": (frozenset({"Lab 5 - Q1"}),),
+    "lab5-q2": (frozenset({"Lab 5 - Q2"}),),
+    "lab5-q3": (frozenset({"Lab 5 - Q3"}),),
+}
+
 
 OPPORTUNITY_IDS = frozenset(mapping[1] for mapping in COLUMN_MAPPINGS.values())
 MANUAL_ONLY_OPPORTUNITY_IDS = frozenset({
     "lab4-q1", "lab5-q1", "lab5-q2", "lab5-q3",
 })
-AUTOGRADER_OPPORTUNITY_IDS = OPPORTUNITY_IDS - MANUAL_ONLY_OPPORTUNITY_IDS
+AUTOGRADER_OPPORTUNITY_IDS = frozenset({
+    "lab1-q1-2", "lab1-q3", "lab2-q1", "lab2-q2", "lab2-q3",
+    "lab3-q1", "lab3-q2", "lab3-q3", "lab4-q2", "lab4-q3",
+})
+
+if MANUAL_ONLY_OPPORTUNITY_IDS & AUTOGRADER_OPPORTUNITY_IDS:
+    raise RuntimeError("manual-only and autograded opportunity policies overlap")
+if MANUAL_ONLY_OPPORTUNITY_IDS | AUTOGRADER_OPPORTUNITY_IDS != OPPORTUNITY_IDS:
+    raise RuntimeError("every mapped opportunity must have exactly one explicit policy")
+if set(OPPORTUNITY_HEADER_GROUPS) != OPPORTUNITY_IDS:
+    raise RuntimeError("every mapped opportunity must have approved Sheet-header groups")
+for _opportunity_id, _groups in OPPORTUNITY_HEADER_GROUPS.items():
+    _mapped_headers = {
+        column for column, mapping in COLUMN_MAPPINGS.items()
+        if mapping[1] == _opportunity_id
+    }
+    if not _groups or any(not group for group in _groups) or set().union(*_groups) != _mapped_headers:
+        raise RuntimeError("approved Sheet-header groups do not match COLUMN_MAPPINGS")
 LAB_ASSIGNMENT_PATTERN = re.compile(
     r"^\s*Lab\s*(?P<lab>[0-9]+)\s*[,;:\-]\s*Q\s*"
     r"(?P<start>[0-9]+)(?:\s*[-–—]\s*(?P<end>[0-9]+))?\s*$",

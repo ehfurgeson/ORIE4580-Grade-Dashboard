@@ -2,6 +2,7 @@ from pathlib import Path
 
 import pytest
 
+from sync.checkoff_mappings import COLUMN_MAPPINGS
 from sync.combined_checkoffs import SCHEMA_VERSION
 from sync.simple_checkoffs import rows_to_simple_records, validate_manual_record
 from sync.simple_generate import (
@@ -73,6 +74,19 @@ def test_wide_rows_map_headers_to_standards_and_aggregate_lab_1():
     assert validate_manual_record(record) == []
 
 
+def test_grouped_opportunity_rejects_missing_approved_headers():
+    with pytest.raises(ValueError, match="incomplete or ambiguous"):
+        rows_to_simple_records(
+            [{"NetID": "abc123", "Lab 1 - Q1.3": True}],
+            updated_at=UPDATED_AT, worksheet="Lab Checkoffs",
+        )
+    record = rows_to_simple_records(
+        [make_rows()[0]], updated_at=UPDATED_AT, worksheet="Lab Checkoffs"
+    )[0]
+    record["standards"][0]["checkmarks"][0]["requirements"].pop()
+    assert any("requirements is invalid" in error for error in validate_manual_record(record))
+
+
 def test_grouped_checkmark_requires_every_recorded_requirement():
     record = rows_to_simple_records(make_rows()[1:], updated_at=UPDATED_AT, worksheet="Lab Checkoffs")[0]
     checkmark = record["standards"][0]["checkmarks"][0]
@@ -96,6 +110,15 @@ def test_lab_3_maps_to_updated_handout_standards():
     assert [(item["id"], item["status"]) for item in record["standards"][2]["checkmarks"]] == [
         ("lab3-q2", "incomplete"), ("lab3-q3", "complete")
     ]
+
+
+def test_lab_3_q2_accepts_the_approved_aggregate_header_alternative():
+    record = rows_to_simple_records(
+        [{"NetID": "abc123", "Lab 3 - Q2": True}],
+        updated_at=UPDATED_AT, worksheet="Lab Checkoffs",
+    )[0]
+    assert record["standards"][2]["checkmarks"][0]["id"] == "lab3-q2"
+    assert validate_manual_record(record) == []
 
 
 def test_lab_4_maps_to_three_standards():
@@ -140,12 +163,80 @@ def test_lab_5_maps_to_three_manual_only_standards():
         ([{"NetID": "abc123", "Lab 2 - Q1": "maybe"}], "True/False"),
         ([{"NetID": "ABC123", "Lab 2 - Q1": "True"}, {"NetID": "abc123", "Lab 2 - Q1": "False"}], "duplicate"),
         ([{"NetID": "abc123"}], "at least one"),
-        ([{"NetID": "abc123", "Lab 6 - Q1": "True"}], "unmapped checkoff"),
     ],
 )
 def test_wide_rows_reject_unsafe_or_ambiguous_input(rows, message):
     with pytest.raises(ValueError, match=message):
         rows_to_simple_records(rows, updated_at=UPDATED_AT, worksheet="Lab Checkoffs")
+
+
+def test_unknown_columns_are_quarantined_in_sheet_order_without_reading_values():
+    sentinel = object()
+    rows = [{
+        "NetID": "abc123",
+        "Lab 6 - Q2": sentinel,
+        "Lab 2 - Q1": True,
+        "Lab 6 - Q1": "not a checkbox",
+    }]
+    record = rows_to_simple_records(rows, updated_at=UPDATED_AT, worksheet="Lab Checkoffs")[0]
+    assert record["unmapped_columns"] == ["Lab 6 - Q2", "Lab 6 - Q1"]
+    assert "not a checkbox" not in str(record)
+    assert repr(sentinel) not in str(record)
+    assert record["standards"][0]["checkmarks"][0]["id"] == "lab2-q1"
+    assert validate_manual_record(record) == []
+
+
+def test_approved_mapping_activates_strict_checkbox_parsing():
+    header = "Lab 5 - Q1"
+    original = list(COLUMN_MAPPINGS.items())
+    COLUMN_MAPPINGS.pop(header)
+    try:
+        pending = rows_to_simple_records(
+            [{"NetID": "abc123", header: "not yet a checkbox"}],
+            updated_at=UPDATED_AT, worksheet="Lab Checkoffs",
+        )[0]
+        assert pending["unmapped_columns"] == [header]
+    finally:
+        COLUMN_MAPPINGS.clear()
+        COLUMN_MAPPINGS.update(original)
+    with pytest.raises(ValueError, match="True/False"):
+        rows_to_simple_records(
+            [{"NetID": "abc123", header: "not yet a checkbox"}],
+            updated_at=UPDATED_AT, worksheet="Lab Checkoffs",
+        )
+    mapped = rows_to_simple_records(
+        [{"NetID": "abc123", header: True}],
+        updated_at=UPDATED_AT, worksheet="Lab Checkoffs",
+    )[0]
+    assert mapped["unmapped_columns"] == []
+    assert mapped["standards"][2]["checkmarks"][0]["id"] == "lab5-q1"
+
+
+def test_unmapped_metadata_rejects_duplicates_mapped_names_and_unsafe_headers():
+    record = rows_to_simple_records(
+        [{"NetID": "abc123", "Lab 6 - Q1": "ignored"}],
+        updated_at=UPDATED_AT, worksheet="Lab Checkoffs",
+    )[0]
+    for value in (
+        ["Lab 6 - Q1", "Lab 6 - Q1"],
+        ["Lab 2 - Q1"],
+        [""],
+        ["unsafe\nheader"],
+        ["unsafe\u202eheader"],
+    ):
+        invalid = {**record, "unmapped_columns": value}
+        assert validate_manual_record(invalid)
+
+
+def test_unsafe_or_excessive_sheet_headers_fail_closed():
+    with pytest.raises(ValueError, match="unsafe checkoff header"):
+        rows_to_simple_records(
+            [{"NetID": "abc123", "unsafe\nheader": "ignored"}],
+            updated_at=UPDATED_AT, worksheet="Lab Checkoffs",
+        )
+    too_wide = {"NetID": "abc123", **{f"Pending {index}": "" for index in range(702)}}
+    with pytest.raises(ValueError, match="too many columns"):
+        rows_to_simple_records([too_wide], updated_at=UPDATED_AT, worksheet="Lab Checkoffs")
 
 
 def test_publisher_creates_exact_netid_authorization(tmp_path):
@@ -177,6 +268,14 @@ def test_publisher_creates_exact_netid_authorization(tmp_path):
     assert "EN-OR-or4580-students" not in rule
     assert "Options -Indexes" in rule
     assert 'private, no-store, max-age=0' in rule
+
+
+def test_publisher_rejects_student_specific_unmapped_metadata(tmp_path):
+    records = published_records(make_rows())
+    records[1]["unmapped_columns"] = ["Lab 6 - Q1"]
+    with pytest.raises(ValueError, match="disagree about unmapped"):
+        write_simple_release(records, tmp_path / "students")
+    assert not (tmp_path / "students").exists()
 
 
 def test_new_release_removes_students_not_in_selected_batch(tmp_path):

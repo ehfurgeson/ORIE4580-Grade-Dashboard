@@ -168,6 +168,7 @@ def write_simple_release(
         raise ValueError("records must be a nonempty list")
     errors: list[str] = []
     seen: set[str] = set()
+    expected_unmapped: tuple[str, ...] | None = None
     for index, record in enumerate(records):
         errors.extend(f"student {index}: {error}" for error in validate_combined_record(record))
         student = record.get("student") if isinstance(record, dict) else None
@@ -176,6 +177,13 @@ def write_simple_release(
             if netid in seen:
                 errors.append(f"duplicate NetID: {netid}")
             seen.add(netid)
+        unmapped = record.get("unmapped_columns") if isinstance(record, dict) else None
+        if isinstance(unmapped, list) and all(isinstance(item, str) for item in unmapped):
+            current_unmapped = tuple(unmapped)
+            if expected_unmapped is None:
+                expected_unmapped = current_unmapped
+            elif current_unmapped != expected_unmapped:
+                errors.append("records disagree about unmapped Sheet columns")
     if errors:
         raise ValueError("invalid simple records: " + "; ".join(errors))
 

@@ -74,6 +74,21 @@ header > p:last-child { margin: .4rem 0 0; color: var(--muted); }
 .student-meta p { margin: 0; }
 .student-meta strong { color: var(--ink); }
 
+.pending-mappings {
+  margin: 1rem 0;
+  padding: .85rem 1rem;
+  border: 1px solid var(--warning);
+  background: #fffaf0;
+}
+
+.pending-mappings > p { margin: .25rem 0 .65rem; color: var(--muted); }
+.pending-mappings ul { margin: 0; padding-left: 1.25rem; }
+.pending-mapping { padding: .25rem 0; }
+.pending-mapping-name,
+.pending-mapping-note { display: block; }
+.pending-mapping-name { overflow-wrap: anywhere; word-break: break-word; }
+.pending-mapping-note { color: var(--muted); font-size: .825rem; }
+
 .summary-strip {
   display: flex;
   justify-content: space-between;

@@ -9,6 +9,7 @@ See [`docs/deployment.md`](docs/deployment.md) for the shortest safe Ubuntu rele
 ## Requirements
 
 - Python 3.11 or newer
+- Node.js (for JavaScript syntax and DOM regression checks)
 - [Zola](https://www.getzola.org/) 0.23
 
 ```sh
@@ -16,6 +17,8 @@ python -m venv .venv
 . .venv/bin/activate
 python -m pip install -r requirements.txt
 python -m pytest -q
+node --check static/simple-dashboard.js
+node tests/simple-dashboard-dom.test.js
 zola check
 ```
 
@@ -108,7 +111,7 @@ Normal repeated runs should omit `--no-carry-forward`. A prior verified pass is 
 
 ### Local combined dashboard canary
 
-Schema version 5 combines the normalized Gradescope snapshot with the existing Google Sheet opportunities and any available Exam marks. Autograded opportunities display two independent requirements: **Manual checkoff** and **Autograder**, and require both to complete. Lab 4 Q1 and all Lab 5 questions are manual-only: their green checkmarks depend on the recorded checkoffs and do not display or require an autograder.
+Schema version 6 combines the normalized Gradescope snapshot with the existing Google Sheet opportunities and any available Exam marks. Autograded opportunities display two independent requirements: **Manual checkoff** and **Autograder**, and require both to complete. Lab 4 Q1 and all Lab 5 questions are manual-only: their green checkmarks depend on the recorded checkoffs and do not display or require an autograder.
 
 Gradescope Lab titles are mapped by the reviewed convention `Lab N, QN` or `Lab N, QN-N`. In particular, `Lab 1, Q1-2` maps to the one `lab1-q1-2` opportunity that aggregates the three sheet columns `Lab 1 - Q1.3`, `Lab 1 - Q2.3`, and `Lab 1 - Q2.4`. Other recognized titles map one-to-one. Non-Lab assignments are ignored because they are not allowlisted. Malformed, unknown, duplicate, or conflicting Lab mappings fail closed. A reviewed config can set `title_mapping_override = true` as an explicit fallback; there is no fuzzy matching.
 
@@ -137,7 +140,7 @@ Use the dedicated, non-login `orie4580-dashboard` system account from the unit. 
 
 ### Optional Exam 1 results
 
-The same schema-version-5 dashboard includes any available Exam 1 question results; standards without Exam opportunities remain valid. The checked-in Gradescope config names the allowlisted assignment `Exam 1`; title matching treats spaces and upstream underscore separators as equivalent. Each question must appear in the Gradescope CSV export as exactly 1 point. A numeric score strictly greater than `0.8` earns its configured purple or shiny-purple checkmark; exactly `0.8` does not. Questions 1, 2, and 6 map to S2. Questions 3, 4, and 5 map to S1. Questions 5 and 6 are shiny purple.
+The same schema-version-6 dashboard includes any available Exam 1 question results; standards without Exam opportunities remain valid. The checked-in Gradescope config names the allowlisted assignment `Exam 1`; title matching treats spaces and upstream underscore separators as equivalent. Each question must appear in the Gradescope CSV export as exactly 1 point. A numeric score strictly greater than `0.8` earns its configured purple or shiny-purple checkmark; exactly `0.8` does not. Questions 1, 2, and 6 map to S2. Questions 3, 4, and 5 map to S1. Questions 5 and 6 are shiny purple.
 
 Exam ingestion remains deliberately soft-failing to isolate the optional source, although the rubric is finalized and versioned. A missing assignment, changed title, missing or non-1-point question column, nonnumeric/out-of-range score, duplicate student, or unavailable export converts all Exam 1 entries to **Not available yet** and does not block the strict Lab refresh. Raw question scores are never written to student JSON. Lab source, contract, roster, and merge errors still fail closed and preserve the prior release.
 
@@ -151,7 +154,9 @@ Google Sheets still performs one complete read per refresh. Exam 1 still perform
 
 ## Simple NetID-protected checkoff dashboard
 
-The protected worksheet dashboard maps each known checkoff column to the standard named in the Lab 1–5 handouts. The mapping lives in `sync/checkoff_mappings.py`; unknown columns fail closed so a new lab cannot be silently assigned to the wrong standard. Multi-column opportunities are aggregated explicitly: the three recorded Lab 1 Q1–2 milestones produce one S1 green checkmark and all must be complete. Generated schema-version-5 records retain the source requirements for auditability.
+The protected worksheet dashboard maps each known checkoff column to the standard named in the Lab 1–5 handouts. The mapping lives in `sync/checkoff_mappings.py` and remains authoritative. A valid unknown Sheet column is quarantined and displayed under **Pending Sheet mappings** instead of being assigned to a standard. It cannot earn a checkmark, affect totals or allocation, or require a Gradescope assignment. Only the column name is published in `unmapped_columns`; raw cell values are not interpreted or published. Invalid headers and malformed values in mapped columns still fail closed.
+
+Generated schema-version-6 records require the `unmapped_columns` array, which is empty when all columns are mapped. The browser treats the pending list as empty for compatible schema versions 3–5. Multi-column opportunities are aggregated explicitly: the three recorded Lab 1 Q1–2 milestones produce one S1 green checkmark and all must be complete. Records retain the mapped source requirements for auditability.
 
 All importers and validators read the S1–S5 catalog in `sync/standards.py`. Lab and Exam mappings use those IDs directly. Categories and separate descriptive keys have been removed. See [`docs/standards.md`](docs/standards.md) for the opportunity mappings and how to replace imports from the retired tentative catalog.
 
@@ -164,7 +169,7 @@ students/ehf38/
 └── .htaccess   # owner OR explicit staff list
 ```
 
-Generate student pages with `scripts.refresh_combined_dashboard` as shown above. Sheet rows must be merged with Gradescope results before publication; the manual-only publisher has been removed. Unknown checkbox values, unsafe NetIDs, and duplicate NetIDs fail closed.
+Generate student pages with `scripts.refresh_combined_dashboard` as shown above. Sheet rows must be merged with Gradescope results before publication; the manual-only publisher has been removed. Malformed checkbox values in mapped columns, unsafe NetIDs, and duplicate NetIDs fail closed.
 
 Deploy `static/simple-dashboard.js` and `static/simple-style.css` as public assets under the course root, then publish the protected student tree. An owner page is available at:
 

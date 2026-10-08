@@ -117,6 +117,21 @@ def _selected_netid(explicit: str | None, all_students: bool) -> str | None:
     return normalized
 
 
+def _unmapped_column_names(records: list[dict]) -> tuple[str, ...]:
+    """Return one worksheet-wide ordered pending-header list."""
+    expected: tuple[str, ...] | None = None
+    for record in records:
+        value = record.get("unmapped_columns")
+        if not isinstance(value, list) or any(not isinstance(item, str) for item in value):
+            raise ValueError("normalized records contain invalid unmapped-column metadata")
+        current = tuple(value)
+        if expected is None:
+            expected = current
+        elif current != expected:
+            raise ValueError("normalized records disagree about unmapped Sheet columns")
+    return expected or ()
+
+
 def main() -> None:
     load_dotenv(override=False)
     parser = argparse.ArgumentParser(description=__doc__)
@@ -205,6 +220,12 @@ def main() -> None:
         else:
             records = rows_to_simple_records(rows, updated_at=timestamp, worksheet=title)
 
+        unmapped_columns = _unmapped_column_names(records)
+        if unmapped_columns:
+            print(
+                f"[1/6] Warning: unmapped Sheet columns={len(unmapped_columns)}",
+                flush=True,
+            )
         google_netids = {record["student"]["netid"] for record in records}
         prior_lab_passes: frozenset[tuple[str, str]] = frozenset()
         if completion_cache is not None:

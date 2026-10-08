@@ -17,7 +17,7 @@ The main files are:
 |---|---|
 | `sync/standards.py` | Shared standard IDs and wording |
 | [`standards.md`](standards.md) | Reviewed opportunity mappings and import migration rules |
-| `sync/checkoff_mappings.py` | Sheet columns, opportunity IDs, labels, manual-only set, and mapping version |
+| `sync/checkoff_mappings.py` | Sheet columns, opportunity IDs, labels, explicit manual-only/autograded policy sets, and mapping version |
 | `deployment/gradescope.toml.example` | Executable production course and exact autograder contracts |
 | `sync/gradescope.py` | Strict Gradescope configuration and submission validation |
 | `sync/combined_checkoffs.py` | Merge manual and autograder requirements |
@@ -31,7 +31,7 @@ The main files are:
 The standards are defined in `sync/standards.py`. The Lab 4 Sheet columns, requirement policies, and Gradescope contracts are recorded in [`standards.md`](standards.md#3-green-lab-mappings). The implementation work was:
 
 - Added the S4 and S5 display text and all three exact Sheet headers.
-- Added `MANUAL_ONLY_OPPORTUNITY_IDS` and derived the autograded set from it.
+- Added `MANUAL_ONLY_OPPORTUNITY_IDS` and derived the autograded set from it (the policy at that historical release).
 - Bumped `LAB_MAPPING_VERSION` from `lab-mapping-v1` to `lab-mapping-v2`.
 - Changed the merger, validator, browser, and cache so a manual-only Lab is first-class and cannot accidentally receive an autograder rule or cached autograder evidence.
 - Added the two real Gradescope rules to the deployment config, but deliberately added no Q1 rule.
@@ -61,6 +61,20 @@ Never guess a standard, assignment ID, or autograder contract. The pipeline inte
 
 Put new or revised standard wording in `sync/standards.py`. Record the approved opportunity mapping, policy, and contract in [`standards.md`](standards.md) first. That reviewed document is the opportunity-mapping authority.
 
+### Quarantining new Sheet columns
+
+Staff may add a valid Sheet column before its code mapping is ready. The next refresh quarantines the header in `unmapped_columns` and shows it under **Pending Sheet mappings**. A quarantined column has no standard, opportunity ID, or Gradescope policy. It cannot earn a checkmark or affect totals and allocation. The importer neither interprets nor publishes its raw cell values. Invalid headers and malformed values in already mapped columns still stop publication.
+
+Before activating a quarantined column, course staff must complete a mapping audit:
+
+1. Confirm the exact header, display label, stable opportunity ID, and standard against the handout and this document.
+2. Audit and backfill every existing cell in the column so each value is a valid checkbox value.
+3. Classify the opportunity explicitly in exactly one policy set: `MANUAL_ONLY_OPPORTUNITY_IDS` or `AUTOGRADER_OPPORTUNITY_IDS`. Never infer the standard or policy from the header.
+4. For a manual-only opportunity, add no Gradescope rule. For an autograded opportunity, add and verify the exact Gradescope assignment contract.
+5. Add the reviewed mapping and increment `LAB_MAPPING_VERSION`, then update tests and deploy through the normal release process.
+
+The unknown column alone does not require a mapping-version bump or Gradescope change. Its later activation is an effective mapping change and does require the normal mapping-version bump. Bump a Gradescope `contract_version` only when an autograded assignment contract is added or changed. Do not retire a Gradescope snapshot merely because an unknown or manual-only column appeared.
+
 ### 2.2 Update the source mapping
 
 Mirror the approved mapping from `standards.md` into `sync/checkoff_mappings.py`:
@@ -68,9 +82,10 @@ Mirror the approved mapping from `standards.md` into `sync/checkoff_mappings.py`
 1. Add new standards to `sync/standards.py` only; mappings use their S IDs directly.
 2. Add each exact Sheet header to `COLUMN_MAPPINGS`.
 3. Use the same opportunity ID for multiple Sheet columns that jointly form one checkmark.
-4. Add manual-only IDs to `MANUAL_ONLY_OPPORTUNITY_IDS`.
-5. Leave autograded IDs out of that set; `AUTOGRADER_OPPORTUNITY_IDS` is derived automatically.
-6. Increment `LAB_MAPPING_VERSION` when the effective mapping changes.
+4. Add each opportunity's exact allowed header set (or reviewed alternative sets) to `OPPORTUNITY_HEADER_GROUPS`; omitting one header from a grouped opportunity must fail closed.
+5. Add each opportunity ID to exactly one of `MANUAL_ONLY_OPPORTUNITY_IDS` or `AUTOGRADER_OPPORTUNITY_IDS`.
+6. Add a Gradescope rule only for IDs in `AUTOGRADER_OPPORTUNITY_IDS`.
+7. Increment `LAB_MAPPING_VERSION` when the effective mapping changes; quarantine alone is not a mapping change.
 
 Example shapes:
 
@@ -87,7 +102,13 @@ COLUMN_MAPPINGS = {
     "Lab 5 - Q2.2": ("S6", "lab5-q2", "Lab 5 · Q2"),
 }
 
+OPPORTUNITY_HEADER_GROUPS = {
+    "lab4-q1": (frozenset({"Lab 4 - Q1"}),),
+    "lab4-q2": (frozenset({"Lab 4 - Q2"}),),
+    "lab5-q2": (frozenset({"Lab 5 - Q2.1", "Lab 5 - Q2.2"}),),
+}
 MANUAL_ONLY_OPPORTUNITY_IDS = frozenset({"lab4-q1"})
+AUTOGRADER_OPPORTUNITY_IDS = frozenset({"lab4-q2", "lab5-q2"})
 ```
 
 All grouped Sheet columns must be complete before their single manual requirement is complete.
@@ -250,7 +271,8 @@ Do not expose raw grades, free-form grader output, credentials, submission IDs, 
 ## 5. Maintenance checklist
 
 - [ ] Authoritative mapping and wording recorded.
-- [ ] New Sheet headers mapped exactly.
+- [ ] Pending Sheet mappings reviewed; raw unknown cell values were not published.
+- [ ] New Sheet headers and all existing cells audited before mapping activation.
 - [ ] Manual-only versus autograded policy explicit.
 - [ ] Gradescope IDs and contracts observed, not guessed.
 - [ ] Mapping and rubric/contract versions bumped where required.

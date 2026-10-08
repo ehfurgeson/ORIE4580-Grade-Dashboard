@@ -119,6 +119,54 @@ def test_unconfigured_opportunity_is_visible_and_never_earned():
     assert q3["status"] == "incomplete"
 
 
+def test_unmapped_columns_survive_merge_and_publication_without_marks_or_gradescope_rules(tmp_path):
+    row = {
+        "NetID": "abc123",
+        "Lab 1 - Q1.3": True,
+        "Lab 1 - Q2.3": True,
+        "Lab 1 - Q2.4": True,
+        "Lab 6 - Q1": "not a checkbox",
+    }
+    google = rows_to_simple_records([row], updated_at=NOW, worksheet="Lab Checkoffs")[0]
+    record = merge_checkoffs_with_autograders([google], snapshot())[0]
+    assert record["unmapped_columns"] == ["Lab 6 - Q1"]
+    assert find_checkmark(record, "lab1-q1-2")["status"] == "complete"
+    assert all(
+        item["id"] != "Lab 6 - Q1"
+        for standard in record["standards"] for item in standard["checkmarks"]
+    )
+    assert validate_combined_record(record) == []
+    [path] = write_simple_release([record], tmp_path / "students")
+    assert json.loads(path.read_text())["unmapped_columns"] == ["Lab 6 - Q1"]
+
+
+def test_only_unmapped_combined_record_schema_validates_with_all_standards():
+    record = merge_checkoffs_with_autograders(
+        [google_record()], snapshot(), allow_unconfigured=True
+    )[0]
+    record["unmapped_columns"] = ["Lab 6 - Q1"]
+    for standard in record["standards"]:
+        standard["checkmarks"] = []
+    assert validate_combined_record(record) == []
+
+
+def test_combined_validator_rejects_mapped_pending_name_and_mapping_tampering():
+    record = merge_checkoffs_with_autograders(
+        [google_record()], snapshot(), allow_unconfigured=True
+    )[0]
+    record["unmapped_columns"] = ["Lab 1 - Q1.3"]
+    assert any("mapped header" in error for error in validate_combined_record(record))
+    record["unmapped_columns"] = []
+    find_checkmark(record, "lab1-q1-2")["label"] = "Unapproved label"
+    assert any("approved mapping" in error for error in validate_combined_record(record))
+
+    grouped = merge_checkoffs_with_autograders(
+        [google_record()], snapshot(), allow_unconfigured=True
+    )[0]
+    find_checkmark(grouped, "lab1-q1-2")["requirements"][0]["details"].pop()
+    assert any("details are invalid" in error for error in validate_combined_record(grouped))
+
+
 def test_strict_merge_rejects_missing_assignment_or_student_mapping():
     with pytest.raises(ValueError, match="missing Gradescope assignment mappings"):
         merge_checkoffs_with_autograders([google_record()], snapshot())
@@ -183,12 +231,13 @@ def test_combined_schema_validation_and_publisher(tmp_path):
     record = merge_checkoffs_with_autograders(
         [google_record()], snapshot(), allow_unconfigured=True
     )[0]
-    assert record['schema_version'] == 5
+    assert record['schema_version'] == 6
     assert validate_combined_record(record) == []
     paths = write_simple_release([record], tmp_path / "students")
     assert len(paths) == 1
     saved = json.loads(paths[0].read_text())
-    assert saved['schema_version'] == 5
+    assert saved['schema_version'] == 6
+    assert saved['unmapped_columns'] == []
 
 
 def test_tampered_combined_status_fails_validation():
@@ -197,6 +246,14 @@ def test_tampered_combined_status_fails_validation():
     )[0]
     find_checkmark(record, "lab1-q1-2")["status"] = "incomplete"
     assert any("does not match" in error for error in validate_combined_record(record))
+
+
+def test_combined_validator_returns_errors_for_unhashable_malformed_fields():
+    record = merge_checkoffs_with_autograders(
+        [google_record()], snapshot(), allow_unconfigured=True
+    )[0]
+    find_checkmark(record, "lab1-q1-2")["kind"] = []
+    assert validate_combined_record(record)
 
 
 def test_frontend_displays_both_requirement_sources_safely():

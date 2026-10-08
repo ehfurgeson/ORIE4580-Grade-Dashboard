@@ -35,3 +35,23 @@ def test_maintenance_uses_standards_document_instead_of_local_notes():
     assert "standards.md" in maintenance
     assert "notes.md" not in maintenance
     assert "§17" not in maintenance
+
+
+def test_unmapped_column_quarantine_policy_is_documented_consistently():
+    readme = Path("README.md").read_text()
+    maintenance = Path("docs/maintenance.md").read_text()
+    standards = Path("docs/standards.md").read_text()
+    deployment = Path("docs/deployment.md").read_text()
+
+    assert "schema-version-6" in readme
+    assert "Pending Sheet mappings" in readme
+    assert "raw cell values are not interpreted or published" in readme
+    assert "Quarantining new Sheet columns" in maintenance
+    assert "OPPORTUNITY_HEADER_GROUPS" in maintenance
+    assert "MANUAL_ONLY_OPPORTUNITY_IDS" in maintenance
+    assert "AUTOGRADER_OPPORTUNITY_IDS" in maintenance
+    assert "schema-version-6" in standards
+    assert "absent from it is quarantined" in standards
+    assert "install schema-6 `simple-dashboard.js`" in deployment
+    assert "unknown quarantined column" in deployment
+    assert "unknown columns fail closed" not in readme

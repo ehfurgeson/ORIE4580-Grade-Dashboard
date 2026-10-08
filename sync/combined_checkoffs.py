@@ -6,15 +6,19 @@ from datetime import datetime
 import json
 from typing import Any
 
-from .checkoff_mappings import MANUAL_ONLY_OPPORTUNITY_IDS
+from .checkoff_mappings import (
+    AUTOGRADER_OPPORTUNITY_IDS, COLUMN_MAPPINGS, MANUAL_ONLY_OPPORTUNITY_IDS,
+    OPPORTUNITY_HEADER_GROUPS, OPPORTUNITY_IDS,
+)
 from .gradescope import validate_snapshot
 from .gradescope_exam import EXAM_OPPORTUNITIES, ExamImport
 from .simple_checkoffs import (
-    NETID_PATTERN, STATUSES as MANUAL_STATUSES, validate_manual_record,
+    MAX_WORKSHEET_COLUMNS, NETID_PATTERN, STATUSES as MANUAL_STATUSES,
+    valid_checkoff_header, validate_manual_record,
 )
 from .standards import STANDARDS
 
-SCHEMA_VERSION = 5
+SCHEMA_VERSION = 6
 AUTOGRADER_STATUSES = {
     "passed", "failed", "pending", "error", "not_submitted",
     "not_configured", "not_found",
@@ -69,7 +73,7 @@ def merge_checkoffs_with_autograders(
     if manual_only_configured:
         raise ValueError("manual-only opportunities must not have Gradescope assignment mappings")
     if not allow_unconfigured:
-        autograded_opportunities = available_opportunities - MANUAL_ONLY_OPPORTUNITY_IDS
+        autograded_opportunities = available_opportunities & AUTOGRADER_OPPORTUNITY_IDS
         missing = autograded_opportunities - set(configured)
         if missing:
             raise ValueError("manual opportunities are missing Gradescope assignment mappings")
@@ -108,7 +112,7 @@ def merge_checkoffs_with_autograders(
                 if checkmark["id"] in MANUAL_ONLY_OPPORTUNITY_IDS:
                     checkmark["requirements"] = [manual_requirement]
                     checkmark["status"] = manual_status
-                else:
+                elif checkmark["id"] in AUTOGRADER_OPPORTUNITY_IDS:
                     checkmark["requirements"] = [
                         manual_requirement,
                         {
@@ -124,6 +128,8 @@ def merge_checkoffs_with_autograders(
                         if manual_status == "complete" and autograder_status == "passed"
                         else "incomplete"
                     )
+                else:
+                    raise ValueError("mapped opportunity has no explicit requirement policy")
         errors = validate_combined_record(record)
         if errors:
             raise ValueError(f"combined record for {netid} is invalid: {'; '.join(errors)}")
@@ -134,7 +140,7 @@ def merge_checkoffs_with_autograders(
 def validate_combined_record(record: Any) -> list[str]:
     """Validate the local combined dashboard schema without throwing."""
     errors: list[str] = []
-    expected = {"schema_version", "updated_at", "worksheet", "student", "standards"}
+    expected = {"schema_version", "updated_at", "worksheet", "student", "unmapped_columns", "standards"}
     if not isinstance(record, dict) or set(record) != expected:
         return ["record fields do not match the combined schema"]
     if record.get('schema_version') != SCHEMA_VERSION:
@@ -152,9 +158,25 @@ def validate_combined_record(record: Any) -> list[str]:
     if not isinstance(netid, str) or not NETID_PATTERN.fullmatch(netid):
         errors.append("student.netid is invalid")
 
+    unmapped = record.get("unmapped_columns")
+    unmapped_names: list[str] = []
+    if not isinstance(unmapped, list):
+        errors.append("unmapped_columns must be a list")
+    else:
+        if len(unmapped) > MAX_WORKSHEET_COLUMNS - 1:
+            errors.append("unmapped_columns is too large")
+        if any(not valid_checkoff_header(item) for item in unmapped):
+            errors.append("unmapped_columns contains an invalid header")
+        unmapped_names = [item for item in unmapped if isinstance(item, str)]
+        if len(unmapped_names) != len(set(unmapped_names)):
+            errors.append("unmapped_columns contains a duplicate header")
+        if any(item in COLUMN_MAPPINGS for item in unmapped_names):
+            errors.append("unmapped_columns contains a mapped header")
+
     standards = record.get("standards")
     standard_ids: set[str] = set()
     opportunity_ids: set[str] = set()
+    detail_headers: set[str] = set()
     if not isinstance(standards, list) or not standards:
         errors.append("standards must be a nonempty list")
     else:
@@ -168,7 +190,7 @@ def validate_combined_record(record: Any) -> list[str]:
                 errors.append("a standard does not match the syllabus mapping")
             elif standard_id in standard_ids:
                 errors.append("duplicate standard")
-            else:
+            elif isinstance(standard_id, str):
                 standard_ids.add(standard_id)
             checkmarks = standard["checkmarks"]
             if not isinstance(checkmarks, list):
@@ -180,16 +202,36 @@ def validate_combined_record(record: Any) -> list[str]:
                     errors.append("a checkmark is malformed")
                     continue
                 opportunity = checkmark["id"]
-                if not isinstance(opportunity, str) or opportunity in opportunity_ids:
-                    errors.append("checkmark ID is invalid or duplicated")
+                kind = checkmark["kind"]
+                known_opportunity = isinstance(opportunity, str) and isinstance(kind, str) and (
+                    (kind == "green" and opportunity in OPPORTUNITY_IDS)
+                    or (
+                        kind in {"purple", "shiny_purple"}
+                        and opportunity in {item["id"] for item in EXAM_OPPORTUNITIES}
+                    )
+                )
+                if not known_opportunity or opportunity in opportunity_ids:
+                    errors.append("checkmark ID is invalid, unknown, or duplicated")
                 else:
                     opportunity_ids.add(opportunity)
                 requirements = checkmark["requirements"]
                 requirement_fields = {"id", "label", "source", "status", "details"}
-                if checkmark["kind"] == "green":
-                    if checkmark["status"] not in MANUAL_STATUSES:
+                if kind == "green":
+                    if not isinstance(checkmark["status"], str) or checkmark["status"] not in MANUAL_STATUSES:
                         errors.append("lab checkmark status is invalid")
-                    manual_only = opportunity in MANUAL_ONLY_OPPORTUNITY_IDS
+                    authoritative = [
+                        mapping for mapping in COLUMN_MAPPINGS.values()
+                        if mapping[1] == opportunity
+                    ] if isinstance(opportunity, str) else []
+                    if not authoritative or any(
+                        mapping[0] != standard_id or mapping[2] != checkmark["label"]
+                        for mapping in authoritative
+                    ):
+                        errors.append("lab checkmark does not match the approved mapping")
+                    manual_only = opportunity in MANUAL_ONLY_OPPORTUNITY_IDS if known_opportunity else False
+                    autograded = opportunity in AUTOGRADER_OPPORTUNITY_IDS if known_opportunity else False
+                    if manual_only == autograded:
+                        errors.append("lab checkmark does not have exactly one explicit policy")
                     expected_requirement_ids = {"manual"} if manual_only else {"manual", "autograder"}
                     expected_requirement_count = len(expected_requirement_ids)
                     if not isinstance(requirements, list) or len(requirements) != expected_requirement_count:
@@ -206,16 +248,42 @@ def validate_combined_record(record: Any) -> list[str]:
                     if set(manual) != requirement_fields:
                         errors.append("a checkmark requirement is malformed")
                         continue
-                    if manual["source"] != "google_sheets" or manual["status"] not in MANUAL_STATUSES:
+                    if (
+                        manual["source"] != "google_sheets"
+                        or not isinstance(manual["status"], str)
+                        or manual["status"] not in MANUAL_STATUSES
+                    ):
                         errors.append("manual requirement is invalid")
                     details = manual["details"]
-                    if not isinstance(details, list) or not details or any(
-                        not isinstance(item, dict)
-                        or set(item) != {"label", "status"}
-                        or not isinstance(item["label"], str)
-                        or item["status"] not in MANUAL_STATUSES
-                        for item in details
-                    ):
+                    details_valid = isinstance(details, list) and bool(details)
+                    local_headers: set[str] = set()
+                    if details_valid:
+                        for item in details:
+                            if (
+                                not isinstance(item, dict)
+                                or set(item) != {"label", "status"}
+                                or not isinstance(item.get("label"), str)
+                                or not isinstance(item.get("status"), str)
+                                or item.get("status") not in MANUAL_STATUSES
+                            ):
+                                details_valid = False
+                                continue
+                            header = item["label"]
+                            mapping = COLUMN_MAPPINGS.get(header)
+                            if (
+                                mapping is None
+                                or mapping[0] != standard_id
+                                or mapping[1] != opportunity
+                                or mapping[2] != checkmark["label"]
+                                or header in local_headers
+                                or header in detail_headers
+                            ):
+                                details_valid = False
+                            local_headers.add(header)
+                            detail_headers.add(header)
+                    if frozenset(local_headers) not in OPPORTUNITY_HEADER_GROUPS.get(opportunity, ()):
+                        details_valid = False
+                    if not details_valid:
                         errors.append("manual requirement details are invalid")
                     elif manual["status"] != (
                         "complete" if all(item["status"] == "complete" for item in details) else "incomplete"
@@ -228,7 +296,12 @@ def validate_combined_record(record: Any) -> list[str]:
                         if set(auto) != requirement_fields:
                             errors.append("a checkmark requirement is malformed")
                             continue
-                        if auto["source"] != "gradescope" or auto["status"] not in AUTOGRADER_STATUSES or auto["details"] != []:
+                        if (
+                            auto["source"] != "gradescope"
+                            or not isinstance(auto["status"], str)
+                            or auto["status"] not in AUTOGRADER_STATUSES
+                            or auto["details"] != []
+                        ):
                             errors.append("autograder requirement is invalid")
                         expected_status = (
                             "complete"
@@ -237,8 +310,19 @@ def validate_combined_record(record: Any) -> list[str]:
                         )
                     if checkmark["status"] != expected_status:
                         errors.append("checkmark status does not match its requirements")
-                elif checkmark["kind"] in {"purple", "shiny_purple"}:
-                    if checkmark["status"] not in {"complete", "incomplete", "not_graded"}:
+                elif isinstance(kind, str) and kind in {"purple", "shiny_purple"}:
+                    definition = next(
+                        (item for item in EXAM_OPPORTUNITIES if item["id"] == opportunity), None
+                    )
+                    if definition is None or any(
+                        checkmark[field] != definition[field]
+                        for field in ("label", "kind")
+                    ) or definition.get("standard_id") != standard_id:
+                        errors.append("exam checkmark does not match the approved mapping")
+                    if (
+                        not isinstance(checkmark["status"], str)
+                        or checkmark["status"] not in {"complete", "incomplete", "not_graded"}
+                    ):
                         errors.append("exam checkmark status is invalid")
                     if not isinstance(requirements, list) or len(requirements) != 1:
                         errors.append("exam checkmark must have one score requirement")
@@ -257,6 +341,8 @@ def validate_combined_record(record: Any) -> list[str]:
                     errors.append("checkmark kind is invalid")
     if standard_ids != set(STANDARDS):
         errors.append("record must contain every currently defined standard")
+    if len(detail_headers) + len(unmapped_names) > MAX_WORKSHEET_COLUMNS - 1:
+        errors.append("record contains too many Sheet columns")
     try:
         json.dumps(record, allow_nan=False)
     except (TypeError, ValueError):

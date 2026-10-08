@@ -2,7 +2,7 @@ import pytest
 
 from scripts.refresh_combined_dashboard import (
     _acquire_lock, _lab_statuses, _require_private_snapshot, _require_private_state,
-    _secret, _selected_netid, _validate_roster_coverage,
+    _secret, _selected_netid, _unmapped_column_names, _validate_roster_coverage,
 )
 
 
@@ -71,11 +71,23 @@ def test_service_allows_google_students_missing_from_gradescope():
     assert "--maximum-missing-gradescope-students" not in unit
 
 
+def test_unmapped_warning_metadata_is_worksheet_wide_and_contains_no_values():
+    records = [
+        {"student": {"netid": "abc123"}, "unmapped_columns": ["Lab 6 - Q2", "Lab 6 - Q1"]},
+        {"student": {"netid": "xy99"}, "unmapped_columns": ["Lab 6 - Q2", "Lab 6 - Q1"]},
+    ]
+    assert _unmapped_column_names(records) == ("Lab 6 - Q2", "Lab 6 - Q1")
+    records[1]["unmapped_columns"].reverse()
+    with pytest.raises(ValueError, match="disagree"):
+        _unmapped_column_names(records)
+
+
 def test_refresh_progress_is_aggregate_and_journal_ready():
     from pathlib import Path
     script = Path("scripts/refresh_combined_dashboard.py").read_text()
     unit = Path("deployment/orie4580-checkoffs.service").read_text()
     assert "Gradescope students visited: {completed}/{total}" in script
+    assert "Warning: unmapped Sheet columns={len(unmapped_columns)}" in script
     assert "Lab cache:" in script
     assert "completion cache hits=" in script
     assert 'else "selected student"' in script

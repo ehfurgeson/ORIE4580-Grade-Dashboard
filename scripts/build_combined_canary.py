@@ -27,7 +27,7 @@ def main() -> None:
     parser.add_argument(
         "--allow-unconfigured",
         action="store_true",
-        help="local-only: show unmapped manual opportunities as Not connected yet",
+        help="local-only: show mapped opportunities lacking Gradescope as Not connected yet",
     )
     args = parser.parse_args()
     netid = args.student_netid.strip().casefold()

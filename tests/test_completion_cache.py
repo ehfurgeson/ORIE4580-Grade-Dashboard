@@ -11,6 +11,7 @@ from types import SimpleNamespace
 import pytest
 
 from sync.completion_cache import (
+    build_completion_cache,
     exam_contract,
     exam_contract_fingerprint,
     filter_completion_cache,
@@ -251,3 +252,39 @@ def test_loader_rejects_cache_with_group_or_world_permissions(tmp_path: Path) ->
     write_completion_cache_atomic(_cache(), path)
     path.chmod(0o640)
     assert load_completion_cache(path, config=_config()) is None
+
+
+def test_quarantined_sheet_columns_have_no_completion_cache_surface() -> None:
+    config = _config()
+    snapshot = {
+        "schema_version": 1,
+        "source": "gradescope_unofficial_read_only",
+        "course_id": config.course_id,
+        "generated_at": NOW,
+        "assignments": [{
+            "assignment_id": 101,
+            "opportunity_id": "lab1-q1-2",
+            "contract_version": "lab1-q1-2-v1",
+            "expected_score": "3",
+            "expected_test_count": 2,
+            "expected_test_maxima": ["1", "2"],
+            "title_mapping_override": False,
+        }],
+        "students": [{
+            "netid": "abc123",
+            "autograders": [{
+                "opportunity_id": "lab1-q1-2",
+                "status": "passed",
+                "pass_evidence": "current_history",
+                "submissions_observed": 1,
+                "submissions_checked": 1,
+            }],
+        }],
+        "unmatched_members": 0,
+    }
+    cache = build_completion_cache(
+        config, snapshot, frozenset(), written_at=NOW,
+    )
+    assert set(cache["lab_contracts"]) == {"lab1-q1-2"}
+    assert {item["opportunity_id"] for item in cache["lab_passes"]} == {"lab1-q1-2"}
+    assert "unmapped_columns" not in json.dumps(cache)

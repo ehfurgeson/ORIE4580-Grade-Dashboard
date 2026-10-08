@@ -1,4 +1,7 @@
-from sync.checkoff_mappings import COLUMN_MAPPINGS
+from sync.checkoff_mappings import (
+    AUTOGRADER_OPPORTUNITY_IDS, COLUMN_MAPPINGS, MANUAL_ONLY_OPPORTUNITY_IDS,
+    OPPORTUNITY_HEADER_GROUPS, OPPORTUNITY_IDS,
+)
 from sync.google_sheets import rows_to_records
 from sync.gradescope_exam import EXAM_OPPORTUNITIES
 from sync.simple_checkoffs import rows_to_simple_records, validate_manual_record
@@ -31,3 +34,16 @@ def test_row_and_wide_importers_use_the_same_standard_ids_and_wording():
 def test_lab_and_exam_mappings_reference_the_shared_catalog():
     assert {mapping[0] for mapping in COLUMN_MAPPINGS.values()} <= set(STANDARDS)
     assert {item['standard_id'] for item in EXAM_OPPORTUNITIES} <= set(STANDARDS)
+
+
+def test_every_lab_opportunity_has_exactly_one_explicit_policy_and_header_group():
+    assert MANUAL_ONLY_OPPORTUNITY_IDS.isdisjoint(AUTOGRADER_OPPORTUNITY_IDS)
+    assert MANUAL_ONLY_OPPORTUNITY_IDS | AUTOGRADER_OPPORTUNITY_IDS == OPPORTUNITY_IDS
+    assert set(OPPORTUNITY_HEADER_GROUPS) == OPPORTUNITY_IDS
+    for opportunity_id, groups in OPPORTUNITY_HEADER_GROUPS.items():
+        mapped = {
+            column for column, mapping in COLUMN_MAPPINGS.items()
+            if mapping[1] == opportunity_id
+        }
+        assert groups
+        assert set().union(*groups) == mapped

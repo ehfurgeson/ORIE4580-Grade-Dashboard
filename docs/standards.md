@@ -14,13 +14,15 @@ The former tentative twelve-standard catalog has been removed. Its P/M IDs are n
 
 For the row-based CSV/API importer, use the current S1–S5 IDs in `standard_id`. Re-export old source data with an explicit, reviewed assignment to the current standards; do not relabel old rows by number. A CSV row with only an S ID cannot identify which catalog it came from. Regenerate old `grades.json` releases after correcting the source; JSON validation rejects obsolete IDs and wording before publication.
 
-The live pipeline now writes schema-version-5 `checkoffs.json` records with only `id`, `name`, and `checkmarks` per standard. This is the single format for Labs and any available Exam marks; standards need not have Exam opportunities. Normalized Sheet rows are internal merge inputs and cannot be published directly. The browser also accepts older combined versions 3–4, so deploy the updated JavaScript before generating new records. Older backend records must be regenerated from the source data.
+The live pipeline writes schema-version-6 `checkoffs.json` records with `id`, `name`, and `checkmarks` per standard plus the top-level `unmapped_columns` list. This is the single format for Labs and any available Exam marks; standards need not have Exam opportunities. Normalized Sheet rows are internal merge inputs and cannot be published directly. The browser also accepts older combined versions 3–5 and treats their pending list as empty. Deploy the schema-6 JavaScript and CSS before generating new records. Older backend records must be regenerated from the source data.
 
 Lab and Exam opportunity IDs, earning rules, and grading rules are unchanged. No Google Sheet or Gradescope changes are needed for the live pipeline, and existing Gradescope snapshots remain compatible. Mapping versions have advanced because references now use S IDs. Before refreshing, use the [one-time completion-cache migration](deployment.md#one-time-standard-id-cache-migration) to retain verified completions. Without migration, old completion caches are rejected and Gradescope is crawled again. Keep the previous release and cache for rollback.
 
 ## 3. Green Lab mappings
 
 Every listed Lab opportunity requires its Google Sheet checkoff. An **Autograded** opportunity additionally requires one full-credit Gradescope submission under the exact configured contract. A **Manual-only** opportunity has no Gradescope assignment and earns green from the recorded checkoff alone.
+
+The table below is authoritative. A valid Sheet column absent from it is quarantined as a pending mapping; it is not temporarily added to this table, assigned a standard, or counted toward grades. Only its header is published, never raw cell values. Before activation, staff must audit and backfill the column's existing cells, approve its mapping, and classify its opportunity explicitly as exactly one of manual-only or autograded. Manual-only opportunities require no Gradescope rule. Autograded opportunities require an exact reviewed Gradescope contract. The system never infers either policy from a header.
 
 | Green opportunity | Opportunity ID | Display standard | Google Sheet column(s) | Policy | Gradescope assignment and contract |
 |---|---|---|---|---|---|
@@ -41,7 +43,7 @@ Every listed Lab opportunity requires its Google Sheet checkoff. An **Autograded
 
 ### Grouped manual checkoffs
 
-Lab 1 Q1–2 is one green opportunity, not three. All three listed Sheet milestones must be complete. When the Lab 3 Q2 milestone columns are present, all recorded milestones must be complete for its one green opportunity.
+Lab 1 Q1–2 is one green opportunity, not three. All three listed Sheet milestones must be present and complete. Lab 3 Q2 may use the aggregate header, all four milestone headers, or both forms during a transition; partial milestone groups fail closed, and every present approved entry must be complete for its one green opportunity.
 
 ### Lab 4 student-facing requirements
 
@@ -91,11 +93,13 @@ Student pages show both linked boxes and all earned checkmarks in a compact over
 When course staff approve a new or changed mapping:
 
 1. Update `sync/standards.py` if standard IDs or wording change.
-2. Update this document and `sync/checkoff_mappings.py` for Lab opportunity mappings.
-3. Update `sync/gradescope_exam.py` for exam opportunities.
-4. Update `deployment/gradescope.toml.example` for exact Gradescope contracts.
-5. Increment the relevant mapping, contract, or rubric version.
-6. Update mapping, merge, cache, frontend, and end-to-end tests.
-7. Run a one-student live preview before following [`deployment.md`](deployment.md).
+2. Audit and backfill every existing value before activating a pending Sheet column.
+3. Update this document and `sync/checkoff_mappings.py` for Lab opportunity mappings, including each exact allowed Sheet-header group and membership in exactly one explicit manual-only or autograded policy set.
+4. Update `sync/gradescope_exam.py` for exam opportunities.
+5. Update `deployment/gradescope.toml.example` only for exact autograded Gradescope contracts.
+6. Increment `LAB_MAPPING_VERSION` for an activated or changed Lab mapping. An unknown quarantined column alone does not bump it.
+7. Increment a Gradescope contract or exam rubric/mapping version only when that corresponding contract, rubric, or mapping changes.
+8. Update mapping, merge, cache, frontend, and end-to-end tests.
+9. Run a one-student live preview before following [`deployment.md`](deployment.md).
 
 A Sheet header, standard, Gradescope assignment, or rubric that is not explicitly recorded here must not be guessed or silently mapped.

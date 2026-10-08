@@ -11,12 +11,26 @@
 
   function validatePayload(data) {
     if (!data || typeof data !== 'object') throw new Error('The checkoff data is not an object.');
-    if (![3, 4, 5].includes(data.schema_version)) throw new Error('The checkoff data uses an unsupported schema.');
+    if (![3, 4, 5, 6].includes(data.schema_version)) throw new Error('The checkoff data uses an unsupported schema.');
     if (!data.student || typeof data.student.netid !== 'string') throw new Error('Student information is missing.');
     if (typeof data.worksheet !== 'string' || !data.worksheet) throw new Error('Worksheet information is missing.');
     if (!Array.isArray(data.standards) || data.standards.length === 0) throw new Error('No standards were provided.');
     const updatedAt = new Date(data.updated_at);
     if (Number.isNaN(updatedAt.getTime())) throw new Error('The update time is invalid.');
+    const unmappedColumns = data.schema_version === 6 ? data.unmapped_columns : [];
+    if (!Array.isArray(unmappedColumns) || unmappedColumns.length > 701) {
+      throw new Error('Pending Sheet mappings are malformed.');
+    }
+    const uniqueUnmappedColumns = new Set();
+    const unsafeHeaderCharacters = /[\u0000-\u001f\u007f\u061c\u200e\u200f\u202a-\u202e\u2066-\u2069]/u;
+    for (const column of unmappedColumns) {
+      if (typeof column !== 'string' || column.trim().length === 0 ||
+          Array.from(column).length > 200 || unsafeHeaderCharacters.test(column) ||
+          uniqueUnmappedColumns.has(column)) {
+        throw new Error('Pending Sheet mappings are malformed.');
+      }
+      uniqueUnmappedColumns.add(column);
+    }
     for (const standard of data.standards) {
       if (!standard || typeof standard.id !== 'string' ||
           typeof standard.name !== 'string' || !Array.isArray(standard.checkmarks)) {
@@ -47,7 +61,7 @@
         }
       }
     }
-    return updatedAt;
+    return { updatedAt, unmappedColumns };
   }
 
   function make(tag, className, text) {
@@ -205,7 +219,33 @@
     return item;
   }
 
-  function render(data, updatedAt) {
+  function renderUnmappedColumns(unmappedColumns) {
+    const section = document.querySelector('#unmapped-columns-section');
+    if (!section) {
+      if (unmappedColumns.length > 0) {
+        throw new Error('The dashboard page does not support pending Sheet mappings.');
+      }
+      return;
+    }
+    if (unmappedColumns.length === 0) {
+      section.hidden = true;
+      return;
+    }
+    const list = document.querySelector('#unmapped-columns');
+    if (!list) throw new Error('The dashboard page is missing its pending mapping list.');
+    for (const column of unmappedColumns) {
+      const item = make('li', 'pending-mapping');
+      item.append(
+        make('strong', 'pending-mapping-name', column),
+        make('span', 'pending-mapping-note',
+          'Awaiting course-staff mapping. This column does not earn a checkmark.')
+      );
+      list.append(item);
+    }
+    section.hidden = false;
+  }
+
+  function render(data, updatedAt, unmappedColumns) {
     document.querySelector('.summary-strip span').textContent = 'Checkmarks earned';
     document.querySelector('#dashboard-description').textContent =
       'Your lab checkoffs, autograder results, and available Exam 1 checkmarks, mapped to course standards.';
@@ -216,6 +256,7 @@
     const time = document.querySelector('#updated-at');
     time.dateTime = data.updated_at;
     time.textContent = updatedAt.toLocaleString(undefined, { timeZoneName: 'short' });
+    renderUnmappedColumns(unmappedColumns);
 
     let earned = 0;
     let available = 0;
@@ -256,7 +297,10 @@
       if (!response.ok) throw new Error(`Request failed (${response.status}).`);
       return response.json();
     })
-    .then(data => render(data, validatePayload(data)))
+    .then(data => {
+      const validated = validatePayload(data);
+      render(data, validated.updatedAt, validated.unmappedColumns);
+    })
     .catch(error => {
       statusElement.textContent = `Unable to load checkoffs. ${error.message} Please refresh or contact course staff.`;
       statusElement.classList.add('error');
