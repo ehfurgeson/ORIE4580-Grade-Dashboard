@@ -196,3 +196,46 @@ If the log ends with `cannot carry pass evidence across a changed course or assi
 - [ ] Lab requirements render correctly; Pending Sheet mappings were reviewed and do not affect marks or totals.
 - [ ] Owner, cross-user, and staff authorization checks pass.
 - [ ] The timer is active only after validation.
+
+
+## Standalone grade calculator (optional, manual publication)
+
+The calculator source is `static/grade_calculator/index.html`. It contains its
+own CSS and JavaScript and reads no student data. Its intended public URL is
+`https://zivscully.orie.cornell.edu/orie4580_fa26/grade_calculator/`.
+Preparing this file does not publish it. The refresh service and its
+`--copy-assets-to` option do not install the calculator.
+
+Before an explicitly authorized publication, run locally:
+
+```sh
+node tests/grade_calculator.test.js
+git diff --check
+```
+
+After transferring the reviewed source to the server checkout, the following
+commands install only the calculator. They do not require a student refresh,
+timer interruption, or changes to the course-root redirect:
+
+```sh
+cd /opt/orie4580-grade-dashboard
+sudo install -d -o root -g www-data -m 0755 \
+  /var/www/html/orie4580_fa26/grade_calculator
+sudo install -o root -g www-data -m 0644 \
+  static/grade_calculator/index.html \
+  /var/www/html/orie4580_fa26/grade_calculator/index.html
+```
+
+The checked-in `apache/course-root-redirect.conf` matches only the exact course
+root, so this subdirectory does not need a redirect exception. Apache should
+serve its `index.html` through the existing `DirectoryIndex` configuration.
+Inspect the active virtual host and any inherited authentication rules before
+publication: the calculator should be public, while `students/` retains all
+existing authorization rules. Do not loosen course-wide or student rules to
+serve the calculator.
+
+After publication, verify an unauthenticated GET returns HTTP 200 and the
+calculator HTML at the intended URL, without redirecting to Shibboleth or a
+student dashboard. Check that the existing course-root redirect and protected
+student URLs still behave as before. No server changes have been made merely
+by adding these instructions.

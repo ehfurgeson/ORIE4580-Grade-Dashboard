@@ -41,6 +41,20 @@ zola build
 
 The browser requests the relative URL `students/me/grades.json`, so local and staging builds do not contact the production site.
 
+## Standalone grade calculator
+
+Open `static/grade_calculator/index.html` directly in a browser, or serve `static/` and visit
+`/grade_calculator/`. This self-contained page needs no student data, network calls,
+or build. Edit earned counts (five standards by default, with an adjustable
+standard count) to update linked
+boxes, shiny overflow, unused marks, and tentative grade cutoffs. The currently
+satisfied grade is highlighted. Reset clears all counts.
+
+The calculator uses `min(purple, 1)` for standards with purple, as confirmed
+for this draft. Extra ordinary purple and green marks do not count. Scenarios
+are held only in memory and reset on reload. Validate its algorithm against the
+Python implementation with `node tests/grade_calculator.test.js` (requires Python 3).
+
 ## Data model and grading rules
 
 `fixtures/grades.json` is the canonical example. `fixtures/ehf38-grades.fake.json` is clearly labeled fake data for the first authenticated server test. Each record contains:

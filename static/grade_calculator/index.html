@@ -1,0 +1,151 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Checkmark to grade calculator</title>
+<style>
+:root { color-scheme: light; --ink:#202124; --muted:#5f6368; --line:#dadce0; --purple:#6f42c1; --green:#137333; }
+* { box-sizing:border-box; }
+body { margin:0; background:#fff; color:var(--ink); font:15px/1.5 system-ui,sans-serif; }
+main { max-width:1080px; margin:auto; padding:32px 24px 60px; }
+h1 { font-size:24px; letter-spacing:-.03em; margin:0; } h2 { font-size:20px; margin:0; } p { margin:.5rem 0; }
+header { display:flex; align-items:center; justify-content:space-between; gap:16px; } .muted, small { color:var(--muted); }
+button,select,input { font:inherit; color:inherit; border:1px solid #9aa0a6; background:white; padding:8px; }
+button { cursor:pointer; } button:hover { background:#f1edf8; border-color:var(--purple); }
+:focus-visible { outline:3px solid var(--purple); outline-offset:3px; }
+input[type=number] { width:70px; }
+.checkmark-grid { table-layout:fixed; }
+.checkmark-grid col:first-child { width:6%; }
+.checkmark-grid col.input-col { width:11%; }
+.checkmark-grid col.linked-col { width:17%; }
+.checkmark-grid col.output-col { width:22%; }
+.checkmark-grid th[scope=row] { color:var(--ink); font-size:15px; }
+.checkmark-grid th:first-child { position:sticky; left:0; z-index:1; background:white; border-right:1px solid var(--line); padding-right:4px; }
+.checkmark-grid td:nth-child(5), .checkmark-grid th:nth-child(5) { border-left:1px solid var(--line); padding-left:6px; }
+.unused .mark:not(.open-slot) { opacity:.35; }
+.mark.open-slot { color:#aaa; border-style:dotted; background:transparent; }
+.box-legend { display:flex; flex-wrap:wrap; align-items:center; gap:8px 16px; margin-top:12px; font-size:13px; color:var(--muted); }
+.box-legend > span { display:inline-flex; align-items:center; gap:5px; }
+.current-totals { background:#f8f9fa; font-weight:650; }
+section { margin-top:28px; } .scroll { overflow-x:auto; } table { border-collapse:collapse; width:100%; text-align:left; margin-top:14px; }
+th,td { padding:12px 10px; border-bottom:1px solid var(--line); vertical-align:middle; } th { font-size:12px; color:var(--muted); } th:first-child,td:first-child { padding-left:0; }
+.marks { display:flex; flex-wrap:wrap; gap:5px; align-items:center; min-width:0; } .mark { display:inline-grid; place-items:center; width:28px; height:28px; flex:0 0 28px; border:1.5px solid currentColor; font:700 15px/1 system-ui,sans-serif; }
+.green { color:var(--green); background:#eef7f0; } .purple,.shiny { color:var(--purple); background:#f1edf8; } .empty { color:#886000; background:#fff3bf; border-color:#d6a500; }
+.pass { color:var(--green); } .fail { color:#8a4c00; } .chosen { background:#f6f3fb; } td small { display:block; font-size:11px; }
+@media(max-width:700px) { main { padding:20px 16px; } th,td { padding:10px 6px; } input[type=number] { width:58px; } }
+.checkmark-grid th, .checkmark-grid td { padding:8px 4px; overflow-wrap:anywhere; }
+.checkmark-grid input[type=number] { width:100%; max-width:52px; min-width:0; padding:6px 3px; }
+.checkmark-grid .marks { gap:3px; }
+.checkmark-grid .mark, .box-legend .mark { width:24px; height:24px; flex-basis:24px; }
+@media(max-width:420px) {
+  .checkmark-grid th { font-size:10px; }
+  .checkmark-grid th, .checkmark-grid td { padding:6px 2px; }
+  .checkmark-grid input[type=number] { font-size:12px; }
+  .checkmark-grid .mark, .box-legend .mark { width:20px; height:20px; flex-basis:20px; }
+}
+.cutoff-table { width:min(100%, 520px); table-layout:fixed; font-variant-numeric:tabular-nums; }
+.cutoff-table th, .cutoff-table td { padding:7px 6px; text-align:left; overflow-wrap:anywhere; }
+.cutoff-table th:first-child { width:16%; text-align:left; border-right:1px solid var(--line); }
+.cutoff-table .chosen { color:#185abc; background:#e8f0fe; font-weight:700; box-shadow:inset 3px 0 #185abc; }
+.cutoff-table .chosen th:first-child { padding-left:8px; color:#185abc; }
+header { flex-wrap:wrap; }
+.controls { display:grid; grid-template-columns:auto 58px 1fr; align-items:center; gap:8px; margin-top:24px; }
+.controls + noscript + section { margin-top:8px; }
+.controls #reset { justify-self:end; font-size:12px; padding:3px 8px; }
+.controls label { font-size:13px; }
+.controls input[type=number] { width:58px; }
+/* A symmetric star avoids font-baseline differences between browsers. */
+.mark.shiny {
+  color:var(--purple);
+  background:color-mix(in srgb, var(--purple) 10%, white);
+ }
+.mark.shiny svg { display:block; width:18px; height:18px; max-width:100%; max-height:100%; fill:currentColor; }
+</style>
+</head>
+<body>
+<main>
+<header><h1>Checkmark to grade calculator</h1></header>
+<div class="controls"><label for="count"># of standards</label><input id="count" type="number" min="1" max="30" step="1" value="5"><button id="reset">Reset</button></div>
+<noscript>Enable JavaScript to edit checkmarks.</noscript>
+<section aria-label="Checkmarks">
+<div class="scroll" tabindex="0" role="region" aria-label="Checkmark grid"><table class="checkmark-grid"><colgroup><col><col class="input-col"><col class="input-col"><col class="input-col"><col class="linked-col"><col class="output-col"><col class="output-col"></colgroup><thead><tr><th scope="col" aria-label="Standard"></th><th scope="col">Green ✓</th><th scope="col">Purple ✓</th><th scope="col">Shiny purple ✦</th><th scope="col">Standards-linked boxes</th><th scope="col">Shiny overflow</th><th scope="col">Earned but unused</th></tr></thead><tbody id="standards"></tbody></table></div>
+<div class="box-legend" aria-label="Box legend"><span><span class="mark green" aria-hidden="true">✓</span> Green</span><span><span class="mark purple" aria-hidden="true">✓</span> Purple</span><span><span class="mark shiny" aria-hidden="true"><svg viewBox="0 0 24 24" aria-hidden="true" focusable="false"><path d="M12 2C12 8 8 12 2 12C8 12 12 16 12 22C12 16 16 12 22 12C16 12 12 8 12 2Z"/></svg></span> Shiny purple</span><span><span class="mark empty" aria-hidden="true">!</span> Missing</span></div>
+</section>
+<section aria-label="Tentative grade cutoffs">
+<div class="scroll"><table class="cutoff-table"><thead><tr><th scope="col">Grade</th><th scope="col">Standards with purple ≥</th><th scope="col">Total purple ≥</th><th scope="col">Shiny purple ≥</th><th scope="col">Missing ≤</th></tr></thead><tbody id="current-totals" class="current-totals"></tbody><tbody id="cutoffs"></tbody></table></div>
+</section>
+</main>
+<script>
+'use strict';
+const FALLBACK = "C- or below — instructor’s discretion";
+function evaluate(rows) {
+  const n = rows.length;
+  const allocations = rows.map(({green, purple, shiny}) => {
+    const ordinary = Math.min(purple, 2);
+    const linkedShiny = Math.min(shiny, 2 - ordinary);
+    const linkedGreen = Math.min(green, 2 - ordinary - linkedShiny);
+    const linked = [...Array(ordinary).fill('purple'), ...Array(linkedShiny).fill('shiny'), ...Array(linkedGreen).fill('green')];
+    const missing = 2 - linked.length;
+    return { linked: [...linked, ...Array(missing).fill('empty')], overflow: shiny - linkedShiny,
+      unused: [...Array(purple - ordinary).fill('purple'), ...Array(green - linkedGreen).fill('green')],
+      ignored: purple - ordinary + green - linkedGreen, purple: ordinary + shiny, shiny, missing };
+  });
+  const totals = allocations.reduce((t, a) => [t[0] + Math.min(a.purple, 1), t[1] + a.purple, t[2] + a.shiny, t[3] + a.missing], [0,0,0,0]);
+  const f = Math.floor;
+  const rules = [['A+',n,2*n,n-1,1],['A',n-1,f(1.5*n),1,1],['A-',n-1,n,0,2],['B+',f(.75*n),n,0,2],['B',f(.75*n),f(.75*n),0,2],['B-',f(.75*n),f(.75*n),0,4],['C+',f(.5*n),f(.75*n),0,4],['C',f(.5*n),f(.5*n),0,4]];
+  const cutoffs = rules.map(([grade,...limits]) => ({grade, limits, gaps: limits.map((v,i) => Math.max(0,i === 3 ? totals[i]-v : v-totals[i]))}));
+  return { allocations, totals, cutoffs, grade: cutoffs.find(c => c.gaps.every(g => g === 0))?.grade || FALLBACK };
+}
+if (typeof document !== 'undefined') {
+  const $ = id => document.getElementById(id);
+  let rows = Array.from({length:5}, () => ({green:0,purple:0,shiny:0}));
+  const shinySymbol = '<svg viewBox="0 0 24 24" aria-hidden="true" focusable="false"><path d="M12 2C12 8 8 12 2 12C8 12 12 16 12 22C12 16 16 12 22 12C16 12 12 8 12 2Z"/></svg>';
+  function mark(kind) { const name = {empty:'Missing',green:'Green',purple:'Purple',shiny:'Shiny purple'}[kind]; return `<span class="mark ${kind}" role="img" aria-label="${name}" title="${name}">${kind === 'empty' ? '!' : kind === 'shiny' ? shinySymbol : '✓'}</span>`; }
+  function buildRows() {
+    $('standards').innerHTML = rows.map((r,i) => `<tr><th scope="row">S${i+1}</th>${['green','purple','shiny'].map(k => `<td><input type="number" min="0" max="999" step="1" value="${r[k]}" data-row="${i}" data-kind="${k}" aria-label="S${i+1} ${k === 'shiny' ? 'shiny purple' : k} earned"></td>`).join('')}<td id="linked-${i}"></td><td id="overflow-${i}"></td><td id="unused-${i}" class="unused"></td></tr>`).join('');
+  }
+  function render() {
+    const result = evaluate(rows);
+    $('current-totals').innerHTML = `<tr><th scope="row">Your scenario</th>${result.totals.map(v => `<td>${v}</td>`).join('')}</tr>`;
+    result.allocations.forEach((a,i) => {
+      $(`linked-${i}`).innerHTML = `<div class="marks">${a.linked.map(mark).join('')}</div>`;
+      $(`overflow-${i}`).innerHTML = `<div class="marks">${Array(a.overflow).fill('shiny').map(mark).join('')}${Array(Math.max(0, 3 - a.overflow)).fill('<span class="mark open-slot" role="img" aria-label="Empty overflow slot" title="Empty overflow slot"></span>').join('')}</div>`;
+      $(`unused-${i}`).innerHTML = `<div class="marks" aria-label="Earned but unused">${a.unused.map(mark).join('')}${Array(Math.max(0, 3 - a.unused.length)).fill('<span class="mark open-slot" role="img" aria-label="Empty unused slot" title="Empty unused slot"></span>').join('')}</div>`;
+    });
+    $('cutoffs').innerHTML = result.cutoffs.map(c => `<tr class="${c.grade === result.grade ? 'chosen' : ''}"${c.grade === result.grade ? ' aria-current="true"' : ''}><th scope="row">${c.grade}</th>${c.limits.map(v => `<td>${v}</td>`).join('')}</tr>`).join('');
+
+  }
+  $('standards').addEventListener('input', e => {
+    const input = e.target;
+    if (!input.matches('input[data-kind]')) return;
+    if (!input.validity.valid || input.value === '') { input.setAttribute('aria-invalid','true'); return; }
+    input.removeAttribute('aria-invalid');
+    rows[Number(input.dataset.row)][input.dataset.kind] = Number(input.value);
+    render();
+  });
+  $('standards').addEventListener('change', e => {
+    const input = e.target;
+    if (input.matches('input[data-kind]') && (!input.validity.valid || input.value === '')) {
+      input.value = rows[Number(input.dataset.row)][input.dataset.kind]; input.removeAttribute('aria-invalid');
+    }
+  });
+  $('count').addEventListener('change', () => {
+    const input = $('count');
+    const n = Number(input.value);
+    if (!input.validity.valid || !Number.isInteger(n) || n < 1) {
+      input.value = rows.length;
+      return;
+    }
+    rows = Array.from({length:n}, (_,i) => rows[i] || {green:0,purple:0,shiny:0});
+    buildRows(); render();
+  });
+  $('reset').addEventListener('click', () => {
+    rows = rows.map(() => ({green:0,purple:0,shiny:0}));
+    buildRows(); render();
+  });
+  buildRows(); render();
+}
+</script>
+</body>
+</html>
