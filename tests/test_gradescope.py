@@ -249,6 +249,25 @@ def test_pass_evidence_is_not_carried_across_changed_contract():
         carry_forward_verified_passes(current, prior)
 
 
+def test_deployed_config_matches_the_reviewed_lab_6_contracts():
+    """The Lab 6 Gradescope contracts are observed facts, not placeholders."""
+    config = load_config("deployment/gradescope.toml.example")
+    rules = {rule.opportunity_id: rule for rule in config.assignments}
+    assert {
+        opportunity_id: (
+            rule.assignment_id,
+            str(rule.expected_score),
+            rule.expected_test_count,
+            [str(value) for value in rule.expected_test_maxima],
+        )
+        for opportunity_id, rule in rules.items()
+        if opportunity_id.startswith("lab6")
+    } == {
+        "lab6-q1": (8900231, "2", 2, ["1", "1"]),
+        "lab6-q2": (8900234, "1", 1, ["1"]),
+    }
+
+
 def test_assignment_title_mapping_matches_sheet_opportunities():
     assert opportunity_from_assignment_title("Lab 1, Q1-2") == "lab1-q1-2"
     assert opportunity_from_assignment_title("Lab 1, Q3") == "lab1-q3"
@@ -256,6 +275,8 @@ def test_assignment_title_mapping_matches_sheet_opportunities():
     assert opportunity_from_assignment_title("Lab 4, Q1") == "lab4-q1"
     assert opportunity_from_assignment_title("Lab 4, Q2") == "lab4-q2"
     assert opportunity_from_assignment_title("Lab 4, Q3") == "lab4-q3"
+    assert opportunity_from_assignment_title("Lab 6, Q1") == "lab6-q1"
+    assert opportunity_from_assignment_title("Lab 6, Q2") == "lab6-q2"
     assert opportunity_from_assignment_title("Prelim 1") is None
     with pytest.raises(ValueError, match="required convention"):
         opportunity_from_assignment_title("Lab One Question Three")

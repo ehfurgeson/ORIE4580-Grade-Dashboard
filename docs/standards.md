@@ -2,7 +2,7 @@
 
 ## 1. Standards catalog
 
-[`sync/standards.py`](../sync/standards.py) is the single source of truth for standard IDs and wording. It defines the currently approved S1–S5 standards. Both the row-based importer and the live Lab/Exam dashboard use this catalog. Change standard wording there; do not maintain a second catalog here or in `sync/checkoff_mappings.py`.
+[`sync/standards.py`](../sync/standards.py) is the single source of truth for standard IDs and wording. It defines the currently approved S1–S6 standards. Both the row-based importer and the live Lab/Exam dashboard use this catalog. Change standard wording there; do not maintain a second catalog here or in `sync/checkoff_mappings.py`.
 
 This document records the reviewed opportunity mappings. Mirror mapping changes in `sync/checkoff_mappings.py`, `sync/gradescope_exam.py`, and `deployment/gradescope.toml.example` as applicable.
 
@@ -12,11 +12,13 @@ Lab and Exam mappings refer directly to the catalog IDs, such as `S1`. There are
 
 The former tentative twelve-standard catalog has been removed. Its P/M IDs are no longer accepted. Its S IDs also had different wording, so there is no automatic translation from that catalog.
 
-For the row-based CSV/API importer, use the current S1–S5 IDs in `standard_id`. Re-export old source data with an explicit, reviewed assignment to the current standards; do not relabel old rows by number. A CSV row with only an S ID cannot identify which catalog it came from. Regenerate old `grades.json` releases after correcting the source; JSON validation rejects obsolete IDs and wording before publication.
+For the row-based CSV/API importer, use the current S1–S6 IDs in `standard_id`. Re-export old source data with an explicit, reviewed assignment to the current standards; do not relabel old rows by number. A CSV row with only an S ID cannot identify which catalog it came from. Regenerate old `grades.json` releases after correcting the source; JSON validation rejects obsolete IDs and wording before publication.
 
 The live pipeline writes schema-version-6 `checkoffs.json` records with `id`, `name`, and `checkmarks` per standard plus the top-level `unmapped_columns` list. This is the single format for Labs and any available Exam marks; standards need not have Exam opportunities. Normalized Sheet rows are internal merge inputs and cannot be published directly. The browser also accepts older combined versions 3–5 and treats their pending list as empty. Deploy the schema-6 JavaScript and CSS before generating new records. Older backend records must be regenerated from the source data.
 
-Lab and Exam opportunity IDs, earning rules, and grading rules are unchanged. No Google Sheet or Gradescope changes are needed for the live pipeline, and existing Gradescope snapshots remain compatible. Mapping versions have advanced because references now use S IDs. Before refreshing, use the [one-time completion-cache migration](deployment.md#one-time-standard-id-cache-migration) to retain verified completions. Without migration, old completion caches are rejected and Gradescope is crawled again. Keep the previous release and cache for rollback.
+The standard-ID transition itself changed no Lab or Exam opportunity ID, earning rule, or grading rule, and needed no Google Sheet or Gradescope change. Later releases do change the Gradescope assignment contract: the Lab 6 release added two autograded assignments, so the previous private snapshot must be retired and the positive completion cache is rebuilt under the new mapping version. See [`deployment.md`](deployment.md) for the current release procedure.
+
+Mapping versions have advanced because references now use S IDs. Before the standard-ID refresh, use the [one-time completion-cache migration](deployment.md#one-time-standard-id-cache-migration) to retain verified completions. Without migration, old completion caches are rejected and Gradescope is crawled again. Keep the previous release and cache for rollback.
 
 ## 3. Green Lab mappings
 
@@ -40,6 +42,8 @@ The table below is authoritative. A valid Sheet column absent from it is quarant
 | Lab 5, Q1 | `lab5-q1` | `S3` | `Lab 5 - Q1` | **Manual-only** | None |
 | Lab 5, Q2 | `lab5-q2` | `S4` | `Lab 5 - Q2` | **Manual-only** | None |
 | Lab 5, Q3 | `lab5-q3` | `S5` | `Lab 5 - Q3` | **Manual-only** | None |
+| Lab 6, Q1 | `lab6-q1` | `S5` | `Lab 6 - Q1` | Autograded | `8900231`; 2 points; 2 × 1-point tests |
+| Lab 6, Q2 | `lab6-q2` | `S6` | `Lab 6 - Q2` | Autograded | `8900234`; 1 point; 1 × 1-point test |
 
 ### Grouped manual checkoffs
 
@@ -58,6 +62,13 @@ Lab 1 Q1–2 is one green opportunity, not three. All three listed Sheet milesto
 - **S5 / Q3:** complete an **[S5]**-marked practice problem from Canvas, then ask for a checkoff.
 
 Lab 5 has no Gradescope portion and no autograding. Its three green checkmarks depend only on the corresponding Google Sheet checkoffs.
+
+### Lab 6 student-facing requirements
+
+- **S5 / Q1:** complete Q1, pass the Q1 Gradescope autograder, then ask for a checkoff.
+- **S6 / Q2:** complete Q2, pass the Q2 Gradescope autograder, then ask for a checkoff.
+
+Both Lab 6 opportunities are autograded. Each green checkmark requires both the recorded Google Sheet checkoff and a full-credit Gradescope submission under the exact configured contract.
 
 ## 4. Exam 1 mappings
 

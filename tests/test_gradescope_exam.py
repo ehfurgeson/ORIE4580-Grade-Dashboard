@@ -115,9 +115,9 @@ def test_exam_results_merge_into_s1_and_s2_with_no_raw_scores():
 def test_exam_merge_preserves_unmapped_columns():
     exam = parse_exam_scores_csv(exam_csv(["1"] * 6), RULE, ["abc123"])
     labs = merge_checkoffs_with_autograders([lab_record()], lab_snapshot())
-    labs[0]["unmapped_columns"] = ["Lab 6 - Q1"]
+    labs[0]["unmapped_columns"] = ["Lab 7 - Q1"]
     record = merge_exam_checkmarks(labs, exam)[0]
-    assert record["unmapped_columns"] == ["Lab 6 - Q1"]
+    assert record["unmapped_columns"] == ["Lab 7 - Q1"]
     assert validate_combined_record(record) == []
 
 

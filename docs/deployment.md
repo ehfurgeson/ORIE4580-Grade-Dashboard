@@ -95,7 +95,7 @@ Validate the checked-in configuration and source on Ubuntu:
 .venv/bin/pytest -q
 ```
 
-For the Lab 5 release, the first command must still print `10`; Lab 5 has no Gradescope assignments.
+For the Lab 5 release, the first command must still print `10`; Lab 5 has no Gradescope assignments. The Lab 6 release adds two autograded assignments, so the first command must print `12`.
 
 When a release changes the Gradescope assignment contract — a new autograded assignment, or a bumped contract version — retire the previous private snapshot before the first refresh. An unknown quarantined column and a mapped manual-only column do not change that contract: they need no Gradescope configuration, and the existing snapshot must not be retired merely because either appeared. The completion cache is invalid after a contract change, so the refresh falls back to `/var/lib/orie4580-dashboard/gradescope-snapshot.json` and aborts with `cannot carry pass evidence across a changed course or assignment contract` if that file still describes the previous contract. Moving it aside lets the full crawl become the new baseline and seed the cache:
 
@@ -165,7 +165,8 @@ fails, leave the original cache in place and inspect the mismatch before
 installing anything. This historical migration applies to the earlier standard-ID
 transition; do not use it for the Lab 5 mapping update. Lab 5 intentionally
 rebuilds the existing `lab-mapping-v3` cache under `lab-mapping-v4` during the
-first full refresh.
+first full refresh. The Lab 6 release does the same, rebuilding the
+`lab-mapping-v4` cache under `lab-mapping-v5`.
 
 Then perform the manual refresh and checks above before re-enabling the timer.
 Cached positive Lab results avoid repeated submission-history reads; current

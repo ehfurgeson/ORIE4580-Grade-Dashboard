@@ -125,26 +125,26 @@ def test_unmapped_columns_survive_merge_and_publication_without_marks_or_gradesc
         "Lab 1 - Q1.3": True,
         "Lab 1 - Q2.3": True,
         "Lab 1 - Q2.4": True,
-        "Lab 6 - Q1": "not a checkbox",
+        "Lab 7 - Q1": "not a checkbox",
     }
     google = rows_to_simple_records([row], updated_at=NOW, worksheet="Lab Checkoffs")[0]
     record = merge_checkoffs_with_autograders([google], snapshot())[0]
-    assert record["unmapped_columns"] == ["Lab 6 - Q1"]
+    assert record["unmapped_columns"] == ["Lab 7 - Q1"]
     assert find_checkmark(record, "lab1-q1-2")["status"] == "complete"
     assert all(
-        item["id"] != "Lab 6 - Q1"
+        item["id"] != "Lab 7 - Q1"
         for standard in record["standards"] for item in standard["checkmarks"]
     )
     assert validate_combined_record(record) == []
     [path] = write_simple_release([record], tmp_path / "students")
-    assert json.loads(path.read_text())["unmapped_columns"] == ["Lab 6 - Q1"]
+    assert json.loads(path.read_text())["unmapped_columns"] == ["Lab 7 - Q1"]
 
 
 def test_only_unmapped_combined_record_schema_validates_with_all_standards():
     record = merge_checkoffs_with_autograders(
         [google_record()], snapshot(), allow_unconfigured=True
     )[0]
-    record["unmapped_columns"] = ["Lab 6 - Q1"]
+    record["unmapped_columns"] = ["Lab 7 - Q1"]
     for standard in record["standards"]:
         standard["checkmarks"] = []
     assert validate_combined_record(record) == []
@@ -215,6 +215,68 @@ def test_lab_5_questions_are_manual_only_in_the_combined_record():
         assert checkmark["status"] == expected_status
         assert [item["id"] for item in checkmark["requirements"]] == ["manual"]
     assert validate_combined_record(record) == []
+
+
+def lab_6_snapshot(q1_status="passed", q2_status="passed"):
+    """A strict snapshot that configures both Lab 6 autograded opportunities."""
+    configured = snapshot()
+    contracts = {
+        "lab6-q1": (8900231, "2", 2, ["1", "1"]),
+        "lab6-q2": (8900234, "1", 1, ["1"]),
+    }
+    for opportunity_id, status in (("lab6-q1", q1_status), ("lab6-q2", q2_status)):
+        assignment_id, score, test_count, maxima = contracts[opportunity_id]
+        configured["assignments"].append({
+            "assignment_id": assignment_id,
+            "opportunity_id": opportunity_id,
+            "contract_version": f"{opportunity_id}-v1",
+            "expected_score": score,
+            "expected_test_count": test_count,
+            "expected_test_maxima": maxima,
+            "title_mapping_override": False,
+        })
+        configured["students"][0]["autograders"].append({
+            "opportunity_id": opportunity_id,
+            "status": status,
+            "pass_evidence": "current_history" if status == "passed" else None,
+            "submissions_observed": 1,
+            "submissions_checked": 1,
+        })
+    return configured
+
+
+def test_lab_6_questions_require_both_the_checkoff_and_the_autograder():
+    row = {
+        "NetID": "abc123",
+        "Lab 1 - Q1.3": True,
+        "Lab 1 - Q2.3": True,
+        "Lab 1 - Q2.4": True,
+        "Lab 6 - Q1": True,
+        "Lab 6 - Q2": True,
+    }
+    google = rows_to_simple_records([row], updated_at=NOW, worksheet="Lab Checkoffs")[0]
+    record = merge_checkoffs_with_autograders([google], lab_6_snapshot())[0]
+    for opportunity_id in ("lab6-q1", "lab6-q2"):
+        checkmark = find_checkmark(record, opportunity_id)
+        assert [(item["id"], item["status"]) for item in checkmark["requirements"]] == [
+            ("manual", "complete"), ("autograder", "passed")
+        ]
+        assert checkmark["status"] == "complete"
+    assert validate_combined_record(record) == []
+
+    failed = merge_checkoffs_with_autograders(
+        [google], lab_6_snapshot(q2_status="failed")
+    )[0]
+    assert find_checkmark(failed, "lab6-q2")["status"] == "incomplete"
+    assert find_checkmark(failed, "lab6-q1")["status"] == "complete"
+
+    without_checkoff = merge_checkoffs_with_autograders(
+        [rows_to_simple_records(
+            [{**row, "Lab 6 - Q1": False}], updated_at=NOW, worksheet="Lab Checkoffs"
+        )[0]],
+        lab_6_snapshot(),
+    )[0]
+    assert find_checkmark(without_checkoff, "lab6-q1")["status"] == "incomplete"
 
 
 def test_manual_only_opportunity_rejects_an_autograder_mapping():

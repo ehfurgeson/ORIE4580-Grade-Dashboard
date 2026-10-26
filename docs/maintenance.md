@@ -36,13 +36,28 @@ The standards are defined in `sync/standards.py`. The Lab 4 Sheet columns, requi
 - Changed the merger, validator, browser, and cache so a manual-only Lab is first-class and cannot accidentally receive an autograder rule or cached autograder evidence.
 - Added the two real Gradescope rules to the deployment config, but deliberately added no Q1 rule.
 - Updated the dashboard explanation, README, authoritative [`standards.md`](standards.md) mapping tables, and regression tests.
-- Validated the current 174-row Sheet and performed a successful live one-student refresh against all 10 configured Lab assignments.
+- Validated the current 174-row Sheet and performed a successful live one-student refresh against all 10 configured Lab assignments at that release.
 
 ### 1.2 Lab 5 worked example
 
 Lab 5 has three independent manual-only opportunities. `Lab 5 - Q1` maps to S3, `Lab 5 - Q2` maps to S4, and `Lab 5 - Q3` maps to S5. The three opportunities earn green from their Google Sheet checkboxes alone; Lab 5 has no Gradescope portion or autograding. Add the exact columns and stable opportunity IDs to `sync/checkoff_mappings.py`, add all three IDs to `MANUAL_ONLY_OPPORTUNITY_IDS`, and do not add Gradescope assignment rules.
 
 Because the effective mapping changes, increment `LAB_MAPPING_VERSION`. The Gradescope assignment snapshot contract does not change, but the positive completion cache will be rebuilt under the new mapping version during the next full refresh.
+
+### 1.3 Lab 6 worked example
+
+Lab 6 has two independent autograded opportunities. `Lab 6 - Q1` maps to S5 and `Lab 6 - Q2` maps to S6, and Q2 introduces a new standard in the catalog. Both opportunities earn green only when the Google Sheet checkoff and the matching Gradescope autograder are both complete.
+
+The implementation work was:
+
+- Added the S6 display text to `sync/standards.py`.
+- Added the two exact Sheet headers, stable opportunity IDs, and header groups to `sync/checkoff_mappings.py`.
+- Added `lab6-q1` and `lab6-q2` to `AUTOGRADER_OPPORTUNITY_IDS`; neither is manual-only.
+- Bumped `LAB_MAPPING_VERSION` from `lab-mapping-v4` to `lab-mapping-v5`.
+- Added the two real Gradescope rules to the deployment config, with the exact assignment IDs, full scores, test counts, and ordered test maxima observed from live submissions.
+- Updated the dashboard explanation, README, authoritative [`standards.md`](standards.md) mapping tables, and regression tests.
+
+Because Lab 6 adds autograded assignments, the Gradescope assignment contract changes. The previous private snapshot must be retired before the first refresh, and the positive completion cache is rebuilt under the new mapping version.
 
 ## 2. Adding a new lab
 
@@ -92,23 +107,23 @@ Example shapes:
 ```python
 COLUMN_MAPPINGS = {
     # One checkbox, no autograder.
-    "Lab 4 - Q1": ("S3", "lab4-q1", "Lab 4 · Q1"),
+    "Lab 5 - Q1": ("S3", "lab5-q1", "Lab 5 · Q1"),
 
     # One checkbox plus one configured Gradescope assignment.
-    "Lab 4 - Q2": ("S4", "lab4-q2", "Lab 4 · Q2"),
+    "Lab 6 - Q1": ("S5", "lab6-q1", "Lab 6 · Q1"),
 
     # Several checkboxes jointly produce one opportunity.
-    "Lab 5 - Q2.1": ("S6", "lab5-q2", "Lab 5 · Q2"),
-    "Lab 5 - Q2.2": ("S6", "lab5-q2", "Lab 5 · Q2"),
+    "Lab 3 - Q2.1": ("S3", "lab3-q2", "Lab 3 · Q2.1–2.4"),
+    "Lab 3 - Q2.2": ("S3", "lab3-q2", "Lab 3 · Q2.1–2.4"),
 }
 
 OPPORTUNITY_HEADER_GROUPS = {
-    "lab4-q1": (frozenset({"Lab 4 - Q1"}),),
-    "lab4-q2": (frozenset({"Lab 4 - Q2"}),),
-    "lab5-q2": (frozenset({"Lab 5 - Q2.1", "Lab 5 - Q2.2"}),),
+    "lab5-q1": (frozenset({"Lab 5 - Q1"}),),
+    "lab6-q1": (frozenset({"Lab 6 - Q1"}),),
+    "lab3-q2": (frozenset({"Lab 3 - Q2.1", "Lab 3 - Q2.2"}),),
 }
-MANUAL_ONLY_OPPORTUNITY_IDS = frozenset({"lab4-q1"})
-AUTOGRADER_OPPORTUNITY_IDS = frozenset({"lab4-q2", "lab5-q2"})
+MANUAL_ONLY_OPPORTUNITY_IDS = frozenset({"lab5-q1"})
+AUTOGRADER_OPPORTUNITY_IDS = frozenset({"lab6-q1", "lab3-q2"})
 ```
 
 All grouped Sheet columns must be complete before their single manual requirement is complete.
@@ -119,12 +134,13 @@ Add one block to `deployment/gradescope.toml.example`. Do not add a block for a 
 
 ```toml
 [assignments."GRADESCOPE_ASSIGNMENT_ID"]
-opportunity_id = "lab5-q2"
-contract_version = "lab5-q2-v1"
-expected_score = "3"
-expected_test_count = 3
-expected_test_maxima = ["1", "1", "1"]
+opportunity_id = "lab6-q1"
+contract_version = "lab6-q1-v1"
+expected_score = "2"
+expected_test_count = 2
+expected_test_maxima = ["1", "1"]
 title_mapping_override = false
+seal_when_closed = false
 ```
 
 The Gradescope title should follow `Lab N, QN` or `Lab N, QN-N`. Keep `title_mapping_override = false` unless a reviewed legacy title cannot follow that convention.

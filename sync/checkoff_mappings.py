@@ -3,7 +3,7 @@ from __future__ import annotations
 
 import re
 
-LAB_MAPPING_VERSION = "lab-mapping-v4"
+LAB_MAPPING_VERSION = "lab-mapping-v5"
 
 # Each worksheet column belongs to exactly one syllabus checkmark opportunity.
 # Multiple columns with the same opportunity ID must all be complete to earn it.
@@ -28,6 +28,8 @@ COLUMN_MAPPINGS = {
     "Lab 5 - Q1": ('S3', "lab5-q1", "Lab 5 · Q1"),
     "Lab 5 - Q2": ('S4', "lab5-q2", "Lab 5 · Q2"),
     "Lab 5 - Q3": ('S5', "lab5-q3", "Lab 5 · Q3"),
+    "Lab 6 - Q1": ('S5', "lab6-q1", "Lab 6 · Q1"),
+    "Lab 6 - Q2": ('S6', "lab6-q2", "Lab 6 · Q2"),
 }
 
 # Each mapped opportunity must use exactly one approved Sheet-header group.
@@ -54,6 +56,8 @@ OPPORTUNITY_HEADER_GROUPS = {
     "lab5-q1": (frozenset({"Lab 5 - Q1"}),),
     "lab5-q2": (frozenset({"Lab 5 - Q2"}),),
     "lab5-q3": (frozenset({"Lab 5 - Q3"}),),
+    "lab6-q1": (frozenset({"Lab 6 - Q1"}),),
+    "lab6-q2": (frozenset({"Lab 6 - Q2"}),),
 }
 
 
@@ -64,6 +68,7 @@ MANUAL_ONLY_OPPORTUNITY_IDS = frozenset({
 AUTOGRADER_OPPORTUNITY_IDS = frozenset({
     "lab1-q1-2", "lab1-q3", "lab2-q1", "lab2-q2", "lab2-q3",
     "lab3-q1", "lab3-q2", "lab3-q3", "lab4-q2", "lab4-q3",
+    "lab6-q1", "lab6-q2",
 })
 
 if MANUAL_ONLY_OPPORTUNITY_IDS & AUTOGRADER_OPPORTUNITY_IDS:

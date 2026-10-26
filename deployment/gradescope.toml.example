@@ -153,3 +153,27 @@ title_mapping_override = false
 # The first closed run performs one final full check, then the recorded result
 # for every roster member is served without any further Gradescope reads.
 seal_when_closed = false
+
+[assignments."8900231"]
+opportunity_id = "lab6-q1"
+contract_version = "lab6-q1-v1"
+expected_score = "2"
+expected_test_count = 2
+expected_test_maxima = ["1", "1"]
+title_mapping_override = false
+# Seal this assignment once Gradescope reports it no longer accepts submissions.
+# The first closed run performs one final full check, then the recorded result
+# for every roster member is served without any further Gradescope reads.
+seal_when_closed = false
+
+[assignments."8900234"]
+opportunity_id = "lab6-q2"
+contract_version = "lab6-q2-v1"
+expected_score = "1"
+expected_test_count = 1
+expected_test_maxima = ["1"]
+title_mapping_override = false
+# Seal this assignment once Gradescope reports it no longer accepts submissions.
+# The first closed run performs one final full check, then the recorded result
+# for every roster member is served without any further Gradescope reads.
+seal_when_closed = false

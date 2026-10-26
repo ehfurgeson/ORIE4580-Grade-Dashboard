@@ -37,7 +37,7 @@ function payload(version, pending) {
     worksheet: "Lab Checkoffs",
     student: { netid: "abc123" },
     unmapped_columns: pending,
-    standards: ["S1", "S2", "S3", "S4", "S5"].map(id => ({
+    standards: ["S1", "S2", "S3", "S4", "S5", "S6"].map(id => ({
       id, name: `Standard ${id}`, checkmarks: []
     }))
   };
@@ -94,7 +94,7 @@ async function run(data, { legacyTemplate = false } = {}) {
   const legacyTemplate = await run(payload(5, ["must be ignored"]), { legacyTemplate: true });
   assert.strictEqual(legacyTemplate["#dashboard"].hidden, false);
 
-  const incompatibleTemplate = await run(payload(6, ["Lab 6 - Q1"]), { legacyTemplate: true });
+  const incompatibleTemplate = await run(payload(6, ["Lab 7 - Q1"]), { legacyTemplate: true });
   assert.match(incompatibleTemplate["#status"].textContent, /does not support pending Sheet mappings/);
   assert.strictEqual(incompatibleTemplate["#dashboard"].hidden, true);
 

@@ -56,8 +56,8 @@ def test_fake_csv_runs_end_to_end(tmp_path):
     rows = load_csv("fixtures/google-sheet.fake.csv")
     records = rows_to_records(rows)
     assert validate_all(records) == []
-    assert len(rows) == 11
-    assert summarize(records[0])["estimated_grade"] == "A−"
+    assert len(rows) == 12
+    assert summarize(records[0])["estimated_grade"] == "B−"
     paths = write_records(records, tmp_path)
     assert paths == [tmp_path / "ehf38" / "grades.json"]
     assert paths[0].exists()

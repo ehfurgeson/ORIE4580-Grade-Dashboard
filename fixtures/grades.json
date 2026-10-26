@@ -45,6 +45,11 @@
       "id": "S5",
       "name": "I can apply confidence intervals in practical situations, handling concerns such as non-independence, multiple hypotheses, and multiple stages of study.",
       "opportunities": []
+    },
+    {
+      "id": "S6",
+      "name": "I can state the defining features of Poisson samplers, use them to construct new samplers, and use them to check if a given sampler is valid.",
+      "opportunities": []
     }
   ]
 }
