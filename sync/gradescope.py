@@ -31,7 +31,9 @@ SOURCE_NAME = "gradescope_unofficial_read_only"
 NETID_EMAIL_PATTERN = re.compile(r"([a-z]{2,3}[0-9]+)@cornell\.edu\Z")
 STATUSES = {"passed", "failed", "pending", "error", "not_submitted"}
 PROCESSED_SUBMISSION_STATUS = "processed"
-PENDING_SUBMISSION_STATUSES = {"processing", "pending", "queued"}
+PENDING_SUBMISSION_STATUSES = {"processing", "pending", "queued", "autograder_task_started"}
+AUTOGRADER_POLL_INTERVAL_SECONDS = 60
+AUTOGRADER_MAX_POLLS = 15
 FAILED_SUBMISSION_STATUSES = {"failed"}
 HISTORY_SUFFIX = ".json?content=react&only_keys%5B%5D=past_submissions"
 BASE_URL = "https://www.gradescope.com"
@@ -397,11 +399,14 @@ def evaluate_submission(payload: Any, rule: AssignmentRule) -> str:
     known_statuses = {PROCESSED_SUBMISSION_STATUS} | PENDING_SUBMISSION_STATUSES | FAILED_SUBMISSION_STATUSES
     if submission_status not in known_statuses:
         raise GradescopeSchemaError(f"unknown assignment submission status: {submission_status!r}")
+    # In-flight submissions can have absent, partial, or stale results.
+    if submission_status in PENDING_SUBMISSION_STATUSES:
+        return "pending"
     if "autograder_results" not in payload:
         raise GradescopeSchemaError("autograder_results field is missing")
     results = payload["autograder_results"]
     if results is None:
-        return "pending" if submission_status in PENDING_SUBMISSION_STATUSES else "error"
+        return "error"
     if not isinstance(results, dict):
         raise GradescopeSchemaError("autograder_results must be an object")
     # Gradescope marks some runner crashes as status "failed" and returns only
@@ -413,9 +418,6 @@ def evaluate_submission(payload: Any, rule: AssignmentRule) -> str:
         raise GradescopeSchemaError("autograder_results.error_code is missing")
     if results.get("error_code") not in (None, "", 0, False):
         return "error"
-    if submission_status in PENDING_SUBMISSION_STATUSES:
-        return "pending"
-
     tests = results.get("tests")
     if not isinstance(tests, list):
         raise GradescopeSchemaError("autograder_results.tests must be a list")
@@ -1375,8 +1377,28 @@ class PrivateWebGradescopeSource:
 
     def _payloads(self, urls: list[str]) -> Iterator[dict[str, Any]]:
         for url in urls:
-            response = self._get(url, content_type="text/html")
-            yield extract_submission_payload(response.text)
+            for attempt in range(AUTOGRADER_MAX_POLLS + 1):
+                response = self._get(url, content_type="text/html")
+                payload = extract_submission_payload(response.text)
+                submission = payload.get("assignment_submission")
+                status = submission.get("status") if isinstance(submission, dict) else None
+                if not isinstance(status, str) or status not in PENDING_SUBMISSION_STATUSES:
+                    break
+                if attempt == AUTOGRADER_MAX_POLLS:
+                    print(
+                        f"[autograder] Still pending after {AUTOGRADER_MAX_POLLS} polls; "
+                        "continuing without awarding credit for this submission.",
+                        flush=True,
+                    )
+                    break
+                print(
+                    f"[autograder] Submission is {status}; rechecking in "
+                    f"{AUTOGRADER_POLL_INTERVAL_SECONDS}s "
+                    f"({attempt + 1}/{AUTOGRADER_MAX_POLLS}).",
+                    flush=True,
+                )
+                time.sleep(AUTOGRADER_POLL_INTERVAL_SECONDS)
+            yield payload
 
     def submissions(self, member_id: str, assignment_id: int) -> SubmissionBatch:
         if assignment_id not in {rule.assignment_id for rule in self.config.assignments}:

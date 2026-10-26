@@ -284,7 +284,26 @@ A new source or a new checkmark kind requires a schema change rather than a mapp
 
 Do not expose raw grades, free-form grader output, credentials, submission IDs, or student emails in generated JSON or logs.
 
-## 5. Maintenance checklist
+## 5. In-progress autograders
+
+The private Gradescope reader recognizes `processing`, `pending`, `queued`, and
+`autograder_task_started` as in-progress submission states. It re-fetches only
+that submission every 60 seconds, up to 15 times, then resumes the existing
+crawl. Polling uses the same guarded transport and request budget as other reads.
+Partial or stale results on an in-progress submission cannot earn credit.
+
+After the polling limit, that submission remains `pending`; the reader continues
+through older submissions, so a historical full pass can still earn credit.
+Pending results are not cached as passes or sealed as final results. A later
+scheduled refresh checks them again. Unknown statuses, malformed completed
+results, and exhausted transport budgets still fail closed. Polling messages
+contain no student or submission identifiers.
+
+The constants `AUTOGRADER_POLL_INTERVAL_SECONDS` and `AUTOGRADER_MAX_POLLS` in
+`sync/gradescope.py` define this policy. The existing systemd two-hour service
+limit still applies to the whole refresh, including all polling waits.
+
+## 6. Maintenance checklist
 
 - [ ] Authoritative mapping and wording recorded.
 - [ ] Pending Sheet mappings reviewed; raw unknown cell values were not published.

@@ -315,6 +315,93 @@ def test_test_maxima_vector_is_part_of_contract():
     assert evaluate_submission(changed_maxima, RULE) == "contract_mismatch"
 
 
+@pytest.mark.parametrize("status", ["processing", "pending", "queued", "autograder_task_started"])
+@pytest.mark.parametrize("results", [None, {}, {"score": 3}])
+def test_inflight_submission_never_uses_partial_or_stale_results(status, results):
+    value = {"assignment_submission": {"status": status}, "autograder_results": results}
+    assert evaluate_submission(value, RULE) == "pending"
+    del value["autograder_results"]
+    assert evaluate_submission(value, RULE) == "pending"
+
+
+def polling_source(monkeypatch, values):
+    from types import SimpleNamespace
+    import html
+
+    source = PrivateWebGradescopeSource.__new__(PrivateWebGradescopeSource)
+    source.config = CONFIG
+    responses = iter(values)
+    calls = []
+    sleeps = []
+
+    def get(url, *, content_type):
+        calls.append((url, content_type))
+        value = next(responses)
+        if isinstance(value, Exception):
+            raise value
+        encoded = html.escape(json.dumps(value), quote=True)
+        return SimpleNamespace(text=(
+            '<div data-react-class="AssignmentSubmissionViewer" '
+            f'data-react-props="{encoded}"></div>'
+        ))
+
+    monkeypatch.setattr(source, "_get", get)
+    monkeypatch.setattr("sync.gradescope.time.sleep", sleeps.append)
+    return source, calls, sleeps
+
+
+@pytest.mark.parametrize("final", [payload(), payload((1, 0, 1)), payload(status="failed")])
+def test_polling_waits_on_same_submission_then_continues_history(monkeypatch, final):
+    pending = {"assignment_submission": {"status": "autograder_task_started"}}
+    source, calls, sleeps = polling_source(monkeypatch, [pending, payload(status="queued"), final, payload()])
+    values = list(source._payloads(["first", "second"]))
+    assert values == [final, payload()]
+    assert [url for url, _ in calls] == ["first", "first", "first", "second"]
+    assert sleeps == [60, 60]
+
+
+def test_stuck_autograder_is_pending_and_does_not_block_remaining_history(monkeypatch):
+    from sync.gradescope import AUTOGRADER_MAX_POLLS
+
+    pending = {"assignment_submission": {"status": "autograder_task_started"}}
+    source, calls, sleeps = polling_source(monkeypatch, [pending] * (AUTOGRADER_MAX_POLLS + 1) + [payload()])
+    values = list(source._payloads(["first", "second"]))
+    assert [evaluate_submission(value, RULE) for value in values] == ["pending", "passed"]
+    assert len(calls) == AUTOGRADER_MAX_POLLS + 2
+    assert sleeps == [60] * AUTOGRADER_MAX_POLLS
+
+
+@pytest.mark.parametrize("bad", [payload(status="new-upstream-state"), {"assignment_submission": {"status": "processed"}}])
+def test_polling_does_not_retry_unknown_or_malformed_completed_results(monkeypatch, bad):
+    source, calls, sleeps = polling_source(monkeypatch, [bad])
+    with pytest.raises(GradescopeSchemaError):
+        evaluate_submission(next(source._payloads(["first"])), RULE)
+    assert len(calls) == 1
+    assert sleeps == []
+
+
+def test_snapshot_resumes_after_polling_without_restarting_crawl(monkeypatch):
+    pending = {"assignment_submission": {"status": "autograder_task_started"}}
+    source, calls, sleeps = polling_source(monkeypatch, [payload(), pending, payload()])
+    members = [MemberRef("first", "abc123@cornell.edu", "0"), MemberRef("second", "xy99@cornell.edu", "0")]
+    monkeypatch.setattr(source, "list_members", lambda: members)
+    monkeypatch.setattr(source, "_submission_urls", lambda member_id, assignment_id: [member_id])
+    snapshot, _ = build_snapshot(source, CONFIG, generated_at=NOW)
+    assert [student["autograders"][0]["status"] for student in snapshot["students"]] == ["passed", "passed"]
+    assert [url for url, _ in calls] == ["first", "second", "second"]
+    assert sleeps == [60]
+    assert validate_snapshot(snapshot) == []
+
+
+def test_polling_preserves_transport_failure(monkeypatch):
+    pending = {"assignment_submission": {"status": "autograder_task_started"}}
+    source, calls, sleeps = polling_source(monkeypatch, [pending, GradescopeTransportError("request budget exceeded")])
+    with pytest.raises(GradescopeTransportError, match="request budget"):
+        next(source._payloads(["first"]))
+    assert len(calls) == 2
+    assert sleeps == [60]
+
+
 def test_unknown_submission_status_fails_closed():
     with pytest.raises(GradescopeSchemaError, match="unknown assignment submission status"):
         evaluate_submission(payload(status="new-upstream-state"), RULE)
