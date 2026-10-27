@@ -23,6 +23,8 @@ from sync.completion_cache import (
 )
 from sync.google_sheets_api import fetch_first_worksheet_rows
 from sync.gradescope_exam import import_exam_soft
+from sync.gradescope_exam2 import EXAM2_OPPORTUNITIES, import_exam2_soft
+from sync.exam2_publication import load_publication_state, write_publication_state, visible_records
 from sync.gradescope import (
     GradescopeAdapterError,
     PrivateWebGradescopeSource,
@@ -132,6 +134,25 @@ def _unmapped_column_names(records: list[dict]) -> tuple[str, ...]:
     return expected or ()
 
 
+def _validate_exam2_preview(args) -> None:
+    """Constrain unpublished Exam 2 previews to the nonserved local research tree."""
+    if not args.exam2_preview:
+        return
+    if not args.disable_completion_cache:
+        raise ValueError("Exam 2 preview requires --disable-completion-cache")
+    local_root = (Path(__file__).resolve().parents[1] / "local_notes").resolve()
+    paths = (args.output, args.snapshot, args.copy_assets_to, args.completion_cache, args.lock_file, args.exam2_state)
+    for path in paths:
+        if path is not None and local_root not in path.resolve().parents:
+            raise ValueError("Exam 2 preview paths must be inside local_notes")
+
+
+def _collect_exam2(config, preview: bool) -> bool:
+    if preview and config.exam2 is None:
+        raise ValueError("Exam 2 preview requires configured sources")
+    return config.exam2 is not None
+
+
 def main() -> None:
     load_dotenv(override=False)
     parser = argparse.ArgumentParser(description=__doc__)
@@ -156,6 +177,7 @@ def main() -> None:
     )
     parser.add_argument("--completion-cache", type=Path, help="private positive-only cache")
     parser.add_argument("--lock-file", type=Path, help="private nonblocking process lock")
+    parser.add_argument("--exam2-state", type=Path, help="private collected dashboard and Exam 2 visibility state")
     parser.add_argument(
         "--force-full-revalidation", action="store_true",
         help="perform every Lab source check while preserving verified positive results",
@@ -168,6 +190,10 @@ def main() -> None:
         "--shadow-cache-comparison", action="store_true",
         help="compare cached Lab results with a forced full revalidation before publishing",
     )
+    parser.add_argument(
+        "--exam2-preview", action="store_true",
+        help="include unpublished Exam 2 only in local_notes; requires disabled completion cache",
+    )
     args = parser.parse_args()
 
     if not args.spreadsheet_id:
@@ -175,6 +201,7 @@ def main() -> None:
 
     lock_handle = None
     try:
+        _validate_exam2_preview(args)
         selected_netid = _selected_netid(args.student_id, args.all_students)
         _require_private_state(args.snapshot, args.output, args.copy_assets_to)
         if args.completion_cache is not None:
@@ -182,6 +209,18 @@ def main() -> None:
         if args.lock_file is not None:
             _require_private_state(args.lock_file, args.output, args.copy_assets_to)
         config = load_config(args.config)
+        collect_exam2 = _collect_exam2(config, args.exam2_preview)
+        if collect_exam2:
+            if args.exam2_state is None:
+                raise ValueError("configured Exam 2 collection requires --exam2-state")
+            _require_private_state(args.exam2_state, args.output, args.copy_assets_to)
+            other_state_paths = (args.snapshot, args.completion_cache, args.lock_file)
+            if any(path is not None and path.resolve() == args.exam2_state.resolve() for path in other_state_paths):
+                raise ValueError("Exam 2 state must be distinct from snapshots, cache, and lock")
+            if args.lock_file is None:
+                raise ValueError("Exam 2 collection requires the shared --lock-file")
+            if selected_netid is not None and not args.exam2_preview:
+                raise ValueError("selected-student Exam 2 collection requires --exam2-preview")
         if config.cache.google_conditional_requests or config.cache.exam_conditional_requests:
             raise ValueError("conditional requests require a successful source capability probe")
         cache_active = config.cache.enabled and not args.disable_completion_cache
@@ -196,6 +235,10 @@ def main() -> None:
         if args.lock_file is not None:
             lock_handle = _acquire_lock(args.lock_file)
 
+        publication_state = load_publication_state(args.exam2_state) if collect_exam2 else None
+        exam2_visible = bool(publication_state and publication_state["visible"])
+        if args.exam2_preview:
+            exam2_visible = True
         email = _secret("GRADESCOPE_EMAIL")
         password = _secret("GRADESCOPE_PASSWORD")
         completion_cache = None
@@ -284,7 +327,7 @@ def main() -> None:
                 flush=True,
             )
 
-        if args.all_students and args.snapshot.exists() and (
+        if args.all_students and not args.exam2_preview and args.snapshot.exists() and (
             not cache_active or completion_cache is None
         ):
             # Migration/fallback precedence: a valid completion cache is the
@@ -346,12 +389,26 @@ def main() -> None:
             "conditional export retrieval=unsupported",
             flush=True,
         )
+        if collect_exam2:
+            exam2 = import_exam2_soft(
+                source,
+                [record["student"]["netid"] for record in combined],
+                current_gradescope_netids=frozenset(gradescope_netids),
+            )
+            combined = merge_exam_checkmarks(combined, exam2, opportunities=EXAM2_OPPORTUNITIES)
+            print(f"[5/6] {exam2.message}; Exam 2 caching=disabled; visibility={'on' if exam2_visible else 'off'}", flush=True)
         print("[6/6] Validating and atomically publishing the new release...", flush=True)
 
-        # Publish first. State files follow, and the optimization cache is last.
+        # Save private publication state first; positive optimization caches remain last.
         # A crash before the cache write causes extra work on the next run, not
         # an incorrectly awarded checkmark.
-        paths = write_simple_release(combined, args.output, retain_previous=True)
+        if collect_exam2:
+            write_publication_state(args.exam2_state, {
+                "schema_version": 1, "visible": exam2_visible,
+                "collected_at": timestamp, "records": combined,
+            })
+        public_records = visible_records(combined, exam2_visible)
+        paths = write_simple_release(public_records, args.output, retain_previous=False)
         write_snapshot_atomic(snapshot, args.snapshot)
         if cache_active and args.completion_cache is not None:
             next_cache = build_completion_cache(

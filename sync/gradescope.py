@@ -91,6 +91,11 @@ class ExamRule:
 
 
 @dataclass(frozen=True)
+class Exam2Rule:
+    sources: tuple[tuple[int, str], ...]
+
+
+@dataclass(frozen=True)
 class CachePolicy:
     enabled: bool = False
     lab_contract_canary_each_run: bool = True
@@ -120,6 +125,7 @@ class AdapterConfig:
     maximum_submissions_per_student: int = 500
     exam: ExamRule | None = None
     cache: CachePolicy = CachePolicy()
+    exam2: Exam2Rule | None = None
 
 
 @dataclass(frozen=True)
@@ -157,7 +163,7 @@ def load_config(path: str | Path) -> AdapterConfig:
     with Path(path).open("rb") as handle:
         raw = tomllib.load(handle)
     required_top = {"schema_version", "course_id", "roles", "network", "assignments", "cache"}
-    if set(raw) not in (required_top, required_top | {"exam"}):
+    if not required_top <= set(raw) or set(raw) - required_top - {"exam", "exam2"}:
         raise ValueError("Gradescope config fields do not match the expected schema")
     if raw.get("schema_version") != CONFIG_SCHEMA_VERSION:
         raise ValueError(f"Gradescope config schema_version must be {CONFIG_SCHEMA_VERSION}; migrate the deployed config")
@@ -324,6 +330,31 @@ def load_config(path: str | Path) -> AdapterConfig:
             rubric_version, rubric_finalized,
         )
 
+    exam2_rule = None
+    if "exam2" in raw:
+        exam2_raw = raw["exam2"]
+        if not isinstance(exam2_raw, dict) or set(exam2_raw) != {"sources"}:
+            raise ValueError("Gradescope Exam 2 config fields are invalid")
+        sources = exam2_raw["sources"]
+        if not isinstance(sources, dict) or not sources:
+            raise ValueError("Exam 2 requires explicit sources")
+        exam2_sources = []
+        used_ids = {rule.assignment_id for rule in rules}
+        if exam_rule is not None:
+            used_ids.add(exam_rule.assignment_id)
+        for key, title in sources.items():
+            if not isinstance(key, str) or not re.fullmatch(r"[1-9][0-9]*", key):
+                raise ValueError("Exam 2 source IDs must be canonical positive integers")
+            assignment_id = int(key)
+            if assignment_id in used_ids:
+                raise ValueError("Exam 2 source duplicates another configured assignment")
+            if not isinstance(title, str) or not re.fullmatch(r"Exam 2, Version [0-9]+", title):
+                raise ValueError("Exam 2 source title must identify a reviewed version")
+            exam2_sources.append((assignment_id, title))
+        if len(set(sources.values())) != len(sources):
+            raise ValueError("Exam 2 source titles must be unique")
+        exam2_rule = Exam2Rule(tuple(sorted(exam2_sources)))
+
     cache_raw = raw.get("cache")
     cache_fields = {
         "enabled", "lab_contract_canary_each_run",
@@ -356,6 +387,7 @@ def load_config(path: str | Path) -> AdapterConfig:
         maximum_submissions,
         exam_rule,
         cache_policy,
+        exam2_rule,
     )
 
 
@@ -1176,6 +1208,7 @@ class PrivateWebGradescopeSource:
                     "Gradescope assignment title maps to a different Google Sheet opportunity"
                 )
 
+        self._available_assignments = available
         self._exam_assignment = None
         if config.exam is not None:
             exam_assignment = available.get(config.exam.assignment_id)
@@ -1235,6 +1268,40 @@ class PrivateWebGradescopeSource:
             return response.content.decode("utf-8-sig")
         except UnicodeDecodeError as error:
             raise GradescopeSchemaError("Exam 1 grade export is not UTF-8") from error
+
+    def exam2_scores_csvs(self) -> dict[int, str]:
+        """Fetch reviewed Exam 2 leaf exports; never ingest a parent container."""
+        if self.config.exam2 is None:
+            raise GradescopeSchemaError("Exam 2 is not configured")
+        expected = dict(self.config.exam2.sources)
+        candidates = {}
+        for assignment_id, assignment in self._available_assignments.items():
+            if not assignment.title.replace("_", " ").startswith("Exam 2"):
+                continue
+            path = getattr(assignment, "url", None)
+            if not isinstance(path, str):
+                raise GradescopeSchemaError("Exam 2 assignment URL is unavailable")
+            if "/assignment_containers/" not in path:
+                candidates[assignment_id] = assignment
+        if set(candidates) != set(expected):
+            raise GradescopeSchemaError("Exam 2 source set changed; staff review required")
+        exports = {}
+        for assignment_id, title in expected.items():
+            assignment = candidates[assignment_id]
+            if not assignment_title_matches(assignment.title, title):
+                raise GradescopeSchemaError("Exam 2 source title changed")
+            try:
+                url = assignment.get_grades_url()
+            except (AttributeError, TypeError, ValueError) as error:
+                raise GradescopeSchemaError("Exam 2 grade-export URL is unavailable") from error
+            if not isinstance(url, str):
+                raise GradescopeSchemaError("Exam 2 grade-export URL is invalid")
+            response = self._get(url, content_type="text/csv")
+            try:
+                exports[assignment_id] = response.content.decode("utf-8-sig")
+            except UnicodeDecodeError as error:
+                raise GradescopeSchemaError("Exam 2 export is not UTF-8") from error
+        return exports
 
     def list_members(self) -> list[MemberRef]:
         try:

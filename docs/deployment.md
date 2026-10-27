@@ -240,3 +240,52 @@ calculator HTML at the intended URL, without redirecting to Shibboleth or a
 student dashboard. Check that the existing course-root redirect and protected
 student URLs still behave as before. No server changes have been made merely
 by adding these instructions.
+
+## Exam 2: pre-collect and switch visibility at lecture time
+
+This is separate from publishing grades in Gradescope. Installing the reviewed
+`[exam2.sources]` table and updated service enables collection automatically on
+normal refreshes. Remove the earlier `publication_enabled` setting if migrating
+an unreleased draft configuration; visibility is no longer a TOML setting.
+The service passes `--exam2-state /var/lib/orie4580-dashboard/exam2-publication.json`.
+The initial visibility is **OFF**. The private state holds normalized full
+combined dashboard records and the current visibility choice, with mode `0600`,
+outside all served directories. Raw scores/submission IDs are not stored.
+
+Before lecture, trigger the regular service and inspect its result:
+
+```sh
+sudo systemctl start orie4580-checkoffs.service
+sudo journalctl -u orie4580-checkoffs.service -n 40 --no-pager
+```
+
+Check that the run succeeded, Exam 2 scores loaded, and the collection time is
+suitable before showing the results. Do not enable a draft Exam 2 result merely
+because a private snapshot exists. The switch does not contact external services
+or revalidate grades; it publishes the latest locally collected records.
+
+From `/opt/orie4580-grade-dashboard`, show Exam 2 with:
+
+```sh
+sudo -u orie4580-dashboard -g www-data .venv/bin/python -m scripts.set_exam2_visibility on /var/lib/orie4580-dashboard/exam2-publication.json /var/www/html/orie4580_fa26/students --lock-file /var/lib/orie4580-dashboard/refresh.lock
+```
+
+Hide again using the identical command with `off`. This is the simple on/off
+switch; no web-admin endpoint or exposed browser control is added. Both commands
+must use the same state, output, and lock as the service. A refresh in progress
+causes a lock error rather than racing; retry after it finishes. The switch only
+rebuilds the protected local tree, so it avoids network delay but is not literally
+zero-time. Later timer refreshes preserve the choice. Open student pages need a
+reload; `off` cannot erase information already viewed or saved.
+
+Hiding removes Exam 2 from student payloads and discards the previous generated
+student tree so a prior visible copy is not retained as a rollback tree. Do not
+restore a visible older release while expecting Exam 2 to remain hidden.
+The private desired visibility is saved before local publication; if publication
+fails or the process is interrupted, inspect the error and rerun the command.
+Do not assume the switch succeeded until it reports successful publication.
+
+Test both directions using fake or local preview data before production. All
+preview state, locks, snapshots, and output stay under `local_notes/`; production
+state must not be reused for preview. Existing access-control checks still apply.
+This feature has not itself been deployed by the development session.

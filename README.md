@@ -158,6 +158,40 @@ The same schema-version-6 dashboard includes any available Exam 1 question resul
 
 Exam ingestion remains deliberately soft-failing to isolate the optional source, although the rubric is finalized and versioned. A missing assignment, changed title, missing or non-1-point question column, nonnumeric/out-of-range score, duplicate student, or unavailable export converts all Exam 1 entries to **Not available yet** and does not block the strict Lab refresh. Raw question scores are never written to student JSON. Lab source, contract, roster, and merge errors still fail closed and preserve the prior release.
 
+### Exam 2: collect privately, show or hide on demand
+
+The reviewed eight Gradescope versions map to one logical Exam 2 with twelve
+question opportunities. Q1 needs at least 4/5 fully correct parts, Q2 7/8,
+Q3 5/6; Q4–7 and Q9–12 require every part correct. Q8 awards one shiny purple
+when all four parts are correct; otherwise parts 8.1 and 8.2 correct earn one
+ordinary purple. Versions and raw scores are not included in student records.
+
+Once the reviewed `[exam2.sources]` settings and updated service are installed,
+every scheduled refresh collects Exam 2 automatically into a mode-600 private
+publication snapshot, **even while hidden**. Visibility defaults OFF. Hidden
+means Exam 2 is omitted from student JSON, not merely concealed by JavaScript.
+Existing configs without Exam 2 remain valid. Exam 2 rereads current exports
+without positive caching; Exam 1 and Lab cache behavior is unchanged.
+
+Before lecture, run the normal refresh and verify its success. At lecture time,
+use the local-only switch described in `docs/deployment.md`:
+
+```sh
+sudo -u orie4580-dashboard -g www-data /opt/orie4580-grade-dashboard/.venv/bin/python -m scripts.set_exam2_visibility on /var/lib/orie4580-dashboard/exam2-publication.json /var/www/html/orie4580_fa26/students --lock-file /var/lib/orie4580-dashboard/refresh.lock
+```
+
+Use `off` instead of `on` to hide it again. Run from the installed checkout.
+The switch republishes already collected records locally without Google or
+Gradescope calls. It preserves the current visibility choice across later
+refreshes. Students must reload their dashboard; already viewed grades cannot
+be revoked. This is an operator command, not a browser button.
+
+For unpublished local tests use `--exam2-preview --disable-completion-cache`,
+`--exam2-state local_notes/preview/exam2-publication.json`, a local lock file,
+and output/state paths entirely inside `local_notes/`. Never reuse production
+state for a local preview or serve the private state directory. See
+`local_notes/exam2_findings_and_plan.md` for research and validation.
+
 ### Positive completion cache
 
 Production uses `/var/lib/orie4580-dashboard/completion-cache.json` to retain only verified positive results under exact versioned contracts. Lab `passed` results can skip repeated student history reads. One deterministic live contract canary is still checked for each assignment that had no uncached compatible submission. Finalized Exam 1 `complete` results are monotone under `exam1-final-v1`; incomplete and unavailable questions are still read from the current export. Current Gradescope roster membership is required for every cache reuse, and current Google manual status still controls whether a green checkmark is earned.
@@ -270,7 +304,7 @@ sudo systemctl enable --now orie4580-checkoffs.timer
 Staff authorization and the protected staff index can be updated without fetching Google Sheets or Gradescope and without changing any student HTML or JSON:
 
 ```sh
-sudo -u orie4580-dashboard \
+sudo -u orie4580-dashboard -g www-data \
   /opt/orie4580-grade-dashboard/.venv/bin/python \
   -m scripts.update_dashboard_authorization \
   /var/www/html/orie4580_fa26/students

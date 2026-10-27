@@ -12,6 +12,7 @@ from .checkoff_mappings import (
 )
 from .gradescope import validate_snapshot
 from .gradescope_exam import EXAM_OPPORTUNITIES, ExamImport
+from .gradescope_exam2 import EXAM2_OPPORTUNITIES
 from .simple_checkoffs import (
     MAX_WORKSHEET_COLUMNS, NETID_PATTERN, STATUSES as MANUAL_STATUSES,
     valid_checkoff_header, validate_manual_record,
@@ -19,6 +20,17 @@ from .simple_checkoffs import (
 from .standards import STANDARDS
 
 SCHEMA_VERSION = 6
+EXAM_CATALOG = {item["id"]: item for item in (*EXAM_OPPORTUNITIES, *EXAM2_OPPORTUNITIES)}
+
+
+def _approved_exam_kind(definition: dict[str, Any], kind: Any, status: Any) -> bool:
+    return kind == definition["kind"] or (
+        definition["id"] == "exam2-q8"
+        and kind == "shiny_purple"
+        and status == "complete"
+    )
+
+
 AUTOGRADER_STATUSES = {
     "passed", "failed", "pending", "error", "not_submitted",
     "not_configured", "not_found",
@@ -207,7 +219,7 @@ def validate_combined_record(record: Any) -> list[str]:
                     (kind == "green" and opportunity in OPPORTUNITY_IDS)
                     or (
                         kind in {"purple", "shiny_purple"}
-                        and opportunity in {item["id"] for item in EXAM_OPPORTUNITIES}
+                        and opportunity in EXAM_CATALOG
                     )
                 )
                 if not known_opportunity or opportunity in opportunity_ids:
@@ -311,13 +323,13 @@ def validate_combined_record(record: Any) -> list[str]:
                     if checkmark["status"] != expected_status:
                         errors.append("checkmark status does not match its requirements")
                 elif isinstance(kind, str) and kind in {"purple", "shiny_purple"}:
-                    definition = next(
-                        (item for item in EXAM_OPPORTUNITIES if item["id"] == opportunity), None
-                    )
-                    if definition is None or any(
-                        checkmark[field] != definition[field]
-                        for field in ("label", "kind")
-                    ) or definition.get("standard_id") != standard_id:
+                    definition = EXAM_CATALOG.get(opportunity) if isinstance(opportunity, str) else None
+                    if (
+                        definition is None
+                        or checkmark["label"] != definition["label"]
+                        or not _approved_exam_kind(definition, kind, checkmark["status"])
+                        or definition["standard_id"] != standard_id
+                    ):
                         errors.append("exam checkmark does not match the approved mapping")
                     if (
                         not isinstance(checkmark["status"], str)
@@ -333,6 +345,8 @@ def validate_combined_record(record: Any) -> list[str]:
                         or set(score) != requirement_fields
                         or score["id"] != "exam_score"
                         or score["source"] != "gradescope_exam"
+                        or definition is None
+                        or score["label"] != f'{definition["label"].split(" · ")[0]} question score'
                         or score["status"] != checkmark["status"]
                         or score["details"] != []
                     ):
@@ -351,38 +365,44 @@ def validate_combined_record(record: Any) -> list[str]:
 
 
 def merge_exam_checkmarks(
-    records: list[dict[str, Any]], exam: ExamImport
+    records: list[dict[str, Any]], exam: ExamImport, *,
+    opportunities: tuple[dict[str, Any], ...] = EXAM_OPPORTUNITIES,
 ) -> list[dict[str, Any]]:
-    """Add optional Exam 1 marks without changing the dashboard schema."""
+    """Add one approved logical exam without exposing scores or physical sources."""
+    if opportunities not in (EXAM_OPPORTUNITIES, EXAM2_OPPORTUNITIES):
+        raise ValueError("exam opportunities do not match an approved catalog")
     expected_netids = {record["student"]["netid"] for record in records}
     if set(exam.by_netid) != expected_netids:
-        raise ValueError("Exam 1 student set does not match the dashboard records")
+        raise ValueError("exam student set does not match the dashboard records")
     merged = deepcopy(records)
-    definitions = {item["id"]: item for item in EXAM_OPPORTUNITIES}
+    definitions = {item["id"]: item for item in opportunities}
+    exam_label = opportunities[0]["label"].split(" · ")[0]
     for record in merged:
         if validate_combined_record(record):
-            raise ValueError("Exam 1 can only be merged into valid dashboard records")
+            raise ValueError("exam can only be merged into valid dashboard records")
         netid = record["student"]["netid"]
         standards = {standard["id"]: standard for standard in record["standards"]}
         results = exam.by_netid[netid]
         if {item.get("id") for item in results} != set(definitions) or len(results) != len(definitions):
-            raise ValueError("Exam 1 results do not match the configured questions")
+            raise ValueError("exam results do not match the configured questions")
         for result in results:
             definition = definitions[result["id"]]
-            for field in ("question", "standard_id", "label", "kind"):
+            for field in ("question", "standard_id", "label"):
                 if result.get(field) != definition[field]:
-                    raise ValueError("Exam 1 result mapping was modified")
+                    raise ValueError("exam result mapping was modified")
             status = result.get("status")
             if status not in {"complete", "incomplete", "not_graded"}:
-                raise ValueError("Exam 1 result status is invalid")
+                raise ValueError("exam result status is invalid")
+            if not _approved_exam_kind(definition, result.get("kind"), status):
+                raise ValueError("exam result mapping was modified")
             standards[definition["standard_id"]]["checkmarks"].append({
                 "id": definition["id"],
                 "label": definition["label"],
-                "kind": definition["kind"],
+                "kind": result["kind"],
                 "status": status,
                 "requirements": [{
                     "id": "exam_score",
-                    "label": "Exam 1 question score",
+                    "label": f"{exam_label} question score",
                     "source": "gradescope_exam",
                     "status": status,
                     "details": [],
@@ -390,5 +410,5 @@ def merge_exam_checkmarks(
             })
         errors = validate_combined_record(record)
         if errors:
-            raise ValueError(f"combined Exam 1 record for {netid} is invalid: {'; '.join(errors)}")
+            raise ValueError(f"combined {exam_label} record for {netid} is invalid: {'; '.join(errors)}")
     return merged

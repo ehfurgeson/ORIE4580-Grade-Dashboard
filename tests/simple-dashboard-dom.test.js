@@ -84,6 +84,12 @@ async function run(data, { legacyTemplate = false } = {}) {
     child => child.className.includes("checkmark")
   ));
 
+  const explanation = current["#completion-note"].textContent;
+  assert.match(explanation, /Exam 1 scores over 0\.8/);
+  assert.match(explanation, /Q1 at least 4 of 5, Q2 at least 7 of 8, Q3 at least 5 of 6/);
+  assert.match(explanation, /Q8 earns one shiny-purple mark for all 4 parts correct/);
+  assert.match(explanation, /parts 8\.1 and 8\.2 correct earn one purple mark/);
+
   const empty = await run(payload(6, []));
   assert.strictEqual(empty["#unmapped-columns-section"].hidden, true);
 

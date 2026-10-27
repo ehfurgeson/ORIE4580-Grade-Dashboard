@@ -34,6 +34,18 @@ expected_question_count = 6
 expected_question_score = "1"
 earn_threshold = "0.8"
 
+# Configured sources are collected automatically into private publication state.
+# Visibility defaults OFF and is controlled by scripts.set_exam2_visibility.
+[exam2.sources]
+"8911573" = "Exam 2, Version 0"
+"8911490" = "Exam 2, Version 1"
+"8911492" = "Exam 2, Version 2"
+"8911493" = "Exam 2, Version 3"
+"8911494" = "Exam 2, Version 4"
+"8911496" = "Exam 2, Version 5"
+"8911497" = "Exam 2, Version 6"
+"8911498" = "Exam 2, Version 7"
+
 [assignments."8532407"]
 opportunity_id = "lab1-q1-2"
 contract_version = "lab1-q1-2-v1"

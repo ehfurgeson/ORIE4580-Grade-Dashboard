@@ -248,9 +248,9 @@
   function render(data, updatedAt, unmappedColumns) {
     document.querySelector('.summary-strip span').textContent = 'Checkmarks earned';
     document.querySelector('#dashboard-description').textContent =
-      'Your lab checkoffs, autograder results, and available Exam 1 checkmarks, mapped to course standards.';
+      'Your lab checkoffs, autograder results, and available exam checkmarks, mapped to course standards.';
     document.querySelector('#completion-note').textContent =
-      'Lab green checkmarks require the listed Lab sources. Manual-only Lab opportunities have no autograded component. Exam 1 scores over 0.8 earn their mapped purple or shiny-purple checkmark. Unavailable exam scores do not earn a mark.';
+      'Lab green checkmarks require the listed Lab sources. Manual-only Lab opportunities have no autograded component. Exam 1 scores over 0.8 earn their mapped purple or shiny-purple checkmark. Exam 2 requires fully correct parts: Q1 at least 4 of 5, Q2 at least 7 of 8, Q3 at least 5 of 6, and all parts for other questions except Q8. Q8 earns one shiny-purple mark for all 4 parts correct; otherwise, parts 8.1 and 8.2 correct earn one purple mark. Unavailable exam scores do not earn a mark.';
     document.querySelector('#student-netid').textContent = data.student.netid;
     document.querySelector('#worksheet').textContent = data.worksheet;
     const time = document.querySelector('#updated-at');

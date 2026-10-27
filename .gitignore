@@ -19,5 +19,4 @@ __pycache__/
 .DS_Store
 
 # Local infrastructure notes
-notes.md
-cache_plan.md
+local_notes/
