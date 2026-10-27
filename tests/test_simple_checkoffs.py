@@ -189,12 +189,12 @@ def test_unknown_columns_are_quarantined_in_sheet_order_without_reading_values()
     sentinel = object()
     rows = [{
         "NetID": "abc123",
-        "Lab 7 - Q2": sentinel,
+        "Lab 8 - Q2": sentinel,
         "Lab 2 - Q1": True,
-        "Lab 7 - Q1": "not a checkbox",
+        "Lab 8 - Q1": "not a checkbox",
     }]
     record = rows_to_simple_records(rows, updated_at=UPDATED_AT, worksheet="Lab Checkoffs")[0]
-    assert record["unmapped_columns"] == ["Lab 7 - Q2", "Lab 7 - Q1"]
+    assert record["unmapped_columns"] == ["Lab 8 - Q2", "Lab 8 - Q1"]
     assert "not a checkbox" not in str(record)
     assert repr(sentinel) not in str(record)
     assert record["standards"][0]["checkmarks"][0]["id"] == "lab2-q1"
@@ -229,11 +229,11 @@ def test_approved_mapping_activates_strict_checkbox_parsing():
 
 def test_unmapped_metadata_rejects_duplicates_mapped_names_and_unsafe_headers():
     record = rows_to_simple_records(
-        [{"NetID": "abc123", "Lab 7 - Q1": "ignored"}],
+        [{"NetID": "abc123", "Lab 8 - Q1": "ignored"}],
         updated_at=UPDATED_AT, worksheet="Lab Checkoffs",
     )[0]
     for value in (
-        ["Lab 7 - Q1", "Lab 7 - Q1"],
+        ["Lab 8 - Q1", "Lab 8 - Q1"],
         ["Lab 2 - Q1"],
         [""],
         ["unsafe\nheader"],
@@ -287,7 +287,7 @@ def test_publisher_creates_exact_netid_authorization(tmp_path):
 
 def test_publisher_rejects_student_specific_unmapped_metadata(tmp_path):
     records = published_records(make_rows())
-    records[1]["unmapped_columns"] = ["Lab 7 - Q1"]
+    records[1]["unmapped_columns"] = ["Lab 8 - Q1"]
     with pytest.raises(ValueError, match="disagree about unmapped"):
         write_simple_release(records, tmp_path / "students")
     assert not (tmp_path / "students").exists()

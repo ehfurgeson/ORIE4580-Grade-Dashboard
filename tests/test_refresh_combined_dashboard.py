@@ -73,10 +73,10 @@ def test_service_allows_google_students_missing_from_gradescope():
 
 def test_unmapped_warning_metadata_is_worksheet_wide_and_contains_no_values():
     records = [
-        {"student": {"netid": "abc123"}, "unmapped_columns": ["Lab 7 - Q2", "Lab 7 - Q1"]},
-        {"student": {"netid": "xy99"}, "unmapped_columns": ["Lab 7 - Q2", "Lab 7 - Q1"]},
+        {"student": {"netid": "abc123"}, "unmapped_columns": ["Lab 8 - Q2", "Lab 8 - Q1"]},
+        {"student": {"netid": "xy99"}, "unmapped_columns": ["Lab 8 - Q2", "Lab 8 - Q1"]},
     ]
-    assert _unmapped_column_names(records) == ("Lab 7 - Q2", "Lab 7 - Q1")
+    assert _unmapped_column_names(records) == ("Lab 8 - Q2", "Lab 8 - Q1")
     records[1]["unmapped_columns"].reverse()
     with pytest.raises(ValueError, match="disagree"):
         _unmapped_column_names(records)

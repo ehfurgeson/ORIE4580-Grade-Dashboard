@@ -289,3 +289,21 @@ Test both directions using fake or local preview data before production. All
 preview state, locks, snapshots, and output stay under `local_notes/`; production
 state must not be reused for preview. Existing access-control checks still apply.
 This feature has not itself been deployed by the development session.
+
+## Lab 7: manual-only activation and publication-state migration
+
+This update maps `Lab 7 - Q1` to S6 and `Lab 7 - Q2` to newly active S7. Both are manual-only; do not add Gradescope assignments. S7 uses the owner-approved (log-)likelihood maximization wording. The active standard count becomes seven, so estimates use fourteen linked boxes and the existing seven-standard thresholds.
+
+Stop the timer and wait for any running refresh before updating code or migrating state. Back up the installed config, existing student release, and private state outside the web root. Preserve the Lab assignment snapshot: its contract is unchanged. Mapping v6 rebuilds the positive Lab cache on the next refresh, so allow time for a full crawl. No manual deletion or migration of the completion cache is needed solely for this update.
+
+After installing the new code, if the deployed private publication snapshot still has the previous S1–S6 catalog, migrate it to a **new private output** while preserving visibility. From the checkout, with timer stopped and no refresh running:
+
+```sh
+sudo env PYTHONDONTWRITEBYTECODE=1 .venv/bin/python -m scripts.migrate_lab7_publication /var/lib/orie4580-dashboard/exam2-publication.json /var/lib/orie4580-dashboard/exam2-publication.lab7-migrated.json
+sudo cp -p /var/lib/orie4580-dashboard/exam2-publication.json /var/lib/orie4580-dashboard/exam2-publication.pre-lab7.json
+sudo install -o orie4580-dashboard -g www-data -m 0600 /var/lib/orie4580-dashboard/exam2-publication.lab7-migrated.json /var/lib/orie4580-dashboard/exam2-publication.json
+```
+
+Use unique backup/output names if they already exist. Skip migration if there is no Exam 2 publication state, or if it already has the formal S7 wording. The script accepts the previous S1–S6 catalog or the temporary “Standard 7” label; it rejects an already-current catalog rather than silently applying twice. Migration reads no Google/Gradescope data and changes no served student tree. It preserves the current ON/OFF setting, adds empty S7, and removes Lab 7 headers from the pending list; it does not fabricate checkoffs.
+
+Run a successful normal combined refresh before using the Exam 2 visibility switch, so its private combined snapshot includes real Lab 7 results. Verify Q1 under S6 and Q2 under S7, both with only **Manual checkoff**, True earning green and False not earning green. Verify Exam 2 visibility remains as intended, owner/cross-user/staff authorization, and updated grade estimates. Re-enable the timer only after success. Old full-catalog row-import fixtures/releases also need regeneration with S7.

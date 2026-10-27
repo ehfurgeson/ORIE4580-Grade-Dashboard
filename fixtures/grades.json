@@ -50,6 +50,11 @@
       "id": "S6",
       "name": "I can state the defining features of Poisson samplers, use them to construct new samplers, and use them to check if a given sampler is valid.",
       "opportunities": []
+    },
+    {
+      "id": "S7",
+      "name": "I can write down the (log-)likelihood function of a sampler, and I can use calculus to find parameters that maximize simple (log-)likelihood functions.",
+      "opportunities": []
     }
   ]
 }

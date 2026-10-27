@@ -125,26 +125,26 @@ def test_unmapped_columns_survive_merge_and_publication_without_marks_or_gradesc
         "Lab 1 - Q1.3": True,
         "Lab 1 - Q2.3": True,
         "Lab 1 - Q2.4": True,
-        "Lab 7 - Q1": "not a checkbox",
+        "Lab 8 - Q1": "not a checkbox",
     }
     google = rows_to_simple_records([row], updated_at=NOW, worksheet="Lab Checkoffs")[0]
     record = merge_checkoffs_with_autograders([google], snapshot())[0]
-    assert record["unmapped_columns"] == ["Lab 7 - Q1"]
+    assert record["unmapped_columns"] == ["Lab 8 - Q1"]
     assert find_checkmark(record, "lab1-q1-2")["status"] == "complete"
     assert all(
-        item["id"] != "Lab 7 - Q1"
+        item["id"] != "Lab 8 - Q1"
         for standard in record["standards"] for item in standard["checkmarks"]
     )
     assert validate_combined_record(record) == []
     [path] = write_simple_release([record], tmp_path / "students")
-    assert json.loads(path.read_text())["unmapped_columns"] == ["Lab 7 - Q1"]
+    assert json.loads(path.read_text())["unmapped_columns"] == ["Lab 8 - Q1"]
 
 
 def test_only_unmapped_combined_record_schema_validates_with_all_standards():
     record = merge_checkoffs_with_autograders(
         [google_record()], snapshot(), allow_unconfigured=True
     )[0]
-    record["unmapped_columns"] = ["Lab 7 - Q1"]
+    record["unmapped_columns"] = ["Lab 8 - Q1"]
     for standard in record["standards"]:
         standard["checkmarks"] = []
     assert validate_combined_record(record) == []

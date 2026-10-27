@@ -2,7 +2,7 @@
 
 ## 1. Standards catalog
 
-[`sync/standards.py`](../sync/standards.py) is the single source of truth for standard IDs and wording. It defines the currently approved S1–S6 standards. Both the row-based importer and the live Lab/Exam dashboard use this catalog. Change standard wording there; do not maintain a second catalog here or in `sync/checkoff_mappings.py`.
+[`sync/standards.py`](../sync/standards.py) is the single source of truth for standard IDs and wording. It defines the currently approved S1–S7 standards. Both the row-based importer and the live Lab/Exam dashboard use this catalog. Change standard wording there; do not maintain a second catalog here or in `sync/checkoff_mappings.py`.
 
 This document records the reviewed opportunity mappings. Mirror mapping changes in `sync/checkoff_mappings.py`, `sync/gradescope_exam.py`, and `deployment/gradescope.toml.example` as applicable.
 
@@ -12,7 +12,7 @@ Lab and Exam mappings refer directly to the catalog IDs, such as `S1`. There are
 
 The former tentative twelve-standard catalog has been removed. Its P/M IDs are no longer accepted. Its S IDs also had different wording, so there is no automatic translation from that catalog.
 
-For the row-based CSV/API importer, use the current S1–S6 IDs in `standard_id`. Re-export old source data with an explicit, reviewed assignment to the current standards; do not relabel old rows by number. A CSV row with only an S ID cannot identify which catalog it came from. Regenerate old `grades.json` releases after correcting the source; JSON validation rejects obsolete IDs and wording before publication.
+For the row-based CSV/API importer, use the current S1–S7 IDs in `standard_id`. Re-export old source data with an explicit, reviewed assignment to the current standards; do not relabel old rows by number. A CSV row with only an S ID cannot identify which catalog it came from. Regenerate old `grades.json` releases after correcting the source; JSON validation rejects obsolete IDs and wording before publication.
 
 The live pipeline writes schema-version-6 `checkoffs.json` records with `id`, `name`, and `checkmarks` per standard plus the top-level `unmapped_columns` list. This is the single format for Labs and any available Exam marks; standards need not have Exam opportunities. Normalized Sheet rows are internal merge inputs and cannot be published directly. The browser also accepts older combined versions 3–5 and treats their pending list as empty. Deploy the schema-6 JavaScript and CSS before generating new records. Older backend records must be regenerated from the source data.
 
@@ -44,6 +44,8 @@ The table below is authoritative. A valid Sheet column absent from it is quarant
 | Lab 5, Q3 | `lab5-q3` | `S5` | `Lab 5 - Q3` | **Manual-only** | None |
 | Lab 6, Q1 | `lab6-q1` | `S5` | `Lab 6 - Q1` | Autograded | `8900231`; 2 points; 2 × 1-point tests |
 | Lab 6, Q2 | `lab6-q2` | `S6` | `Lab 6 - Q2` | Autograded | `8900234`; 1 point; 1 × 1-point test |
+| Lab 7, Q1 | `lab7-q1` | `S6` | `Lab 7 - Q1` | **Manual-only** | None |
+| Lab 7, Q2 | `lab7-q2` | `S7` | `Lab 7 - Q2` | **Manual-only** | None |
 
 ### Grouped manual checkoffs
 
@@ -69,6 +71,13 @@ Lab 5 has no Gradescope portion and no autograding. Its three green checkmarks d
 - **S6 / Q2:** complete Q2, pass the Q2 Gradescope autograder, then ask for a checkoff.
 
 Both Lab 6 opportunities are autograded. Each green checkmark requires both the recorded Google Sheet checkoff and a full-credit Gradescope submission under the exact configured contract.
+
+### Lab 7 student-facing requirements
+
+- **S6 / Q1:** complete Q1, then ask for a checkoff.
+- **S7 / Q2:** complete at least **6 total (sub)questions** from the Likelihood Drills posed on Canvas, then ask for a checkoff.
+
+Neither opportunity requires or accepts a Gradescope autograder rule. The shared catalog contains the owner-approved Poisson sampler (S6) and (log-)likelihood maximization (S7) descriptions. There are now seven standards and fourteen standard-linked boxes; existing grade formulas use the new standard count without changing their rules.
 
 ## 4. Exam 1 mappings
 

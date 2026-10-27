@@ -23,12 +23,12 @@ def opportunity(identifier, kind="purple", status="complete"):
 
 def test_summary_counts_only_complete_checkmarks():
     assert summarize(load_record()) == {
-        "standards": 6,
+        "standards": 7,
         "green": 1,
         "purple": 0,
         "shiny": 0,
         "purple_standards": 0,
-        "missing": 11,
+        "missing": 13,
         "estimated_grade": None,
     }
 
@@ -136,13 +136,13 @@ def test_ehf38_fake_fixture_is_valid_and_demonstrates_all_colors():
     record = json.loads(Path("fixtures/ehf38-grades.fake.json").read_text())
     assert validate_record(record) == []
     assert summarize(record) == {
-        "standards": 6,
+        "standards": 7,
         "green": 3,
         "purple": 6,
         "shiny": 2,
         "purple_standards": 4,
-        "missing": 4,
-        "estimated_grade": "B−",
+        "missing": 6,
+        "estimated_grade": None,
     }
 
 

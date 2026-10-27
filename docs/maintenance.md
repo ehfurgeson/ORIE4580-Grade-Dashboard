@@ -59,6 +59,14 @@ The implementation work was:
 
 Because Lab 6 adds autograded assignments, the Gradescope assignment contract changes. The previous private snapshot must be retired before the first refresh, and the positive completion cache is rebuilt under the new mapping version.
 
+### 1.4 Lab 7 manual-only opportunities
+
+`Lab 7 - Q1` maps to S6 (`lab7-q1`), and `Lab 7 - Q2` maps to S7 (`lab7-q2`). Both are manual-only green opportunities. No Gradescope rule or contract change is required. `LAB_MAPPING_VERSION` is now `lab-mapping-v6`, so the positive Lab cache is rebuilt; retain the existing Gradescope assignment snapshot.
+
+S7 uses the owner-approved (log-)likelihood and likelihood-maximization description. Its manual checkoff requires at least six total (sub)questions from the Canvas Likelihood Drills; Q1 requires completing the Lab question and asking for a checkoff. The grade formulas now use seven standards (fourteen linked boxes); their constants and rules are unchanged. A newly empty standard can lower the estimated grade.
+
+Before deploying, audit existing Sheet cells in the newly mapped columns as True/False checkboxes. Existing private Exam 2 publication state must be migrated as described in `deployment.md` before refresh; it lacks S7 and may still quarantine the two newly mapped headers. Do not delete it and lose the ON/OFF choice. The migration preserves visibility, adds an empty S7, and removes the now-mapped pending headers without inferring credit. A normal refresh then collects the actual Lab 7 marks.
+
 ## 2. Adding a new lab
 
 ### 2.1 Collect the facts first

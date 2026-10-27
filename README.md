@@ -60,7 +60,7 @@ Python implementation with `node tests/grade_calculator.test.js` (requires Pytho
 `fixtures/grades.json` is the canonical example. `fixtures/ehf38-grades.fake.json` is clearly labeled fake data for the first authenticated server test. Each record contains:
 
 - `course`: `ORIE 4580`, `ORIE 5580`, or `ORIE 5581`.
-- `standards`: all currently defined standards (S1–S6) for 4580/5580, or an evaluated subset for 5581.
+- `standards`: all currently defined standards (S1–S7) for 4580/5580, or an evaluated subset for 5581.
 - `kind`: `green` for a lab, `purple` for an exam/exam-like opportunity, or `shiny_purple` for a challenging purple problem.
 - `status`: `complete`, `incomplete`, `not_graded`, or `excused`.
 
@@ -78,7 +78,7 @@ The command validates and serializes the whole input batch before it writes. A m
 
 ### Google Sheets adapter
 
-`sync.google_sheets.rows_to_records` accepts one standard per row. The required columns are `updated_at`, `course`, `student_id`, `student_name`, and `standard_id` (a current S1–S6 ID). Rows with an opportunity also use `opportunity_id`, `opportunity_label`, `source`, `kind`, and `status`. Use additional rows when one standard has multiple opportunities; a standard with no opportunity still needs one row with the opportunity columns empty.
+`sync.google_sheets.rows_to_records` accepts one standard per row. The required columns are `updated_at`, `course`, `student_id`, `student_name`, and `standard_id` (a current S1–S7 ID). Rows with an opportunity also use `opportunity_id`, `opportunity_label`, `source`, `kind`, and `status`. Use additional rows when one standard has multiple opportunities; a standard with no opportunity still needs one row with the opportunity columns empty.
 
 Test the complete CSV-export path with fake data:
 
@@ -200,13 +200,17 @@ The cache is strict JSON, mode `0600`, outside the served tree, and written atom
 
 Google Sheets still performs one complete read per refresh. Exam 1 still performs one CSV request per refresh. Conditional requests remain disabled because stable ETag behavior has not been proven for either source.
 
+## Lab 7 manual checkoffs
+
+`Lab 7 - Q1` earns a green S6 mark and `Lab 7 - Q2` earns a green S7 mark from Google Sheets alone. Neither requires Gradescope. S7 covers (log-)likelihood functions and their maximization; its checkoff requires at least six total (sub)questions from the Canvas Likelihood Drills. The active catalog has seven standards, so the existing grade calculation uses fourteen linked boxes. See `docs/deployment.md` for the required one-time migration of an existing six-standard Exam 2 publication snapshot before refreshing.
+
 ## Simple NetID-protected checkoff dashboard
 
 The protected worksheet dashboard maps each known checkoff column to the standard named in the Lab 1–6 handouts. The mapping lives in `sync/checkoff_mappings.py` and remains authoritative. A valid unknown Sheet column is quarantined and displayed under **Pending Sheet mappings** instead of being assigned to a standard. It cannot earn a checkmark, affect totals or allocation, or require a Gradescope assignment. Only the column name is published in `unmapped_columns`; raw cell values are not interpreted or published. Invalid headers and malformed values in mapped columns still fail closed.
 
 Generated schema-version-6 records require the `unmapped_columns` array, which is empty when all columns are mapped. The browser treats the pending list as empty for compatible schema versions 3–5. Multi-column opportunities are aggregated explicitly: the three recorded Lab 1 Q1–2 milestones produce one S1 green checkmark and all must be complete. Records retain the mapped source requirements for auditability.
 
-All importers and validators read the S1–S6 catalog in `sync/standards.py`. Lab and Exam mappings use those IDs directly. Categories and separate descriptive keys have been removed. See [`docs/standards.md`](docs/standards.md) for the opportunity mappings and how to replace imports from the retired tentative catalog.
+All importers and validators read the S1–S7 catalog in `sync/standards.py`. Lab and Exam mappings use those IDs directly. Categories and separate descriptive keys have been removed. See [`docs/standards.md`](docs/standards.md) for the opportunity mappings and how to replace imports from the retired tentative catalog.
 
 Each generated NetID directory contains its own HTML, JSON, and authorization rule. Access is granted to the student owner, the explicit staff users.
 

@@ -7,6 +7,7 @@ STANDARDS = {
     'S4': "I can apply the formal definition of confidence intervals to derive confidence interval procedures for both traditional and novel parameter estimation tasks.",
     'S5': "I can apply confidence intervals in practical situations, handling concerns such as non-independence, multiple hypotheses, and multiple stages of study.",
     'S6': "I can state the defining features of Poisson samplers, use them to construct new samplers, and use them to check if a given sampler is valid.",
+    'S7': "I can write down the (log-)likelihood function of a sampler, and I can use calculus to find parameters that maximize simple (log-)likelihood functions.",
 }
 
 COURSES = {'ORIE 4580', 'ORIE 5580', 'ORIE 5581'}
