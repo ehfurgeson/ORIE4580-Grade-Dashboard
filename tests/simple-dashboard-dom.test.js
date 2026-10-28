@@ -88,7 +88,7 @@ async function run(data, { legacyTemplate = false } = {}) {
   return nodes;
 }
 
-async function checkStaffIndex() {
+async function checkStaffIndex(withNames = false) {
   const root = new Element();
   const controls = Object.fromEntries([
     '#student-search', '#toggle-checkmarks', '#staff-status', '#student-count', '#no-students'
@@ -105,9 +105,30 @@ async function checkStaffIndex() {
     row.dataset.netid = netid;
     return row;
   });
+  if (withNames) {
+    rows.forEach((row, index) => {
+      row.dataset.firstName = ['Zoe', 'Alice'][index];
+      row.dataset.lastName = ['Adams', 'Brown'][index];
+      const first = new Element('td');
+      first.textContent = row.dataset.firstName;
+      const last = new Element('td');
+      last.textContent = row.dataset.lastName;
+      row.append(first, last);
+    });
+  }
   const body = new Element('tbody');
   body.append(...rows);
   const allHeaders = [new Element('th'), new Element('th'), new Element('th'), ...headings, new Element('th')];
+  if (withNames) {
+    const keys = ['netid', 'purple', 'missing', 'S1', 'S2', 'shiny'];
+    allHeaders.forEach((header, index) => { header.dataset.sort = keys[index]; });
+    const names = ['firstName', 'lastName'].map(key => {
+      const header = new Element('th');
+      header.dataset.sort = key;
+      return header;
+    });
+    allHeaders.splice(1, 0, ...names);
+  }
   root.append(...allHeaders, body);
   root.querySelector = selector => selector === 'tbody' ? body : controls[selector];
   const descendants = root.querySelectorAll.bind(root);
@@ -148,17 +169,17 @@ async function checkStaffIndex() {
   await new Promise(resolve => setImmediate(resolve));
   assert(root.querySelectorAll('.staff-private').every(cell => cell.hidden),
     'Requests finishing after Hide must stay hidden');
-  const cells = rows[0].children;
+  const cells = rows[0].querySelectorAll('.staff-private');
   assert.strictEqual(cells[0].textContent, '3', 'Two linked purple plus one shiny overflow; extra purple excluded');
   assert.strictEqual(cells[1].textContent, '2', 'Two unfilled S2 boxes');
-  assert.match(rows[1].children[0].textContent, /Unavailable.*403/);
+  assert.match(rows[1].querySelectorAll('.staff-private')[0].textContent, /Unavailable.*403/);
   controls['#toggle-checkmarks'].listeners.click();
   assert.strictEqual(requests.length, 3, 'Only failed rows are retried');
-  allHeaders[1].children[0].listeners.click();
-  assert.strictEqual(allHeaders[1].attributes['aria-sort'], 'descending');
+  allHeaders[withNames ? 3 : 1].children[0].listeners.click();
+  assert.strictEqual(allHeaders[withNames ? 3 : 1].attributes['aria-sort'], 'descending');
   assert.strictEqual(body.children[0].dataset.netid, 'abc123', 'Unavailable stays last');
-  allHeaders[1].children[0].listeners.click();
-  assert.strictEqual(allHeaders[1].attributes['aria-sort'], 'ascending');
+  allHeaders[withNames ? 3 : 1].children[0].listeners.click();
+  assert.strictEqual(allHeaders[withNames ? 3 : 1].attributes['aria-sort'], 'ascending');
   assert.strictEqual(body.children[0].dataset.netid, 'abc123', 'Unavailable stays last ascending');
   assert.strictEqual(cells[2].children.length, 1, 'Only linked boxes in standard cells');
   doc.listeners.keydown({ key: 'Escape' });
@@ -175,10 +196,24 @@ async function checkStaffIndex() {
   assert(root.querySelectorAll('.staff-private').every(cell => cell.hidden));
   assert.strictEqual(controls['#toggle-checkmarks'].attributes['aria-expanded'], 'false');
   await new Promise(resolve => setImmediate(resolve));
+  if (withNames) {
+    assert.strictEqual(rows[0].children[0].textContent, 'Zoe', 'Loading preserves name cells');
+    allHeaders[1].children[0].listeners.click();
+    assert.strictEqual(body.children[0].dataset.netid, 'xy99', 'First name ascending');
+    allHeaders[1].children[0].listeners.click();
+    assert.strictEqual(body.children[0].dataset.netid, 'abc123', 'First name descending');
+    allHeaders[2].children[0].listeners.click();
+    assert.strictEqual(body.children[0].dataset.netid, 'abc123', 'Last name ascending');
+    controls['#student-search'].value = 'alice brown';
+    controls['#student-search'].listeners.input();
+    assert.strictEqual(rows[0].hidden, true);
+    assert.strictEqual(rows[1].hidden, false);
+  }
 }
 
 (async () => {
   await checkStaffIndex();
+  await checkStaffIndex(true);
   const hostile = "<img src=x onerror=alert(1)>";
   const current = await run(payload(6, [hostile]));
   assert.strictEqual(current["#unmapped-columns-section"].hidden, false);

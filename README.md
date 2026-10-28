@@ -305,7 +305,7 @@ sudo systemctl enable --now orie4580-checkoffs.timer
 
 ### Authorization-only update
 
-The staff-only `/students/` index supports NetID search and a **Show checkmarks** button. Checkmark columns start hidden; **Hide checkmarks**, Escape, switching tabs, or returning to the page hides them again. On first reveal, it reads the existing protected student JSON files (six requests at a time), respecting published Exam 2 visibility. Each row shows counted purple marks (including shiny purple), missing linked boxes, each standard's two linked boxes, and shiny overflow. Click any column heading to sort, and click again to reverse. Standard columns sort by purple boxes (including shiny), then purple + green boxes, then shiny purple boxes. Unavailable values stay last. Hiding checkmarks resets the order to NetID for privacy. Standards outside a student's course catalog show N/A. Failed summaries show an error instead of zero totals; hide and show again to retry. Reload to pick up newly synced results. This page uses the existing `simple-dashboard.js` and `simple-style.css` assets, which need to be updated along with the generated index.
+The staff-only `/students/` index supports NetID and name search and a **Show checkmarks** button. Checkmark columns start hidden; **Hide checkmarks**, Escape, switching tabs, or returning to the page hides them again. On first reveal, it reads the existing protected student JSON files (six requests at a time), respecting published Exam 2 visibility. Each row shows counted purple marks (including shiny purple), missing linked boxes, each standard's two linked boxes, and shiny overflow. Click any column heading to sort, and click again to reverse. Standard columns sort by purple boxes (including shiny), then purple + green boxes, then shiny purple boxes. Unavailable values stay last. Hiding checkmarks resets grade-based ordering to NetID for privacy; name sorting is retained. Standards outside a student's course catalog show N/A. Failed summaries show an error instead of zero totals; hide and show again to retry. Reload to pick up newly synced results. This page uses the existing `simple-dashboard.js` and `simple-style.css` assets, which need to be updated along with the generated index.
 
 Staff authorization and the protected staff index can be updated without fetching Google Sheets or Gradescope and without changing any student HTML or JSON:
 
@@ -317,6 +317,50 @@ sudo -u orie4580-dashboard -g www-data \
 ```
 
 The command validates all student directory names before writing, atomically replaces each per-student `.htaccess`, rebuilds `students/index.html` from those validated NetIDs, and updates the protected parent index rule last. It is intended for narrow authorization changes; normal refreshes continue to generate the same rules automatically.
+
+### Private staff roster
+
+Optionally install a UTF-8 CSV outside the web root at
+`/var/lib/orie4580-dashboard/student-names.csv`, with these exact headers:
+
+```csv
+NetID,First Name,Last Name
+abc123,Alice,Example
+xy99,Xavier,Example
+```
+
+```sh
+sudo install -o orie4580-dashboard -g www-data -m 0600 \
+  /path/to/student-names.csv \
+  /var/lib/orie4580-dashboard/student-names.csv
+```
+
+The private CSV is read automatically by both normal publication (including the
+Exam 2 visibility switch) and the authorization/index updater. It is never copied
+into the served tree. Only the staff-protected index includes the names; student
+HTML and JSON are unchanged. First Name and Last Name are separately sortable,
+and search matches names as well as NetIDs.
+
+When the CSV exists, the index lists only NetIDs present in both the CSV and the
+student output. Students omitted from the CSV keep their folders, authorization,
+and dashboards. CSV entries without a dashboard are not listed. A header-only
+CSV lists nobody. Without a CSV, the original full NetID list remains with blank
+name columns. NetIDs are trimmed and lowercased; duplicates and malformed rows
+fail the update rather than silently falling back to the full list.
+
+After installing or editing the CSV, rebuild the index without fetching grades
+or restarting services (run from `/opt/orie4580-grade-dashboard`):
+
+```sh
+sudo -u orie4580-dashboard -g www-data \
+  env PYTHONDONTWRITEBYTECODE=1 \
+  flock -n /var/lib/orie4580-dashboard/refresh.lock \
+  .venv/bin/python -m scripts.update_dashboard_authorization \
+  /var/www/html/orie4580_fa26/students
+```
+
+Retry after the refresh finishes if the lock is busy. When first deploying this
+feature, also install the updated shared JavaScript and CSS as usual.
 
 ### Scheduled refresh
 

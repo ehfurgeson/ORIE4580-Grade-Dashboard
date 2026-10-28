@@ -409,3 +409,25 @@ def test_staff_index_renderer_rejects_unsafe_or_duplicate_netids():
         render_staff_index(["../unsafe"])
     with pytest.raises(ValueError, match="unique"):
         render_staff_index(["abc123", "abc123"])
+
+
+def test_staff_roster_filters_only_index_and_escapes_names(tmp_path, monkeypatch):
+    roster = tmp_path / 'names.csv'
+    roster.write_text('NetID,First Name,Last Name\nabc123,<Alice>,"O""Brien"\nzz123,Other,Student\n')
+    monkeypatch.setattr('sync.staff_roster.STAFF_ROSTER_PATH', roster)
+    output = tmp_path / 'students'
+    paths = write_simple_release(published_records(make_rows()), output)
+    before = {path: path.read_bytes() for path in paths}
+    update_authorization_files(output)
+    index = (output / 'index.html').read_text()
+    assert '&lt;Alice&gt;' in index and 'O&quot;Brien' in index
+    assert 'data-netid="abc123"' in index
+    assert 'data-netid="xy99"' not in index
+    assert 'data-netid="zz123"' not in index
+    assert {path: path.read_bytes() for path in paths} == before
+    assert (output / 'xy99' / 'index.html').exists()
+    assert (output / 'xy99' / '.htaccess').exists()
+    roster.write_text('NetID,First Name,Last Name\n')
+    update_authorization_files(output)
+    assert 'data-netid=' not in (output / 'index.html').read_text()
+    assert {path: path.read_bytes() for path in paths} == before

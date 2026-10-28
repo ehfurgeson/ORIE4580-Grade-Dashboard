@@ -300,7 +300,9 @@
     const standardIds = [...root.querySelectorAll('[data-standard]')].map(cell => cell.dataset.standard);
     const sortValues = new Map();
     const headers = [...root.querySelectorAll('thead th')];
-    const sortKeys = ['netid', 'purple', 'missing', ...standardIds, 'shiny'];
+    const legacyKeys = ['netid', 'purple', 'missing', ...standardIds, 'shiny'];
+    const sortKeys = headers.map((header, index) => header.dataset.sort || header.dataset.standard || legacyKeys[index]);
+    const identityKeys = new Set(['netid', 'firstName', 'lastName']);
     let sortKey = 'netid';
     let ascending = true;
     const sortButtons = headers.map((header, index) => {
@@ -310,7 +312,7 @@
       header.append(button);
       button.addEventListener('click', () => {
         const key = sortKeys[index];
-        ascending = sortKey === key ? !ascending : key === 'netid';
+        ascending = sortKey === key ? !ascending : identityKeys.has(key);
         sortKey = key;
         sortRows();
       });
@@ -320,7 +322,13 @@
     function sortRows() {
       const ordered = [...rows].sort((a, b) => {
         const tie = a.dataset.netid.localeCompare(b.dataset.netid);
-        if (sortKey === 'netid') return ascending ? tie : -tie;
+        if (identityKeys.has(sortKey)) {
+          const left = a.dataset[sortKey] || '';
+          const right = b.dataset[sortKey] || '';
+          if (!left || !right) return !left ? (!right ? tie : 1) : -1;
+          const comparison = left.localeCompare(right, undefined, { sensitivity: 'base' });
+          return (ascending ? comparison : -comparison) || tie;
+        }
         const left = sortValues.get(a)?.[sortKey];
         const right = sortValues.get(b)?.[sortKey];
         // Unavailable and non-applicable summaries stay last in either direction.
@@ -350,7 +358,7 @@
 
     function setShowing(value) {
       showing = value;
-      if (!showing) {
+      if (!showing && !identityKeys.has(sortKey)) {
         // Grade-based ordering itself can disclose information after hiding.
         sortKey = 'netid';
         ascending = true;
@@ -369,7 +377,7 @@
     }
 
     function replaceCells(row, cells) {
-      for (const cell of [...row.querySelectorAll('td')]) cell.remove();
+      for (const cell of [...row.querySelectorAll('.staff-private')]) cell.remove();
       row.append(...cells);
     }
 
@@ -467,7 +475,7 @@
       const query = search.value.trim().toLowerCase();
       let matches = 0;
       for (const row of rows) {
-        row.hidden = !row.dataset.netid.includes(query);
+        row.hidden = !`${row.dataset.netid} ${row.dataset.firstName || ''} ${row.dataset.lastName || ''}`.toLowerCase().includes(query);
         if (!row.hidden) matches += 1;
       }
       root.querySelector('#student-count').textContent = `${matches} of ${rows.length} students`;

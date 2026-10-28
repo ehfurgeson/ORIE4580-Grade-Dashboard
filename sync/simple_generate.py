@@ -12,6 +12,7 @@ from typing import Any
 from .combined_checkoffs import validate_combined_record
 from .simple_checkoffs import NETID_PATTERN
 from .standards import STANDARDS
+from .staff_roster import load_staff_roster
 
 
 STAFF_USERS = (
@@ -62,15 +63,23 @@ def render_staff_index(netids: list[str]) -> str:
         raise ValueError("staff index requires validated Cornell NetIDs")
     if len(netids) != len(set(netids)):
         raise ValueError("staff index NetIDs must be unique")
+    roster = load_staff_roster()
+    if roster is not None:
+        netids = [netid for netid in netids if netid in roster]
     headings = ''.join(
         f'<th scope="col" class="staff-private" data-standard="{standard_id}" hidden '
         f'title="{escape(name, quote=True)}">{standard_id}</th>'
         for standard_id, name in STANDARDS.items()
     )
-    links = "\n".join(
-        f'          <tr data-netid="{netid}"><th scope="row"><a href="./{netid}/">{netid}</a></th></tr>'
-        for netid in sorted(netids)
-    )
+    rows = []
+    for netid in sorted(netids):
+        first, last = (escape(name, quote=True) for name in (roster or {}).get(netid, ('', '')))
+        rows.append(
+            f'<tr data-netid="{netid}" data-first-name="{first}" data-last-name="{last}">'
+            f'<th scope="row"><a href="./{netid}/">{netid}</a></th>'
+            f'<td class="staff-name">{first}</td><td class="staff-name">{last}</td></tr>'
+        )
+    links = "\n".join(rows)
     return f"""<!doctype html>
 <html lang="en">
 <head>
@@ -90,7 +99,7 @@ def render_staff_index(netids: list[str]) -> str:
     <section aria-labelledby="student-list-title">
       <h2 id="student-list-title">Students ({len(netids)})</h2>
       <div class="staff-controls">
-        <label for="student-search">Search by NetID
+        <label for="student-search">Search by NetID or name
           <input id="student-search" type="search" autocomplete="off" spellcheck="false" placeholder="e.g. abc123">
         </label>
         <button id="toggle-checkmarks" type="button" aria-expanded="false" aria-controls="student-table" disabled>Show checkmarks</button>
@@ -104,18 +113,20 @@ def render_staff_index(netids: list[str]) -> str:
       <div class="staff-table-scroll" tabindex="0" role="region" aria-label="Student summaries">
       <table id="student-table" class="staff-table">
         <caption class="note">Student dashboards — <span id="student-count">{len(netids)} students</span></caption>
-        <thead><tr><th scope="col">NetID</th>
-          <th scope="col" class="staff-private" hidden>Total purple</th>
-          <th scope="col" class="staff-private" hidden>Total missing</th>
+        <thead><tr><th scope="col" data-sort="netid">NetID</th>
+          <th scope="col" data-sort="firstName">First Name</th>
+          <th scope="col" data-sort="lastName">Last Name</th>
+          <th scope="col" data-sort="purple" class="staff-private" hidden>Total purple</th>
+          <th scope="col" data-sort="missing" class="staff-private" hidden>Total missing</th>
           {headings}
-          <th scope="col" class="staff-private" hidden>Shiny overflow</th>
+          <th scope="col" data-sort="shiny" class="staff-private" hidden>Shiny overflow</th>
         </tr></thead>
         <tbody>
 {links}
         </tbody>
       </table>
       </div>
-      <p id="no-students" class="note" hidden>No matching NetIDs.</p>
+      <p id="no-students" class="note" hidden>No matching students.</p>
     </section>
   </main>
   <script src="../simple-dashboard.js" defer></script>
@@ -168,6 +179,7 @@ def update_authorization_files(output_dir: str | Path) -> list[Path]:
     ]
     if invalid:
         raise ValueError("students output contains an unsafe directory")
+    index_html = render_staff_index([student_dir.name for student_dir in student_dirs])
 
     written: list[Path] = []
     for student_dir in student_dirs:
@@ -176,7 +188,7 @@ def update_authorization_files(output_dir: str | Path) -> list[Path]:
         written.append(path)
     _replace_text_atomic(
         output / "index.html",
-        render_staff_index([student_dir.name for student_dir in student_dirs]),
+        index_html,
     )
     parent_rule = output / ".htaccess"
     _replace_text_atomic(parent_rule, STUDENTS_HTACCESS)
