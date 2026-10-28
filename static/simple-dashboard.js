@@ -298,7 +298,7 @@
     const rows = [...root.querySelectorAll('tbody tr')];
     const standardIds = [...root.querySelectorAll('[data-standard]')].map(cell => cell.dataset.standard);
     const sortValues = new Map();
-    const headers = [...root.querySelectorAll('thead th')];
+    const headers = [...root.querySelectorAll('thead th')].filter(header => !header.className.split(' ').includes('staff-line-number'));
     const legacyKeys = ['netid', 'purple', 'missing', ...standardIds, 'shiny'];
     const sortKeys = headers.map((header, index) => header.dataset.sort || header.dataset.standard || legacyKeys[index]);
     const identityKeys = new Set(['netid', 'firstName', 'lastName']);

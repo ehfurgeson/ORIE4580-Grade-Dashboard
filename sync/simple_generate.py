@@ -76,7 +76,7 @@ def render_staff_index(netids: list[str]) -> str:
         first, last = (escape(name, quote=True) for name in (roster or {}).get(netid, ('', '')))
         rows.append(
             f'<tr data-netid="{netid}" data-first-name="{first}" data-last-name="{last}">'
-            f'<th scope="row"><a href="./{netid}/">{netid}</a></th>'
+            f'<td class="staff-line-number"></td><th scope="row"><a href="./{netid}/">{netid}</a></th>'
             f'<td class="staff-name">{first}</td><td class="staff-name">{last}</td></tr>'
         )
     links = "\n".join(rows)
@@ -109,7 +109,7 @@ def render_staff_index(netids: list[str]) -> str:
       <div class="staff-table-scroll" tabindex="0" role="region" aria-label="Student summaries">
       <table id="student-table" class="staff-table">
         <caption class="note">Student dashboards — <span id="student-count">{len(netids)} students</span></caption>
-        <thead><tr><th scope="col" data-sort="netid">NetID</th>
+        <thead><tr><th class="staff-line-number" scope="col" aria-label="Line number"></th><th scope="col" data-sort="netid">NetID</th>
           <th scope="col" data-sort="firstName">First Name</th>
           <th scope="col" data-sort="lastName">Last Name</th>
           <th scope="col" data-sort="purple" class="staff-private" hidden>Total purple</th>
