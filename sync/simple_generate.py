@@ -2,6 +2,7 @@
 from __future__ import annotations
 
 import json
+from html import escape
 import os
 from pathlib import Path
 import shutil
@@ -10,6 +11,7 @@ from typing import Any
 
 from .combined_checkoffs import validate_combined_record
 from .simple_checkoffs import NETID_PATTERN
+from .standards import STANDARDS
 
 
 STAFF_USERS = (
@@ -60,8 +62,13 @@ def render_staff_index(netids: list[str]) -> str:
         raise ValueError("staff index requires validated Cornell NetIDs")
     if len(netids) != len(set(netids)):
         raise ValueError("staff index NetIDs must be unique")
+    headings = ''.join(
+        f'<th scope="col" class="staff-private" data-standard="{standard_id}" hidden '
+        f'title="{escape(name, quote=True)}">{standard_id}</th>'
+        for standard_id, name in STANDARDS.items()
+    )
     links = "\n".join(
-        f'          <li><a href="./{netid}/">{netid}</a></li>'
+        f'          <tr data-netid="{netid}"><th scope="row"><a href="./{netid}/">{netid}</a></th></tr>'
         for netid in sorted(netids)
     )
     return f"""<!doctype html>
@@ -74,7 +81,7 @@ def render_staff_index(netids: list[str]) -> str:
   <link rel="stylesheet" href="../simple-style.css">
 </head>
 <body>
-  <main class="simple-container">
+  <main class="simple-container staff-container" id="staff-index">
     <header>
       <p class="eyebrow">ORIE 4580</p>
       <h1>Student dashboards</h1>
@@ -82,11 +89,35 @@ def render_staff_index(netids: list[str]) -> str:
     </header>
     <section aria-labelledby="student-list-title">
       <h2 id="student-list-title">Students ({len(netids)})</h2>
-      <ul class="staff-student-index">
+      <div class="staff-controls">
+        <label for="student-search">Search by NetID
+          <input id="student-search" type="search" autocomplete="off" spellcheck="false" placeholder="e.g. abc123">
+        </label>
+        <button id="toggle-checkmarks" type="button" aria-expanded="false" aria-controls="student-table" disabled>Show checkmarks</button>
+      </div>
+      <p id="staff-status" class="note" role="status">Checkmarks are hidden for privacy.</p>
+      <p id="staff-legend" class="note staff-private" hidden>Purple counts marks used toward the grade, including shiny purple; missing counts empty linked boxes.
+        Each standard shows its two linked boxes, then all earned marks below. ✓ = checkmark; ✦ = shiny purple.
+        Press Escape to hide checkmarks. Switching tabs also hides them.</p>
+      <noscript><p>Enable JavaScript to search and show checkmarks.</p></noscript>
+      <div class="staff-table-scroll" tabindex="0" role="region" aria-label="Student summaries">
+      <table id="student-table" class="staff-table">
+        <caption class="note">Student dashboards — <span id="student-count">{len(netids)} students</span></caption>
+        <thead><tr><th scope="col">NetID</th>
+          <th scope="col" class="staff-private" hidden>Total purple</th>
+          <th scope="col" class="staff-private" hidden>Total missing</th>
+          {headings}
+          <th scope="col" class="staff-private" hidden>Shiny overflow</th>
+        </tr></thead>
+        <tbody>
 {links}
-      </ul>
+        </tbody>
+      </table>
+      </div>
+      <p id="no-students" class="note" hidden>No matching NetIDs.</p>
     </section>
   </main>
+  <script src="../simple-dashboard.js" defer></script>
 </body>
 </html>
 """

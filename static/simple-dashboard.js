@@ -292,6 +292,160 @@
     dashboard.hidden = false;
   }
 
+  function renderStaffIndex(root) {
+    const search = root.querySelector('#student-search');
+    const toggle = root.querySelector('#toggle-checkmarks');
+    const status = root.querySelector('#staff-status');
+    const rows = [...root.querySelectorAll('tbody tr')];
+    const standardIds = [...root.querySelectorAll('[data-standard]')].map(cell => cell.dataset.standard);
+    const loaded = new Set();
+    const failed = new Set();
+    let showing = false;
+    let loading = false;
+
+    function updateStatus() {
+      status.textContent = !showing ? 'Checkmarks are hidden for privacy.'
+        : loading ? `Loading summaries… ${loaded.size} of ${rows.length} loaded.`
+          : failed.size ? `${failed.size} summaries unavailable. Hide and show checkmarks to retry.`
+            : 'Showing published checkmarks. Reload the page for newly synced results.';
+    }
+
+    function setShowing(value) {
+      showing = value;
+      for (const cell of root.querySelectorAll('.staff-private')) cell.hidden = !showing;
+      toggle.textContent = showing ? 'Hide checkmarks' : 'Show checkmarks';
+      toggle.setAttribute('aria-expanded', String(showing));
+      updateStatus();
+    }
+
+    function privateCell() {
+      const cell = make('td', 'staff-private');
+      cell.hidden = !showing;
+      return cell;
+    }
+
+    function replaceCells(row, cells) {
+      for (const cell of [...row.querySelectorAll('td')]) cell.remove();
+      row.append(...cells);
+    }
+
+    function rowMessage(row, message) {
+      const cell = privateCell();
+      cell.colSpan = standardIds.length + 3;
+      cell.textContent = message;
+      replaceCells(row, [cell]);
+    }
+
+    function fillRow(row, data, updatedAt) {
+      const allocations = data.standards.map(standard => allocateStandard(standard.checkmarks));
+      const purple = allocations.reduce((sum, allocation) => sum + allocation.shiny.length +
+        allocation.linked.filter(mark => mark.kind !== 'green').length, 0);
+      const missing = allocations.reduce((sum, allocation) => sum + 2 - allocation.linked.length, 0);
+      const totals = [purple, missing].map(value => {
+        const cell = privateCell();
+        cell.classList.add('staff-total');
+        cell.textContent = String(value);
+        cell.title = `Last synced: ${updatedAt.toLocaleString()}`;
+        return cell;
+      });
+      const cells = standardIds.map(id => {
+        const cell = privateCell();
+        const index = data.standards.findIndex(standard => standard.id === id);
+        if (index < 0) {
+          cell.textContent = 'N/A';
+          cell.title = 'This standard does not apply to this student.';
+          return cell;
+        }
+        const allocation = allocations[index];
+        const marks = make('div', 'compact-marks staff-earned');
+        marks.setAttribute('aria-label', 'All earned checkmarks');
+        for (const mark of allocation.earned) {
+          marks.append(renderCompactCheckmark(mark, allocationLabel(mark, allocation)));
+        }
+        if (!allocation.earned.length) marks.append(make('span', 'note', 'None earned'));
+        cell.append(renderLinkedBoxes(allocation, true), marks);
+        return cell;
+      });
+      const overflow = privateCell();
+      const pool = make('div', 'compact-marks');
+      const shinyCount = allocations.reduce((sum, allocation) => sum + allocation.shiny.length, 0);
+      pool.append(make('strong', '', String(shinyCount)));
+      allocations.forEach((allocation, index) => {
+        for (const mark of allocation.shiny) {
+          pool.append(renderCompactCheckmark(mark, `${data.standards[index].id}: Counts in shiny pool (overflow)`));
+        }
+      });
+      overflow.append(pool);
+      replaceCells(row, [...totals, ...cells, overflow]);
+    }
+
+    async function loadRows() {
+      if (loading) return;
+      loading = true;
+      const pending = rows.filter(row => !loaded.has(row));
+      for (const row of pending) rowMessage(row, 'Loading…');
+      updateStatus();
+      async function worker() {
+        while (pending.length) {
+          const row = pending.shift();
+          try {
+            const response = await fetch(`./${row.dataset.netid}/checkoffs.json`, {
+              credentials: 'same-origin', cache: 'no-store', headers: { Accept: 'application/json' }
+            });
+            if (!response.ok) throw new Error(`Request failed (${response.status}).`);
+            const data = await response.json();
+            const { updatedAt } = validatePayload(data);
+            if (data.student.netid !== row.dataset.netid ||
+                data.standards.some(standard => !standardIds.includes(standard.id))) {
+              throw new Error('The student summary does not match this index.');
+            }
+            fillRow(row, data, updatedAt);
+            loaded.add(row);
+            failed.delete(row);
+          } catch (error) {
+            rowMessage(row, `Unavailable: ${error.message}`);
+            failed.add(row);
+          }
+          updateStatus();
+        }
+      }
+      // Bound requests so a class-sized index does not flood the server.
+      await Promise.all(Array.from({ length: 6 }, worker));
+      loading = false;
+      updateStatus();
+    }
+
+    search.addEventListener('input', () => {
+      const query = search.value.trim().toLowerCase();
+      let matches = 0;
+      for (const row of rows) {
+        row.hidden = !row.dataset.netid.includes(query);
+        if (!row.hidden) matches += 1;
+      }
+      root.querySelector('#student-count').textContent = `${matches} of ${rows.length} students`;
+      root.querySelector('#no-students').hidden = matches !== 0;
+    });
+    toggle.addEventListener('click', () => {
+      setShowing(!showing);
+      if (showing) void loadRows();
+    });
+    document.addEventListener('keydown', event => {
+      if (event.key === 'Escape') setShowing(false);
+    });
+    document.addEventListener('visibilitychange', () => {
+      if (document.hidden) setShowing(false);
+    });
+    window.addEventListener('pagehide', () => setShowing(false));
+    window.addEventListener('pageshow', () => setShowing(false));
+    toggle.disabled = false;
+  }
+
+  const staffIndex = document.querySelector('#staff-index');
+  if (staffIndex) {
+    renderStaffIndex(staffIndex);
+    return;
+  }
+
   fetch(endpoint, { credentials: 'same-origin', cache: 'no-store', headers: { Accept: 'application/json' } })
     .then(response => {
       if (!response.ok) throw new Error(`Request failed (${response.status}).`);

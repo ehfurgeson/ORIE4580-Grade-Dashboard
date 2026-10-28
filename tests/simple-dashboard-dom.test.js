@@ -13,11 +13,23 @@ class Element {
     this.textContent = "";
     this.className = "";
     this.attributes = {};
+    this.dataset = {};
+    this.listeners = {};
     this.classList = { add: name => { this.className += ` ${name}`; } };
   }
-  append(...children) { this.children.push(...children); }
+  append(...children) {
+    children.forEach(child => { child.parent = this; });
+    this.children.push(...children);
+  }
   prepend(...children) { this.children.unshift(...children); }
   setAttribute(name, value) { this.attributes[name] = value; }
+  addEventListener(name, callback) { this.listeners[name] = callback; }
+  remove() { this.parent.children = this.parent.children.filter(child => child !== this); }
+  querySelectorAll(selector) {
+    const descendants = this.children.flatMap(child => [child, ...child.querySelectorAll('*')]);
+    return descendants.filter(child => selector === '*' ||
+      (selector === '.staff-private' ? child.className.split(' ').includes('staff-private') : child.tag === selector));
+  }
 }
 
 function elements() {
@@ -55,6 +67,7 @@ async function run(data, { legacyTemplate = false } = {}) {
     window: {},
     document: {
       querySelector(selector) {
+        if (selector === '#staff-index') return null;
         if (selector === "#unmapped-columns-section" || selector === "#unmapped-columns") {
           return nodes[selector] || null;
         }
@@ -72,7 +85,81 @@ async function run(data, { legacyTemplate = false } = {}) {
   return nodes;
 }
 
+async function checkStaffIndex() {
+  const root = new Element();
+  const controls = Object.fromEntries([
+    '#student-search', '#toggle-checkmarks', '#staff-status', '#student-count', '#no-students'
+  ].map(id => [id, new Element()]));
+  const headings = ['S1', 'S2'].map(id => {
+    const element = new Element('th');
+    element.dataset.standard = id;
+    element.className = 'staff-private';
+    element.hidden = true;
+    return element;
+  });
+  const rows = ['abc123', 'xy99'].map(netid => {
+    const row = new Element('tr');
+    row.dataset.netid = netid;
+    return row;
+  });
+  root.append(...headings, ...rows);
+  root.querySelector = selector => controls[selector];
+  const descendants = root.querySelectorAll.bind(root);
+  root.querySelectorAll = selector => selector === 'tbody tr' ? rows
+    : selector === '[data-standard]' ? headings : descendants(selector);
+  const doc = new Element();
+  doc.querySelector = selector => selector === '#staff-index' ? root : null;
+  doc.createElement = tag => new Element(tag);
+  const win = new Element();
+  const requests = [];
+  let finishRequest;
+  const waiting = new Promise(resolve => { finishRequest = resolve; });
+  const data = payload(6, []);
+  data.standards = data.standards.slice(0, 2);
+  data.standards[0].checkmarks = ['purple', 'purple', 'purple', 'shiny_purple'].map((kind, index) => ({
+    kind, status: 'complete', label: `Question ${index}`, requirements: [{
+      id: 'exam_score', source: 'gradescope_exam', status: 'complete'
+    }]
+  }));
+  vm.runInNewContext(source, {
+    window: win, document: doc,
+    fetch: async url => {
+      requests.push(url);
+      await waiting;
+      return { ok: !url.includes('xy99'), status: 403, json: async () => data };
+    }
+  });
+  assert.strictEqual(requests.length, 0, 'No grade requests before reveal');
+  controls['#toggle-checkmarks'].listeners.click();
+  assert.strictEqual(requests.length, 2);
+  controls['#toggle-checkmarks'].listeners.click();
+  finishRequest();
+  await new Promise(resolve => setImmediate(resolve));
+  assert(root.querySelectorAll('.staff-private').every(cell => cell.hidden),
+    'Requests finishing after Hide must stay hidden');
+  const cells = rows[0].children;
+  assert.strictEqual(cells[0].textContent, '3', 'Two linked purple plus one shiny overflow; extra purple excluded');
+  assert.strictEqual(cells[1].textContent, '2', 'Two unfilled S2 boxes');
+  assert.match(rows[1].children[0].textContent, /Unavailable.*403/);
+  controls['#toggle-checkmarks'].listeners.click();
+  assert.strictEqual(requests.length, 3, 'Only failed rows are retried');
+  doc.listeners.keydown({ key: 'Escape' });
+  assert(root.querySelectorAll('.staff-private').every(cell => cell.hidden));
+  controls['#student-search'].value = ' ABC ';
+  controls['#student-search'].listeners.input();
+  assert.strictEqual(rows[0].hidden, false);
+  assert.strictEqual(rows[1].hidden, true);
+  assert.strictEqual(controls['#student-count'].textContent, '1 of 2 students');
+  controls['#toggle-checkmarks'].listeners.click();
+  doc.hidden = true;
+  doc.listeners.visibilitychange();
+  assert(root.querySelectorAll('.staff-private').every(cell => cell.hidden));
+  assert.strictEqual(controls['#toggle-checkmarks'].attributes['aria-expanded'], 'false');
+  await new Promise(resolve => setImmediate(resolve));
+}
+
 (async () => {
+  await checkStaffIndex();
   const hostile = "<img src=x onerror=alert(1)>";
   const current = await run(payload(6, [hostile]));
   assert.strictEqual(current["#unmapped-columns-section"].hidden, false);
