@@ -18,7 +18,10 @@ class Element {
     this.classList = { add: name => { this.className += ` ${name}`; } };
   }
   append(...children) {
-    children.forEach(child => { child.parent = this; });
+    children.forEach(child => {
+      if (child.parent) child.remove();
+      child.parent = this;
+    });
     this.children.push(...children);
   }
   prepend(...children) { this.children.unshift(...children); }
@@ -102,11 +105,15 @@ async function checkStaffIndex() {
     row.dataset.netid = netid;
     return row;
   });
-  root.append(...headings, ...rows);
-  root.querySelector = selector => controls[selector];
+  const body = new Element('tbody');
+  body.append(...rows);
+  const allHeaders = [new Element('th'), new Element('th'), new Element('th'), ...headings, new Element('th')];
+  root.append(...allHeaders, body);
+  root.querySelector = selector => selector === 'tbody' ? body : controls[selector];
   const descendants = root.querySelectorAll.bind(root);
   root.querySelectorAll = selector => selector === 'tbody tr' ? rows
-    : selector === '[data-standard]' ? headings : descendants(selector);
+    : selector === '[data-standard]' ? headings
+      : selector === 'thead th' ? allHeaders : descendants(selector);
   const doc = new Element();
   doc.querySelector = selector => selector === '#staff-index' ? root : null;
   doc.createElement = tag => new Element(tag);
@@ -130,6 +137,10 @@ async function checkStaffIndex() {
     }
   });
   assert.strictEqual(requests.length, 0, 'No grade requests before reveal');
+  allHeaders[0].children[0].listeners.click();
+  assert.strictEqual(body.children[0].dataset.netid, 'xy99', 'NetID descending');
+  allHeaders[0].children[0].listeners.click();
+  assert.strictEqual(body.children[0].dataset.netid, 'abc123', 'NetID ascending');
   controls['#toggle-checkmarks'].listeners.click();
   assert.strictEqual(requests.length, 2);
   controls['#toggle-checkmarks'].listeners.click();
@@ -143,7 +154,15 @@ async function checkStaffIndex() {
   assert.match(rows[1].children[0].textContent, /Unavailable.*403/);
   controls['#toggle-checkmarks'].listeners.click();
   assert.strictEqual(requests.length, 3, 'Only failed rows are retried');
+  allHeaders[1].children[0].listeners.click();
+  assert.strictEqual(allHeaders[1].attributes['aria-sort'], 'descending');
+  assert.strictEqual(body.children[0].dataset.netid, 'abc123', 'Unavailable stays last');
+  allHeaders[1].children[0].listeners.click();
+  assert.strictEqual(allHeaders[1].attributes['aria-sort'], 'ascending');
+  assert.strictEqual(body.children[0].dataset.netid, 'abc123', 'Unavailable stays last ascending');
+  assert.strictEqual(cells[2].children.length, 1, 'Only linked boxes in standard cells');
   doc.listeners.keydown({ key: 'Escape' });
+  assert.strictEqual(allHeaders[0].attributes['aria-sort'], 'ascending', 'Hide resets private ordering');
   assert(root.querySelectorAll('.staff-private').every(cell => cell.hidden));
   controls['#student-search'].value = ' ABC ';
   controls['#student-search'].listeners.input();

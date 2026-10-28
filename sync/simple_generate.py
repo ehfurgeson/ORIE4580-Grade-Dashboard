@@ -97,7 +97,8 @@ def render_staff_index(netids: list[str]) -> str:
       </div>
       <p id="staff-status" class="note" role="status">Checkmarks are hidden for privacy.</p>
       <p id="staff-legend" class="note staff-private" hidden>Purple counts marks used toward the grade, including shiny purple; missing counts empty linked boxes.
-        Each standard shows its two linked boxes, then all earned marks below. ✓ = checkmark; ✦ = shiny purple.
+        Each standard shows its two linked boxes. Click a column heading to sort; click again to reverse.
+        Standards sort by purple boxes (including shiny), then purple + green boxes, then shiny purple boxes; unavailable values stay last. ✓ = checkmark; ✦ = shiny purple.
         Press Escape to hide checkmarks. Switching tabs also hides them.</p>
       <noscript><p>Enable JavaScript to search and show checkmarks.</p></noscript>
       <div class="staff-table-scroll" tabindex="0" role="region" aria-label="Student summaries">

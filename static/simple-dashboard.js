@@ -298,6 +298,44 @@
     const status = root.querySelector('#staff-status');
     const rows = [...root.querySelectorAll('tbody tr')];
     const standardIds = [...root.querySelectorAll('[data-standard]')].map(cell => cell.dataset.standard);
+    const sortValues = new Map();
+    const headers = [...root.querySelectorAll('thead th')];
+    const sortKeys = ['netid', 'purple', 'missing', ...standardIds, 'shiny'];
+    let sortKey = 'netid';
+    let ascending = true;
+    const sortButtons = headers.map((header, index) => {
+      const label = header.textContent;
+      const button = make('button', 'staff-sort', label);
+      header.textContent = '';
+      header.append(button);
+      button.addEventListener('click', () => {
+        const key = sortKeys[index];
+        ascending = sortKey === key ? !ascending : key === 'netid';
+        sortKey = key;
+        sortRows();
+      });
+      return { header, button, label };
+    });
+
+    function sortRows() {
+      const ordered = [...rows].sort((a, b) => {
+        const tie = a.dataset.netid.localeCompare(b.dataset.netid);
+        if (sortKey === 'netid') return ascending ? tie : -tie;
+        const left = sortValues.get(a)?.[sortKey];
+        const right = sortValues.get(b)?.[sortKey];
+        // Unavailable and non-applicable summaries stay last in either direction.
+        if (left == null || right == null) return left == null ? (right == null ? tie : 1) : -1;
+        return (ascending ? left - right : right - left) || tie;
+      });
+      const body = root.querySelector('tbody');
+      for (const row of ordered) body.append(row);
+      sortButtons.forEach(({ header, button, label }, index) => {
+        const active = sortKeys[index] === sortKey;
+        header.setAttribute('aria-sort', active ? (ascending ? 'ascending' : 'descending') : 'none');
+        button.textContent = `${label}${active ? (ascending ? ' ↑' : ' ↓') : ' ↕'}`;
+      });
+    }
+
     const loaded = new Set();
     const failed = new Set();
     let showing = false;
@@ -312,6 +350,12 @@
 
     function setShowing(value) {
       showing = value;
+      if (!showing) {
+        // Grade-based ordering itself can disclose information after hiding.
+        sortKey = 'netid';
+        ascending = true;
+        sortRows();
+      }
       for (const cell of root.querySelectorAll('.staff-private')) cell.hidden = !showing;
       toggle.textContent = showing ? 'Hide checkmarks' : 'Show checkmarks';
       toggle.setAttribute('aria-expanded', String(showing));
@@ -357,13 +401,7 @@
           return cell;
         }
         const allocation = allocations[index];
-        const marks = make('div', 'compact-marks staff-earned');
-        marks.setAttribute('aria-label', 'All earned checkmarks');
-        for (const mark of allocation.earned) {
-          marks.append(renderCompactCheckmark(mark, allocationLabel(mark, allocation)));
-        }
-        if (!allocation.earned.length) marks.append(make('span', 'note', 'None earned'));
-        cell.append(renderLinkedBoxes(allocation, true), marks);
+        cell.append(renderLinkedBoxes(allocation, true));
         return cell;
       });
       const overflow = privateCell();
@@ -375,6 +413,15 @@
           pool.append(renderCompactCheckmark(mark, `${data.standards[index].id}: Counts in shiny pool (overflow)`));
         }
       });
+      const values = { purple, missing, shiny: shinyCount };
+      data.standards.forEach((standard, index) => {
+        const linked = allocations[index].linked;
+        // Lexicographic order of linked boxes: purple (including shiny), purple + green, shiny.
+        values[standard.id] = linked.filter(mark => mark.kind !== 'green').length * 100 +
+          linked.length * 10 +
+          linked.filter(mark => mark.kind === 'shiny_purple').length;
+      });
+      sortValues.set(row, values);
       overflow.append(pool);
       replaceCells(row, [...totals, ...cells, overflow]);
     }
@@ -412,6 +459,7 @@
       // Bound requests so a class-sized index does not flood the server.
       await Promise.all(Array.from({ length: 6 }, worker));
       loading = false;
+      sortRows();
       updateStatus();
     }
 
@@ -437,6 +485,7 @@
     });
     window.addEventListener('pagehide', () => setShowing(false));
     window.addEventListener('pageshow', () => setShowing(false));
+    sortRows();
     toggle.disabled = false;
   }
 

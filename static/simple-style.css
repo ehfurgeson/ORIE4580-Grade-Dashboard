@@ -316,6 +316,7 @@ header > p:last-child { margin: .4rem 0 0; color: var(--muted); }
 .staff-table a { color: #1f4b7a; font-weight: 700; }
 .staff-table tbody tr:hover > * { background-color: var(--soft); }
 .staff-table .linked-boxes { flex-wrap: nowrap; margin-bottom: .35rem; }
-.staff-earned { min-width: 4.5rem; max-width: 10rem; padding-top: .3rem; border-top: 1px dotted var(--line); }
-.staff-earned .note { margin: 0; font-size: .7rem; }
 .staff-total { font-size: 1rem; font-weight: 750; font-variant-numeric: tabular-nums; }
+
+.staff-sort { border: 0; padding: 0; background: transparent; color: inherit; font: inherit; font-weight: inherit; text-align: left; cursor: pointer; }
+.staff-sort:hover { text-decoration: underline; }
