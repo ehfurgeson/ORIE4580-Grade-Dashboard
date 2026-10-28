@@ -318,6 +318,18 @@ header > p:last-child { margin: .4rem 0 0; color: var(--muted); }
 .staff-table [data-sort="lastName"] { white-space: nowrap; }
 .staff-table thead th:first-child { z-index: 3; background: var(--soft); }
 .staff-table a { color: #1f4b7a; font-weight: 700; }
+.staff-table tbody { counter-reset: student-row; }
+.staff-table tbody tr:not([hidden]) { counter-increment: student-row; }
+.staff-table tbody th[scope="row"]::before {
+  content: counter(student-row) ".";
+  display: inline-block;
+  min-width: 3ch;
+  margin-right: .65rem;
+  text-align: right;
+  color: var(--muted);
+  font-weight: 400;
+  font-variant-numeric: tabular-nums;
+}
 .staff-table tbody tr:hover > * { background-color: var(--soft); }
 .staff-table .linked-boxes { flex-wrap: nowrap; margin-bottom: .35rem; }
 .staff-total { font-size: 1rem; font-weight: 750; font-variant-numeric: tabular-nums; }
