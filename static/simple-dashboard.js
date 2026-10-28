@@ -295,7 +295,6 @@
   function renderStaffIndex(root) {
     const search = root.querySelector('#student-search');
     const toggle = root.querySelector('#toggle-checkmarks');
-    const status = root.querySelector('#staff-status');
     const rows = [...root.querySelectorAll('tbody tr')];
     const standardIds = [...root.querySelectorAll('[data-standard]')].map(cell => cell.dataset.standard);
     const sortValues = new Map();
@@ -345,16 +344,8 @@
     }
 
     const loaded = new Set();
-    const failed = new Set();
     let showing = false;
     let loading = false;
-
-    function updateStatus() {
-      status.textContent = !showing ? 'Checkmarks are hidden for privacy.'
-        : loading ? `Loading summaries… ${loaded.size} of ${rows.length} loaded.`
-          : failed.size ? `${failed.size} summaries unavailable. Hide and show checkmarks to retry.`
-            : 'Showing published checkmarks. Reload the page for newly synced results.';
-    }
 
     function setShowing(value) {
       showing = value;
@@ -367,7 +358,6 @@
       for (const cell of root.querySelectorAll('.staff-private')) cell.hidden = !showing;
       toggle.textContent = showing ? 'Hide checkmarks' : 'Show checkmarks';
       toggle.setAttribute('aria-expanded', String(showing));
-      updateStatus();
     }
 
     function privateCell() {
@@ -439,7 +429,6 @@
       loading = true;
       const pending = rows.filter(row => !loaded.has(row));
       for (const row of pending) rowMessage(row, 'Loading…');
-      updateStatus();
       async function worker() {
         while (pending.length) {
           const row = pending.shift();
@@ -456,19 +445,15 @@
             }
             fillRow(row, data, updatedAt);
             loaded.add(row);
-            failed.delete(row);
           } catch (error) {
-            rowMessage(row, `Unavailable: ${error.message}`);
-            failed.add(row);
+            rowMessage(row, `Unavailable: ${error.message} Hide and show checkmarks to retry.`);
           }
-          updateStatus();
         }
       }
       // Bound requests so a class-sized index does not flood the server.
       await Promise.all(Array.from({ length: 6 }, worker));
       loading = false;
       sortRows();
-      updateStatus();
     }
 
     search.addEventListener('input', () => {
