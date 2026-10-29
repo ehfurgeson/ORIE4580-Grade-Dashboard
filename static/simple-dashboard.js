@@ -188,7 +188,7 @@
         shinyCount += 1;
       }
     }
-    pool.prepend(make('strong', '', `Shiny pool (overflow): ${shinyCount}`));
+    pool.prepend(make('strong', '', 'Shiny pool (overflow)'));
     if (shinyCount === 0) pool.append(make('span', 'note', 'No overflow yet'));
     overview.append(pool);
   }
@@ -309,7 +309,8 @@
       article.append(make('h3', '', standard.name));
       article.append(renderLinkedBoxes(allocation));
       const overflow = make('div', 'shiny-pool');
-      overflow.append(make('strong', '', `Shiny overflow: ${allocation.shiny.length}`));
+      overflow.append(make('strong', '', 'Shiny overflow'));
+      if (!allocation.shiny.length) overflow.append(make('span', 'note', 'None yet'));
       for (const item of allocation.shiny) {
         overflow.append(renderCompactCheckmark(item, 'Counts in shiny pool (overflow)'));
       }
@@ -443,7 +444,7 @@
       const overflow = privateCell();
       const pool = make('div', 'compact-marks');
       const shinyCount = allocations.reduce((sum, allocation) => sum + allocation.shiny.length, 0);
-      pool.append(make('strong', '', String(shinyCount)));
+      if (!shinyCount) pool.append(make('span', 'note', '—'));
       allocations.forEach((allocation, index) => {
         for (const mark of allocation.shiny) {
           pool.append(renderCompactCheckmark(mark, `${data.standards[index].id}: Counts in shiny pool (overflow)`));
