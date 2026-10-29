@@ -316,7 +316,7 @@ header > p:last-child { margin: .4rem 0 0; color: var(--muted); }
 .staff-controls button { padding: .55rem .8rem; border: 1px solid var(--ink); background: var(--ink); color: #fff; font: inherit; font-weight: 650; cursor: pointer; }
 .staff-controls button:hover { background: #fff; color: var(--ink); }
 .staff-controls button:disabled { opacity: .5; cursor: wait; }
-.staff-table-scroll { overflow: auto; max-height: 70vh; margin-top: 1rem; }
+.staff-table-scroll { margin-top: 1rem; }
 .staff-table { border-collapse: separate; border-spacing: 0; width: auto; font-size: .85rem; }
 .staff-table caption { text-align: left; padding-bottom: .5rem; }
 .staff-table th, .staff-table td { padding: .6rem; border-bottom: 1px solid var(--line); text-align: left; vertical-align: top; }

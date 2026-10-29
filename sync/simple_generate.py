@@ -106,7 +106,7 @@ def render_staff_index(netids: list[str]) -> str:
       </div>
       <p id="staff-status" class="note">Checkmarks start hidden. Click Show/Hide checkmarks to toggle them; Escape or switching tabs hides them.</p>
       <noscript><p>Enable JavaScript to search and show checkmarks.</p></noscript>
-      <div class="staff-table-scroll" tabindex="0" role="region" aria-label="Student summaries">
+      <div class="staff-table-scroll" role="region" aria-label="Student summaries">
       <table id="student-table" class="staff-table">
         <caption class="note">Student dashboards — <span id="student-count">{len(netids)} students</span></caption>
         <thead><tr><th class="staff-line-number" scope="col" aria-label="Line number"></th><th scope="col" data-sort="netid">NetID</th>
