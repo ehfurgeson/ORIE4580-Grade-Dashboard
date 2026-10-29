@@ -193,6 +193,43 @@
     overview.append(pool);
   }
 
+  function renderAssignments(data, allocations) {
+    const overview = document.querySelector('#assignment-overview');
+    if (!overview) return; // Older generated pages remain compatible with the shared script.
+    const groups = new Map();
+    data.standards.forEach((standard, index) => {
+      for (const mark of standard.checkmarks) {
+        const match = /^(exam|lab)(\d+)-q(\d+)/.exec(mark.id || '');
+        const name = match ? `${match[1] === 'exam' ? 'Exam' : 'Lab'} ${match[2]}`
+          : mark.label.split(' · ')[0];
+        if (!groups.has(name)) groups.set(name, []);
+        groups.get(name).push({ mark, standard, allocation: allocations[index], question: match ? Number(match[3]) : 0 });
+      }
+    });
+    const names = [...groups.keys()].sort((a, b) => a.localeCompare(b, undefined, { numeric: true }));
+    for (const name of names) {
+      const row = make('div', 'assignment-row');
+      row.append(make('h3', '', name));
+      const slots = make('div', 'assignment-slots');
+      for (const { mark, standard, allocation } of groups.get(name).sort((a, b) => a.question - b.question)) {
+        const slot = make('a', 'assignment-slot');
+        slot.href = `#standard-${standard.id}`;
+        const result = mark.status === 'complete' ? allocationLabel(mark, allocation)
+          : mark.status === 'not_graded' ? 'Not available yet' : 'Checkmark not earned';
+        slot.title = `${mark.label} · ${standard.id}: ${result}`;
+        slot.setAttribute('aria-label', `${slot.title}. View standard details.`);
+        const symbol = mark.status === 'complete' ? renderCompactCheckmark(mark, result)
+          : make('span', 'checkmark empty-box', mark.status === 'not_graded' ? '?' : '–');
+        symbol.setAttribute('aria-hidden', 'true');
+        slot.append(make('span', 'assignment-standard', standard.id), symbol);
+        slots.append(slot);
+      }
+      row.append(slots);
+      overview.append(row);
+    }
+    if (names.length === 0) overview.append(make('p', 'note', 'No assignment checkmarks available yet.'));
+  }
+
   function renderCheckmark(checkmark, allocation) {
     const item = make('li', `mapped-checkoff ${checkmark.kind} ${checkmark.status}`);
     const earnedSymbol = checkmark.kind === 'shiny_purple' ? '✦' : '✓';
@@ -262,6 +299,7 @@
     let available = 0;
     const allocations = data.standards.map(standard => allocateStandard(standard.checkmarks));
     renderOverview(data, allocations);
+    renderAssignments(data, allocations);
     const standards = document.querySelector('#standards');
     for (const [standardIndex, standard] of data.standards.entries()) {
       const allocation = allocations[standardIndex];

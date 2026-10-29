@@ -40,7 +40,7 @@ function elements() {
     "#status", "#dashboard", ".summary-strip span", "#dashboard-description",
     "#completion-note", "#student-netid", "#worksheet", "#updated-at",
     "#unmapped-columns-section", "#unmapped-columns", "#checkmark-overview",
-    "#standards", "#earned-total"
+    "#standards", "#earned-total", "#assignment-overview"
   ];
   return Object.fromEntries(selectors.map(selector => [selector, new Element()]));
 }
@@ -214,6 +214,23 @@ async function checkStaffIndex(withNames = false) {
 (async () => {
   await checkStaffIndex();
   await checkStaffIndex(true);
+  const assignmentData = payload(6, []);
+  const examMark = (id, status, kind = 'purple') => ({
+    id, label: id, status, kind,
+    requirements: [{ id: 'exam_score', source: 'gradescope_exam', status }]
+  });
+  assignmentData.standards[0].checkmarks = [
+    examMark('exam1-q10', 'complete', 'shiny_purple'),
+    examMark('exam1-q3', 'not_graded')
+  ];
+  assignmentData.standards[1].checkmarks = [examMark('exam1-q2', 'incomplete')];
+  const assignments = (await run(assignmentData))['#assignment-overview'];
+  assert.strictEqual(assignments.children.length, 1, 'Absent exams must not be manufactured');
+  assert.strictEqual(assignments.children[0].children[0].textContent, 'Exam 1');
+  const slots = assignments.children[0].children[1].children;
+  assert.deepStrictEqual(slots.map(slot => slot.children[0].textContent), ['S2', 'S1', 'S1']);
+  assert.deepStrictEqual(slots.map(slot => slot.children[1].textContent), ['–', '?', '✦']);
+  assert.strictEqual(slots[0].href, '#standard-S2');
   const hostile = "<img src=x onerror=alert(1)>";
   const current = await run(payload(6, [hostile]));
   assert.strictEqual(current["#unmapped-columns-section"].hidden, false);
