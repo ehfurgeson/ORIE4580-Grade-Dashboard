@@ -139,10 +139,15 @@
     });
     figure.append(button); return figure;
   }
-  function answerPair(text, images, label, pdfUrl) {
+  function answerPair(text, images, label, pdfUrl, outcome) {
     const pair = styled('div', `answer-pair ${label ? 'math-pair' : 'code-pair'}`);
     const parsed = styled('div', 'answer-column');
-    if (label && label !== 'Answer') parsed.append(styled('span', 'answer-number', label));
+    if (label && label !== 'Answer') {
+      const partLabel = styled('div', 'answer-label');
+      partLabel.append(styled('span', 'answer-number', label));
+      if (Object.hasOwn(labels, outcome)) partLabel.append(styled('span', `outcome ${outcome}`, labels[outcome]));
+      parsed.append(partLabel);
+    }
     parsed.append(styled('pre', 'answer-text', text));
     const scans = styled('div', 'answer-column');
     if (!images.length) scans.append(styled('p', 'review-message', 'No scan included in this export.'));
@@ -177,7 +182,7 @@
       const toggle = styled('span', 'question-toggle');
       toggle.append(styled('span', 'when-closed', '▸ Show details'), styled('span', 'when-open', '▾ Hide details'));
       line.append(badges); title.append(line, toggle); heading.append(award, title); section.append(heading);
-      const images = question.images || [], used = new Set();
+      const images = question.images || [], used = new Set(), mathLabels = new Set();
       for (const answer of question.answers) {
         let fields = null;
         if (answer.format === 'json') {
@@ -185,8 +190,9 @@
         }
         if (fields && typeof fields === 'object' && !Array.isArray(fields)) {
           for (const [label, value] of Object.entries(fields)) {
+            mathLabels.add(label);
             const matches = images.filter(image => image.label === label); matches.forEach(image => used.add(image));
-            body.append(answerPair(value === null ? '' : typeof value === 'string' ? value : JSON.stringify(value, null, 2), matches, label, pdfUrl));
+            body.append(answerPair(value === null ? '' : typeof value === 'string' ? value : JSON.stringify(value, null, 2), matches, label, pdfUrl, question.parts.find(part => part.label === label)?.outcome));
           }
         } else {
           images.forEach(image => used.add(image));
@@ -198,9 +204,13 @@
       for (const part of question.parts) {
         const selectedPlots = summaryPlots(part);
         const oldSummary = summaryOrder[part.label] && part.plots?.some(plot => !plot.id);
-        if (!selectedPlots.length && !part.message && !oldSummary) continue;
+        const hasOutcome = Object.hasOwn(labels, part.outcome);
+        if (!selectedPlots.length && !part.message && !oldSummary && (!hasOutcome || mathLabels.has(part.label))) continue;
         const evidence = styled('div', 'review-evidence');
-        evidence.append(styled('h3', 'evidence-heading', `Q${part.label} · Code output`));
+        const partHeading = styled('div', 'part-heading');
+        partHeading.append(styled('h3', 'evidence-heading', `Q${part.label}${question.answers.some(answer => answer.format === 'pseudocode') ? ' · Code output' : ''}`));
+        if (hasOutcome) partHeading.append(styled('span', `outcome ${part.outcome}`, labels[part.outcome]));
+        evidence.append(partHeading);
         const plots = styled('div', 'plot-grid'); selectedPlots.forEach(plot => plots.append(plotFigure(plot)));
         evidence.append(plots);
         if (oldSummary) evidence.append(styled('p', 'review-message', 'Plot summary needs a fresh export from the updated Examiner.'));

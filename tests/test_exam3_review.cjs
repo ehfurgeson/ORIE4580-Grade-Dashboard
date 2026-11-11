@@ -18,7 +18,7 @@ test('local viewer renders answer text safely and clears rejected files', async 
   vm.runInNewContext(fs.readFileSync(path.join(__dirname, '../static/exam3-review.js'), 'utf8'), {document, window: {}});
   const answer = '<script>alert(1)</script> # staff comment';
   const data = {schema_version: 1, exam: 3, student: {id: 'synthetic', first: 'Test', last: 'Student'}, questions: [
-    {id: 'q2', title: 'Code', normal_credit: 'met', shiny_credit: 'not_met', answers: [{text: answer}], parts: [
+    {id: 'q2', title: 'Code', normal_credit: 'met', shiny_credit: 'not_met', answers: [{format: 'pseudocode', text: answer}], parts: [
       {label: '2.1', message: null, plots: [{kind: 'cdf', title: 'Test', observed: [[0, 0], [1, 1]], expected: [[0, 0], [1, 1]]}]}
     ]}
   ]};
@@ -162,4 +162,25 @@ test('distribution summary has filled bins, step CDFs, axes and explicit titles 
   const curves = all(svgs[1]).filter(n => n.tag === 'path' && ['#2666b5', '#d07822'].includes(n.attributes.stroke) && n.attributes.d.startsWith('M72'));
   assert.equal(curves.length, 2);
   assert.ok(curves.every(n => /H.*V/.test(n.attributes.d) && !n.attributes.d.includes('L')));
+});
+
+
+test('part badges show math judgments and code judgments without plots', () => {
+  const nodes = {'#review': new Element('review')};
+  const document = {querySelector: id => nodes[id], createElement: tag => new Element(tag),
+    createDocumentFragment: () => new Element('fragment')};
+  const window = {};
+  vm.runInNewContext(fs.readFileSync(path.join(__dirname, '../static/exam3-review.js'), 'utf8'), {window, document});
+  window.Exam3Review.render({schema_version: 1, exam: 3, questions: [
+    {id: 'q1', title: 'Math', normal_credit: 'not_met', answers: [{format: 'json', text: JSON.stringify({answers: {'1.1': 'x', '1.2': '', '1.3': 'y'}})}],
+      parts: [{label: '1.1', outcome: 'met'}, {label: '1.2', outcome: 'blank'}, {label: '1.3', outcome: 'not_met'}]},
+    {id: 'q2', title: 'Code', normal_credit: 'met', shiny_credit: 'blank', answers: [{format: 'pseudocode', text: 'staff edits'}],
+      parts: [{label: '2.1', outcome: 'met', plots: []}, {label: '2.2', outcome: 'blank', plots: []}]}
+  ]});
+  const all = node => [node, ...node.children.flatMap(all)];
+  const rendered = all(nodes['#review']);
+  const math = rendered.filter(node => node.className === 'answer-label');
+  assert.deepEqual(math.map(node => node.children[1].textContent), ['Correct', 'Blank', 'Incorrect']);
+  const code = rendered.filter(node => node.className === 'part-heading');
+  assert.deepEqual(code.map(node => node.children[1].textContent), ['Correct', 'Blank']);
 });
