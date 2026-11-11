@@ -7,6 +7,38 @@
     return node;
   };
   const labels = {met: 'Correct', not_met: 'Incorrect', blank: 'Blank', not_checked: 'Not checked'};
+  // Q7 has a deliberately small summary. Older exports also contain interval
+  // diagnostics and unnamed histograms; select by their saved mathematical role.
+  function summaryPlots(part) {
+    const plots = part.plots || [];
+    const cdf = plots.filter(p => p.kind === 'cdf');
+    const hist = plots.filter(p => p.kind === 'histogram');
+    const named = (plot, title, discrete, extra = {}) => plot ? {...plot, title, discrete, ...extra} : null;
+    if (part.label === '7.1') {
+      const location = cdf.find(p => /^Event locations/i.test(p.title || ''));
+      const count = cdf.find(p => /^Events per realization/i.test(p.title || ''));
+      const locations = hist.find(p => /^Event locations/i.test(p.title || '') ||
+        (p.edges?.[0] === -5 && p.edges?.at(-1) === 5));
+      const counts = hist.find(p => /^Events per realization/i.test(p.title || '') ||
+        (p !== locations && p.expected?.some(([k, v]) => k === 25 && v > .07 && v < .09)));
+      return [
+        named(locations, 'Event locations', false, {expected: [[-5, .2], [0, 0], [5, .2]], expected_label: 'Expected |t| / 25', x_label: 'Event location'}),
+        named(location, 'Event locations', false, {x_label: 'Event location'}),
+        named(counts, 'Events per realization', true, {expected_label: 'Expected Poisson(25)', x_label: 'Number of events'}),
+        named(count, 'Events per realization', true, {x_label: 'Number of events'}),
+      ].filter(Boolean);
+    }
+    if (part.label === '7.2') {
+      return [0.5, 3].flatMap(mean => {
+        const matches = p => new RegExp(`^poisson(?:_dist)?\\(\\s*${String(mean).replace('.', '\\.')}\\s*[,)]`, 'i').test(p.title || '');
+        const histogram = hist.find(p => matches(p) || p.expected?.some(([k, v]) =>
+          k === 0 && Math.abs(v - Math.exp(-mean)) < 1e-8));
+        return [named(histogram, `Poisson(${mean})`, true, {expected_label: `Expected Poisson(${mean})`}),
+          named(cdf.find(matches), `Poisson(${mean})`, true)].filter(Boolean);
+      });
+    }
+    return plots.filter(p => ['cdf', 'histogram'].includes(p.kind));
+  }
   function plotFigure(plot, zoomable = true) {
     const histogram = plot.kind === 'histogram';
     const discrete = plot.discrete === true || /poisson|events per realization/i.test(plot.title || '');
@@ -65,12 +97,12 @@
     if (histogram && discrete && expected.length === plot.density.length) {
       reference = expected.map(([, height], i) => `${i ? 'V' + y(height) : 'M' + x(plot.edges[0]) + ',' + y(height)}H${x(plot.edges[i + 1])}`).join(' ');
     }
-    draw('path', {d: reference, fill: 'none', stroke: '#d07822', 'stroke-width': 2.5, 'stroke-dasharray': '7 4'});
+    draw('path', {d: reference, fill: 'none', stroke: '#d07822', 'stroke-width': 2.5, 'stroke-dasharray': histogram ? 'none' : '7 4'});
     if (!histogram) draw('path', {d: path(observed, true), fill: 'none', stroke: '#2666b5', 'stroke-width': 2});
     draw('path', {d: 'M150,343H180', stroke: '#2666b5', 'stroke-width': histogram ? 10 : 2, 'stroke-opacity': histogram ? .6 : 1});
     draw('text', {x: 188, y: 347, fill: '#354456'}, 'Sampled');
-    draw('path', {d: 'M320,343H350', stroke: '#d07822', 'stroke-width': 2.5, 'stroke-dasharray': '7 4'});
-    draw('text', {x: 358, y: 347, fill: '#354456'}, 'Expected');
+    draw('path', {d: 'M320,343H350', stroke: '#d07822', 'stroke-width': 2.5, 'stroke-dasharray': histogram ? 'none' : '7 4'});
+    draw('text', {x: 358, y: 347, fill: '#354456'}, plot.expected_label || 'Expected');
     if (zoomable) {
       const button = styled('button', 'plot-button'); button.type = 'button';
       button.setAttribute('aria-label', `Enlarge ${title}`);
@@ -184,15 +216,18 @@
         }
       }
       for (const image of images.filter(image => !used.has(image))) body.append(scanFigure(image, pdfUrl));
+      const summaries = styled('div', question.id === 'q7' ? 'process-summary' : '');
       for (const part of question.parts) {
-        if (!part.plots.length && !part.message) continue;
+        const selectedPlots = summaryPlots(part);
+        if (!selectedPlots.length && !part.message) continue;
         const evidence = styled('div', 'review-evidence');
         evidence.append(styled('h3', 'evidence-heading', `Q${part.label} · Code output`));
-        const plots = styled('div', 'plot-grid'); part.plots.filter(plot => ['cdf', 'histogram'].includes(plot.kind)).forEach(plot => plots.append(plotFigure(plot)));
+        const plots = styled('div', 'plot-grid'); selectedPlots.forEach(plot => plots.append(plotFigure(plot)));
         evidence.append(plots);
         if (part.message) evidence.append(styled('p', 'review-message', part.message));
-        body.append(evidence);
+        summaries.append(evidence);
       }
+      body.append(summaries);
       section.append(body);
       fragment.append(section);
     }

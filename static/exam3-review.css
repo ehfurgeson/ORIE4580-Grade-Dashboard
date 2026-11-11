@@ -80,3 +80,11 @@ a:focus-visible, summary:focus-visible, input:focus-visible { outline: 2px solid
 .scan-dialog svg { width: 100%; height: auto; }
 
 .review-heading-row { display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: .75rem; }
+
+/* Match Examiner's two four-plot Q7 summaries; stack the parts on narrow screens. */
+.process-summary { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 1rem; }
+.process-summary .plot-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); gap: .5rem; }
+.process-summary .plot-grid figure { min-width: 0; padding: .4rem; }
+.process-summary .plot-grid figcaption { font-size: .75rem; }
+@media (max-width: 1000px) { .process-summary { grid-template-columns: 1fr; } }
+@media (max-width: 480px) { .process-summary .plot-grid { grid-template-columns: 1fr; } }
