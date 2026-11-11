@@ -424,7 +424,7 @@ def main() -> None:
 
         if args.copy_assets_to is not None:
             args.copy_assets_to.mkdir(parents=True, exist_ok=True)
-            for asset in ("simple-dashboard.js", "simple-style.css", "checkmarks.css", "exam3-review.js", "exam3-review.css", "grade_calculator/index.html", "grade_calculator/.htaccess"):
+            for asset in ("simple-dashboard.js", "simple-style.css", "checkmarks.css", "checkmarks.js", "exam3-review.js", "exam3-review.css", "grade_calculator/index.html", "grade_calculator/.htaccess"):
                 (args.copy_assets_to / asset).parent.mkdir(parents=True, exist_ok=True)
                 shutil.copy2(Path("static") / asset, args.copy_assets_to / asset)
     except (GradescopeAdapterError, KeyError, OSError, RuntimeError, ValueError, json.JSONDecodeError) as error:

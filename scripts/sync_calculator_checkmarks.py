@@ -17,6 +17,14 @@ def main():
     start, end = text.index(START), text.index(END) + len(END)
     replacement = START + '\n<style>\n' + source.rstrip() + '\n</style>\n' + END
     updated = text[:start] + replacement + text[end:]
+    js_start, js_end = '<!-- BEGIN SHARED CHECKMARK JS -->', '<!-- END SHARED CHECKMARK JS -->'
+    script = (ROOT / 'static/checkmarks.js').read_text(encoding='utf-8')
+    embedded = js_start + '\n<script>\n' + script.rstrip() + '\n</script>\n' + js_end
+    if js_start in updated:
+        start, end = updated.index(js_start), updated.index(js_end) + len(js_end)
+        updated = updated[:start] + embedded + updated[end:]
+    else:
+        updated = updated.replace('</body>', embedded + '\n</body>')
     if args.check:
         if text != updated:
             parser.exit(1, "Calculator checkmarks are stale; run scripts/sync_calculator_checkmarks.py.\n")
