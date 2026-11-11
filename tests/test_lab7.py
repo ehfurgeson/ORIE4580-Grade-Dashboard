@@ -33,7 +33,7 @@ def test_lab7_manual_marks_map_to_s6_s7_without_gradescope():
 
 def test_old_publication_state_migration_preserves_visibility_without_inventing_marks(tmp_path):
     from scripts.migrate_lab7_publication import migrate_lab7_state
-    from sync.exam2_publication import write_publication_state, load_publication_state
+    from sync.exam_publication import write_publication_state, load_publication_state
     from sync.gradescope_exam2 import EXAM2_OPPORTUNITIES
     import copy
     marks=[{"id":o["id"],"label":o["label"],"kind":o["kind"],"status":"not_graded","requirements":[{"id":"exam_score","label":"Exam 2 question score","source":"gradescope_exam","status":"not_graded","details":[]}]} for o in EXAM2_OPPORTUNITIES]

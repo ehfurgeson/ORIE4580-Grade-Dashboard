@@ -34,7 +34,7 @@ def test_preview_rejects_served_paths_and_cache(tmp_path):
     local = Path(__file__).resolve().parents[1] / "local_notes" / "exam2-preview-test"
     args = SimpleNamespace(exam2_preview=True, disable_completion_cache=True,
         output=local / "students", snapshot=local / "state.json", copy_assets_to=None,
-        completion_cache=None, lock_file=None, exam2_state=local / "exam2.json")
+        completion_cache=None, lock_file=None, exam_state=local / "exam2.json")
     _validate_exam2_preview(args)
     args.output = Path(__file__).resolve().parents[1] / "static" / "students"
     with pytest.raises(ValueError, match="local_notes"):
@@ -77,18 +77,19 @@ def test_transport_drift_prevents_partial_exam2_import(change):
         source.exam2_scores_csvs()
 
 
-def test_hidden_exam2_is_collected_but_not_emitted(monkeypatch, tmp_path):
+@pytest.mark.parametrize('state_flag', ['--exam-state', '--exam2-state'])
+def test_hidden_exam2_is_collected_but_not_emitted(monkeypatch, tmp_path, state_flag):
     import sys
     import scripts.refresh_combined_dashboard as refresh
     from sync.gradescope_exam import ExamImport
     from sync.gradescope_exam2 import EXAM2_OPPORTUNITIES
     from sync.standards import STANDARDS
-    from sync.exam2_publication import load_publication_state
+    from sync.exam_publication import load_publication_state
     config=load_config("deployment/gradescope.toml.example")
     config=replace(config,cache=replace(config.cache,enabled=False))
     record={"schema_version":6,"updated_at":"2026-10-27T00:00:00Z","worksheet":"fake","student":{"netid":"abc123"},"unmapped_columns":[],"standards":[{"id":sid,"name":name,"checkmarks":[]} for sid,name in STANDARDS.items()]}
     state=tmp_path / "exam2.json"
-    monkeypatch.setattr(sys,"argv",["refresh", "unused.toml",str(tmp_path/"students"),str(tmp_path/"snapshot.json"),"--exam2-state",str(state),"--lock-file",str(tmp_path/"refresh.lock"),"--worksheet-id","1","--spreadsheet-id","fake","--all-students","--disable-completion-cache"])
+    monkeypatch.setattr(sys,"argv",["refresh", "unused.toml",str(tmp_path/"students"),str(tmp_path/"snapshot.json"),state_flag,str(state),"--lock-file",str(tmp_path/"refresh.lock"),"--worksheet-id","1","--spreadsheet-id","fake","--all-students","--disable-completion-cache"])
     monkeypatch.setattr(refresh,"load_config",lambda path:config)
     monkeypatch.setattr(refresh,"_secret",lambda key:"fake")
     monkeypatch.setattr(refresh,"fetch_first_worksheet_rows",lambda *a:("fake",[{"NetID":"abc123"}]))
@@ -119,7 +120,7 @@ def test_hidden_exam2_is_collected_but_not_emitted(monkeypatch, tmp_path):
     private=load_publication_state(state)
     assert private["visible"] is False
     assert "exam2-q" in str(private["records"])
-    from sync.exam2_publication import write_publication_state
+    from sync.exam_publication import write_publication_state
     private["visible"] = True
     write_publication_state(state, private)
     captured.clear()

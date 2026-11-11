@@ -9,7 +9,7 @@ from copy import deepcopy
 import json
 from pathlib import Path
 
-from sync.exam2_publication import write_publication_state
+from sync.exam_publication import write_publication_state
 from sync.standards import STANDARDS
 
 

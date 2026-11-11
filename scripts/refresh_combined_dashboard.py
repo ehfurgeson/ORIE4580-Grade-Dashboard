@@ -24,7 +24,7 @@ from sync.completion_cache import (
 from sync.google_sheets_api import fetch_first_worksheet_rows
 from sync.gradescope_exam import import_exam_soft
 from sync.gradescope_exam2 import EXAM2_OPPORTUNITIES, import_exam2_soft
-from sync.exam2_publication import load_publication_state, write_publication_state, visible_records
+from sync.exam_publication import load_publication_state, write_publication_state, visible_records
 from sync.gradescope import (
     GradescopeAdapterError,
     PrivateWebGradescopeSource,
@@ -141,7 +141,7 @@ def _validate_exam2_preview(args) -> None:
     if not args.disable_completion_cache:
         raise ValueError("Exam 2 preview requires --disable-completion-cache")
     local_root = (Path(__file__).resolve().parents[1] / "local_notes").resolve()
-    paths = (args.output, args.snapshot, args.copy_assets_to, args.completion_cache, args.lock_file, args.exam2_state)
+    paths = (args.output, args.snapshot, args.copy_assets_to, args.completion_cache, args.lock_file, args.exam_state)
     for path in paths:
         if path is not None and local_root not in path.resolve().parents:
             raise ValueError("Exam 2 preview paths must be inside local_notes")
@@ -177,7 +177,8 @@ def main() -> None:
     )
     parser.add_argument("--completion-cache", type=Path, help="private positive-only cache")
     parser.add_argument("--lock-file", type=Path, help="private nonblocking process lock")
-    parser.add_argument("--exam2-state", type=Path, help="private collected dashboard and Exam 2 visibility state")
+    parser.add_argument('--exam-state', '--exam2-state', dest='exam_state', type=Path,
+                        help="private collected dashboard and exam visibility state (--exam2-state is a compatibility alias)")
     parser.add_argument('--examiner-exports', type=Path, help="private Examiner exports directory; publish completed Exam 3 batches")
     parser.add_argument(
         "--force-full-revalidation", action="store_true",
@@ -214,11 +215,11 @@ def main() -> None:
         config = load_config(args.config)
         collect_exam2 = _collect_exam2(config, args.exam2_preview)
         if collect_exam2:
-            if args.exam2_state is None:
-                raise ValueError("configured Exam 2 collection requires --exam2-state")
-            _require_private_state(args.exam2_state, args.output, args.copy_assets_to)
+            if args.exam_state is None:
+                raise ValueError("configured Exam 2 collection requires --exam-state")
+            _require_private_state(args.exam_state, args.output, args.copy_assets_to)
             other_state_paths = (args.snapshot, args.completion_cache, args.lock_file)
-            if any(path is not None and path.resolve() == args.exam2_state.resolve() for path in other_state_paths):
+            if any(path is not None and path.resolve() == args.exam_state.resolve() for path in other_state_paths):
                 raise ValueError("Exam 2 state must be distinct from snapshots, cache, and lock")
             if args.lock_file is None:
                 raise ValueError("Exam 2 collection requires the shared --lock-file")
@@ -238,8 +239,9 @@ def main() -> None:
         if args.lock_file is not None:
             lock_handle = _acquire_lock(args.lock_file)
 
-        publication_state = load_publication_state(args.exam2_state) if collect_exam2 else None
+        publication_state = load_publication_state(args.exam_state) if collect_exam2 else None
         exam2_visible = bool(publication_state and publication_state["visible"])
+        exam3_visible = bool(publication_state and publication_state.get("exam3_visible", False))
         if args.exam2_preview:
             exam2_visible = True
         email = _secret("GRADESCOPE_EMAIL")
@@ -406,13 +408,13 @@ def main() -> None:
         # A crash before the cache write causes extra work on the next run, not
         # an incorrectly awarded checkmark.
         if collect_exam2:
-            write_publication_state(args.exam2_state, {
-                "schema_version": 1, "visible": exam2_visible,
+            write_publication_state(args.exam_state, {
+                "schema_version": 1, "visible": exam2_visible, "exam3_visible": exam3_visible,
                 "collected_at": timestamp, "records": combined,
             })
         public_records = visible_records(combined, exam2_visible)
         paths = write_simple_release(public_records, args.output, retain_previous=False,
-                                     examiner_exports=args.examiner_exports)
+                                     examiner_exports=args.examiner_exports, exam3_visible=exam3_visible)
         write_snapshot_atomic(snapshot, args.snapshot)
         if cache_active and args.completion_cache is not None:
             next_cache = build_completion_cache(

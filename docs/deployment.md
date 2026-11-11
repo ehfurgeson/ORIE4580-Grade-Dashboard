@@ -1,5 +1,8 @@
 # Ubuntu Deployment
 
+For an existing installation using `exam2-publication.json`, follow the
+[shared publication-state rename](exam-publication-migration.md) before restarting refreshes.
+
 For Examiner review exports on the same refresh timer, see [Examiner publication](examiner-publication.md).
 
 This guide covers the shortest safe release procedure for the existing ORIE 4580 Ubuntu server. For source mappings and future dashboard changes, see [`maintenance.md`](maintenance.md).
@@ -261,7 +264,7 @@ This is separate from publishing grades in Gradescope. Installing the reviewed
 `[exam2.sources]` table and updated service enables collection automatically on
 normal refreshes. Remove the earlier `publication_enabled` setting if migrating
 an unreleased draft configuration; visibility is no longer a TOML setting.
-The service passes `--exam2-state /var/lib/orie4580-dashboard/exam2-publication.json`.
+The service passes `--exam-state /var/lib/orie4580-dashboard/exam-publication.json`.
 The initial visibility is **OFF**. The private state holds normalized full
 combined dashboard records and the current visibility choice, with mode `0600`,
 outside all served directories. Raw scores/submission IDs are not stored.
@@ -281,7 +284,7 @@ or revalidate grades; it publishes the latest locally collected records.
 From `/opt/orie4580-grade-dashboard`, show Exam 2 with:
 
 ```sh
-sudo -u orie4580-dashboard -g www-data .venv/bin/python -m scripts.set_exam2_visibility on /var/lib/orie4580-dashboard/exam2-publication.json /var/www/html/orie4580_fa26/students --lock-file /var/lib/orie4580-dashboard/refresh.lock
+sudo -u orie4580-dashboard -g www-data .venv/bin/python -m scripts.set_exam2_visibility on /var/lib/orie4580-dashboard/exam-publication.json /var/www/html/orie4580_fa26/students --lock-file /var/lib/orie4580-dashboard/refresh.lock
 ```
 
 Hide again using the identical command with `off`. This is the simple on/off
@@ -313,9 +316,9 @@ Stop the timer and wait for any running refresh before updating code or migratin
 After installing the new code, if the deployed private publication snapshot still has the previous S1–S6 catalog, migrate it to a **new private output** while preserving visibility. From the checkout, with timer stopped and no refresh running:
 
 ```sh
-sudo env PYTHONDONTWRITEBYTECODE=1 .venv/bin/python -m scripts.migrate_lab7_publication /var/lib/orie4580-dashboard/exam2-publication.json /var/lib/orie4580-dashboard/exam2-publication.lab7-migrated.json
-sudo cp -p /var/lib/orie4580-dashboard/exam2-publication.json /var/lib/orie4580-dashboard/exam2-publication.pre-lab7.json
-sudo install -o orie4580-dashboard -g www-data -m 0600 /var/lib/orie4580-dashboard/exam2-publication.lab7-migrated.json /var/lib/orie4580-dashboard/exam2-publication.json
+sudo env PYTHONDONTWRITEBYTECODE=1 .venv/bin/python -m scripts.migrate_lab7_publication /var/lib/orie4580-dashboard/exam-publication.json /var/lib/orie4580-dashboard/exam-publication.lab7-migrated.json
+sudo cp -p /var/lib/orie4580-dashboard/exam-publication.json /var/lib/orie4580-dashboard/exam-publication.pre-lab7.json
+sudo install -o orie4580-dashboard -g www-data -m 0600 /var/lib/orie4580-dashboard/exam-publication.lab7-migrated.json /var/lib/orie4580-dashboard/exam-publication.json
 ```
 
 Use unique backup/output names if they already exist. Skip migration if there is no Exam 2 publication state, or if it already has the formal S7 wording. The script accepts the previous S1–S6 catalog or the temporary “Standard 7” label; it rejects an already-current catalog rather than silently applying twice. Migration reads no Google/Gradescope data and changes no served student tree. It preserves the current ON/OFF setting, adds empty S7, and removes Lab 7 headers from the pending list; it does not fabricate checkoffs.

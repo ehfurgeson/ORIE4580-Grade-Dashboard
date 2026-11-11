@@ -179,7 +179,7 @@ Before lecture, run the normal refresh and verify its success. At lecture time,
 use the local-only switch described in `docs/deployment.md`:
 
 ```sh
-sudo -u orie4580-dashboard -g www-data /opt/orie4580-grade-dashboard/.venv/bin/python -m scripts.set_exam2_visibility on /var/lib/orie4580-dashboard/exam2-publication.json /var/www/html/orie4580_fa26/students --lock-file /var/lib/orie4580-dashboard/refresh.lock
+sudo -u orie4580-dashboard -g www-data /opt/orie4580-grade-dashboard/.venv/bin/python -m scripts.set_exam2_visibility on /var/lib/orie4580-dashboard/exam-publication.json /var/www/html/orie4580_fa26/students --lock-file /var/lib/orie4580-dashboard/refresh.lock
 ```
 
 Use `off` instead of `on` to hide it again. Run from the installed checkout.
@@ -189,7 +189,7 @@ refreshes. Students must reload their dashboard; already viewed grades cannot
 be revoked. This is an operator command, not a browser button.
 
 For unpublished local tests use `--exam2-preview --disable-completion-cache`,
-`--exam2-state local_notes/preview/exam2-publication.json`, a local lock file,
+`--exam-state local_notes/preview/exam-publication.json`, a local lock file,
 and output/state paths entirely inside `local_notes/`. Never reuse production
 state for a local preview or serve the private state directory. See
 `local_notes/exam2_findings_and_plan.md` for research and validation.

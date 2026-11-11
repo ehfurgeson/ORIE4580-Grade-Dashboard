@@ -1,4 +1,4 @@
-"""Private collected records and the operator-controlled Exam 2 visibility flag."""
+"""Private collected records and independent Exam 2 / Exam 3 visibility flags."""
 from __future__ import annotations
 
 from copy import deepcopy
@@ -15,21 +15,23 @@ _EXAM2_IDS = {item["id"] for item in EXAM2_OPPORTUNITIES}
 
 
 def _validate_state(state: dict) -> None:
-    if not isinstance(state, dict) or set(state) != {"schema_version", "visible", "collected_at", "records"} or type(state.get("schema_version")) is not int or state["schema_version"] != 1:
-        raise ValueError("invalid Exam 2 publication state schema")
+    if not isinstance(state, dict) or set(state) - {"exam3_visible"} != {"schema_version", "visible", "collected_at", "records"} or type(state.get("schema_version")) is not int or state["schema_version"] != 1:
+        raise ValueError("invalid exam publication state schema")
+    if type(state.get("exam3_visible", False)) is not bool:
+        raise ValueError("Exam 3 visibility must be a boolean")
     if type(state.get("visible")) is not bool:
         raise ValueError("Exam 2 visibility must be a boolean")
     if not isinstance(state.get("collected_at"), str) or not state["collected_at"]:
-        raise ValueError("Exam 2 state requires a collection timestamp")
+        raise ValueError("Exam publication state requires a collection timestamp")
     try:
         timestamp = datetime.fromisoformat(state["collected_at"].replace("Z", "+00:00"))
         if timestamp.tzinfo is None:
             raise ValueError("missing timezone")
     except ValueError as error:
-        raise ValueError("invalid Exam 2 collection timestamp") from error
+        raise ValueError("invalid exam collection timestamp") from error
     records = state.get("records")
     if not isinstance(records, list) or not records:
-        raise ValueError("Exam 2 state requires collected records")
+        raise ValueError("Exam publication state requires collected records")
     seen = set()
     metadata = None
     for record in records:
@@ -38,7 +40,7 @@ def _validate_state(state: dict) -> None:
             raise ValueError("invalid collected dashboard: " + "; ".join(errors))
         netid = record["student"]["netid"]
         if netid in seen:
-            raise ValueError("duplicate student in Exam 2 state")
+            raise ValueError("duplicate student in exam publication state")
         seen.add(netid)
         current_metadata = (record.get("updated_at"), record.get("worksheet"), record.get("unmapped_columns"))
         if metadata is None:
@@ -54,7 +56,7 @@ def load_publication_state(path: str | Path) -> dict | None:
     """Read under the shared refresh lock; a missing state means visibility OFF."""
     path = Path(path)
     if path.is_symlink():
-        raise ValueError("Exam 2 state must not be a symlink")
+        raise ValueError("Exam publication state must not be a symlink")
     if not path.exists():
         return None
     state = json.loads(path.read_text(encoding="utf-8"))
@@ -67,7 +69,7 @@ def write_publication_state(path: str | Path, state: dict) -> None:
     _validate_state(state)
     path = Path(path)
     if path.is_symlink():
-        raise ValueError("Exam 2 state must not be a symlink")
+        raise ValueError("Exam publication state must not be a symlink")
     path.parent.mkdir(parents=True, exist_ok=True)
     fd, temporary = tempfile.mkstemp(prefix=f".{path.name}-", dir=path.parent)
     try:

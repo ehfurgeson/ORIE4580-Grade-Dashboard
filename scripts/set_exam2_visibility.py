@@ -4,7 +4,7 @@ from __future__ import annotations
 import argparse
 from pathlib import Path
 
-from sync.exam2_publication import load_publication_state, visible_records, write_publication_state
+from sync.exam_publication import load_publication_state, visible_records, write_publication_state
 from sync.simple_generate import write_simple_release
 
 
@@ -29,7 +29,8 @@ def main() -> None:
             raise ValueError("no collected Exam 2 state; run the scheduled refresh first")
         state["visible"] = args.visibility == "on"
         write_publication_state(args.state, state)
-        paths = write_simple_release(visible_records(state["records"], state["visible"]), args.output, retain_previous=False)
+        paths = write_simple_release(visible_records(state["records"], state["visible"]), args.output, retain_previous=False,
+                                     exam3_visible=state.get("exam3_visible", False))
     except (OSError, ValueError, KeyError, RuntimeError) as error:
         parser.error(str(error))
     finally:

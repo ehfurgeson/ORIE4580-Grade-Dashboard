@@ -58,6 +58,9 @@ Options -Indexes
 """
 
 
+# Deny the actual files, including guessed URLs; collecting them is still allowed.
+EXAM3_HIDDEN_RULE = '\n<FilesMatch "^exam3\\.(json|pdf)$">\n    Require all denied\n</FilesMatch>\n'
+
 def render_staff_index(netids: list[str]) -> str:
     """Render a protected staff index from validated canonical NetIDs."""
     if not netids or any(not NETID_PATTERN.fullmatch(netid) for netid in netids):
@@ -182,7 +185,8 @@ def update_authorization_files(output_dir: str | Path) -> list[Path]:
     written: list[Path] = []
     for student_dir in student_dirs:
         path = student_dir / ".htaccess"
-        _replace_text_atomic(path, HTACCESS_TEMPLATE.format(netid=student_dir.name))
+        _replace_text_atomic(path, HTACCESS_TEMPLATE.format(netid=student_dir.name)
+                             + (EXAM3_HIDDEN_RULE if EXAM3_HIDDEN_RULE in path.read_text() else ""))
         written.append(path)
     _replace_text_atomic(
         output / "index.html",
@@ -201,6 +205,7 @@ def write_simple_release(
     template_path: str | Path = "templates/simple_student_dashboard.html",
     retain_previous: bool = False,
     examiner_exports: str | Path | None = None,
+    exam3_visible: bool = False,
 ) -> list[Path]:
     """Validate everything, build a new tree, then replace the prior release.
 
@@ -279,7 +284,7 @@ def write_simple_release(
             os.chmod(exam_dir / "index.html", 0o640)
             (student_dir / "checkoffs.json").write_text(_payload(record), encoding="utf-8")
             (student_dir / ".htaccess").write_text(
-                HTACCESS_TEMPLATE.format(netid=netid), encoding="utf-8"
+                HTACCESS_TEMPLATE.format(netid=netid) + ("" if exam3_visible else EXAM3_HIDDEN_RULE), encoding="utf-8"
             )
             os.chmod(student_dir / "index.html", 0o640)
             os.chmod(student_dir / "checkoffs.json", 0o640)

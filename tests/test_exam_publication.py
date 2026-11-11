@@ -5,7 +5,7 @@ import sys
 
 import pytest
 
-from sync.exam2_publication import load_publication_state, visible_records, write_publication_state
+from sync.exam_publication import load_publication_state, visible_records, write_publication_state
 from sync.simple_generate import write_simple_release
 from test_exam2_combined import merged
 
@@ -104,7 +104,7 @@ def test_cli_writes_desired_state_before_publication(tmp_path, monkeypatch, stat
     monkeypatch.setattr(sys, "argv", ["switch", "on", str(state_path), str(output), "--lock-file", str(tmp_path / "private" / "refresh.lock")])
     def failed_publication(records, directory, **kwargs):
         assert load_publication_state(state_path)["visible"] is True
-        assert kwargs == {"retain_previous": False}
+        assert kwargs == {"retain_previous": False, "exam3_visible": False}
         raise OSError("fake publication failure")
     monkeypatch.setattr(switch, "write_simple_release", failed_publication)
     with pytest.raises(SystemExit):
@@ -126,3 +126,30 @@ def test_cli_honors_refresh_lock(tmp_path, monkeypatch, state):
     finally:
         handle.close()
     assert load_publication_state(state_path)["visible"] is False
+
+
+@pytest.mark.parametrize('enabled', [True, False])
+def test_exam3_switch_preserves_exam2_and_blocks_direct_files(tmp_path, monkeypatch, state, enabled):
+    import scripts.set_exam3_visibility as switch
+    from sync.simple_generate import EXAM3_HIDDEN_RULE, update_authorization_files
+    state_path = tmp_path / 'private' / 'state.json'
+    output = tmp_path / 'served' / 'students'
+    write_publication_state(state_path, state)
+    write_simple_release(state['records'], output)
+    netid = state['records'][0]['student']['netid']
+    student = output / netid
+    (student / 'exam3.json').write_text('{"synthetic": true}')
+    (student / 'exam3.pdf').write_bytes(b'synthetic PDF placeholder')
+    monkeypatch.setattr(sys, 'argv', ['switch', 'on' if enabled else 'off', str(state_path), str(output), '--lock-file', str(tmp_path / 'private' / 'refresh.lock')])
+    switch.main()
+    saved = load_publication_state(state_path)
+    assert saved['visible'] is False
+    assert saved['exam3_visible'] is enabled
+    assert (EXAM3_HIDDEN_RULE in (student / '.htaccess').read_text()) is not enabled
+    assert (student / 'exam3.json').exists()
+    assert (student / 'exam3.pdf').exists()
+    # Authorization-only repairs and subsequent releases preserve the choice.
+    update_authorization_files(output)
+    assert (EXAM3_HIDDEN_RULE in (student / '.htaccess').read_text()) is not enabled
+    write_simple_release(saved['records'], output, exam3_visible=saved['exam3_visible'])
+    assert (EXAM3_HIDDEN_RULE in (student / '.htaccess').read_text()) is not enabled

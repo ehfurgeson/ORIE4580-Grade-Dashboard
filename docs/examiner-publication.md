@@ -1,8 +1,8 @@
 # Publishing Examiner reviews
 
 The dashboard pulls completed Examiner 03 exports during its existing three-hour
-refresh. Enable this only when exported reviews are ready for students: every
-completed `student-*` batch in the configured directory is eligible for publication.
+refresh. Every completed `student-*` batch in the configured directory is collected.
+Student access defaults to OFF until explicitly enabled with the visibility switch.
 This does not run Examiner checks, finalize decisions, or create exports.
 
 Use **Run & export → Create student JSON** in Examiner. The next successful
@@ -82,3 +82,29 @@ can open the review, that another student is denied, and that the ordinary refre
 and Exam 2 visibility switch retain the review. The code has synthetic tests; the
 server ACLs, service configuration, and Shibboleth behavior need verification on
 your server.
+
+## Exam 3 visibility switch
+
+Exam 3 shares the existing private publication-state file and refresh lock with
+Exam 2, but has an independent `exam3_visible` flag. Old state files default to
+OFF. Scheduled refreshes preserve both choices. Collection continues while OFF;
+Apache denies `exam3.json` and `exam3.pdf`, including direct URLs, for everyone.
+The files remain in the protected student tree so switching back ON needs no
+source reads. The review HTML contains no grades and remains safe to open.
+This requires the same Apache authorization overrides as the existing dashboard;
+plain static development servers do not enforce `.htaccess`.
+
+After installing the updated code, hide Exam 3 immediately with:
+
+```sh
+cd /opt/orie4580-grade-dashboard
+sudo -u orie4580-dashboard -g www-data .venv/bin/python -m scripts.set_exam3_visibility off /var/lib/orie4580-dashboard/exam-publication.json /var/www/html/orie4580_fa26/students --lock-file /var/lib/orie4580-dashboard/refresh.lock
+```
+
+Use `on` in place of `off` to release it. The shared file stores both exam visibility choices. A collected state from the normal
+refresh must exist first. The command rebuilds the protected release under the
+shared lock; it does not change Exam 2 visibility or contact grading sources.
+Like the Exam 2 command, it persists the desired choice before rebuilding: if the
+rebuild fails, the previous release remains until a successful retry or refresh.
+Confirm direct JSON/PDF requests are denied on the deployed Apache server before
+relying on the switch; it has not been deployed merely by editing this repository.
