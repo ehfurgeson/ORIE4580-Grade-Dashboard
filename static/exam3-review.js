@@ -192,7 +192,8 @@
   }
   async function load(url = 'exam3.json') {
     const response = await fetch(url, {credentials: 'same-origin', cache: 'no-store', headers: {Accept: 'application/json'}});
-    if (response.status === 404) return null;
+    // The publication switch denies these files with 403 while Exam 3 is hidden.
+    if (response.status === 403 || response.status === 404) return null;
     if (!response.ok) throw new Error('Exam 3 unavailable.');
     return validate(await response.json());
   }

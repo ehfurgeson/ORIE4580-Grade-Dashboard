@@ -56,7 +56,7 @@ test('local viewer renders answer text safely and clears rejected files', async 
   assert.match(nodes['#status'].textContent, /Expected an Exam 3/);
 });
 
-test('exam3 adapter merges once and distinguishes missing files from failures', async () => {
+test('exam3 adapter merges once and distinguishes hidden or missing files from failures', async () => {
   const window = {}, requests = [];
   let response = {status: 404};
   vm.runInNewContext(fs.readFileSync(path.join(__dirname, '../static/exam3-review.js'), 'utf8'), {
@@ -69,6 +69,8 @@ test('exam3 adapter merges once and distinguishes missing files from failures', 
   assert.equal(requests[0].options.credentials, 'same-origin');
   assert.equal(requests[0].options.cache, 'no-store');
   response = {status: 403, ok: false};
+  assert.equal(await api.load(), null);
+  response = {status: 500, ok: false};
   await assert.rejects(api.load(), /unavailable/);
   const exam = JSON.parse(fs.readFileSync(path.join(__dirname, '../fixtures/exam3/synthetic-student.json')));
   const original = {standards: ['S1', 'S2', 'S3', 'S4', 'S5', 'S6', 'S7'].map(id => ({id, checkmarks: [{id: 'lab1-q1', kind: 'green', status: 'complete'}]}))};
@@ -118,7 +120,7 @@ test('dedicated page loads metadata and offers correct page links from zoom over
   assert.equal(plotDialog.children[0].children.at(-1).textContent, 'Close');
 });
 
-test('direct review URL with missing JSON exposes no exam content, even with a question hash', async () => {
+for (const unavailableStatus of [403, 404]) test(`direct review URL with JSON status ${unavailableStatus} exposes no exam content, even with a question hash`, async () => {
   const keys = ['#exam3-page', '#review', '#status', '#student-netid', '#updated-at'];
   const nodes = Object.fromEntries(keys.map(id => [id, new Element(id)]));
   nodes['#exam3-page'].dataset = {source: '../exam3.json', checkoffs: '../checkoffs.json', pdf: '../exam3.pdf'};
@@ -127,7 +129,7 @@ test('direct review URL with missing JSON exposes no exam content, even with a q
     document: {querySelector: id => nodes[id]}, window: {}, location: {hash: '#q2'},
     fetch: async url => {
       requests.push(url);
-      if (url === '../exam3.json') return {status: 404, ok: false};
+      if (url === '../exam3.json') return {status: unavailableStatus, ok: false};
       return {status: 200, ok: true, json: async () => ({student: {netid: 'abc123'}, updated_at: '2026-11-11T15:00:00Z'})};
     }
   });

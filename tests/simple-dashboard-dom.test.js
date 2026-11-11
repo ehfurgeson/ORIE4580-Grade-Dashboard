@@ -102,7 +102,7 @@ async function run(data, { legacyTemplate = false, examData = undefined } = {}) 
   return nodes;
 }
 
-async function checkStaffIndex(withNames = false) {
+async function checkStaffIndex(withNames = false, supplementFailure = false) {
   const root = new Element();
   const controls = Object.fromEntries([
     '#student-search', '#toggle-checkmarks', '#staff-status', '#student-count', '#no-students'
@@ -153,6 +153,7 @@ async function checkStaffIndex(withNames = false) {
   doc.querySelector = selector => selector === '#staff-index' ? root : null;
   doc.createElement = tag => new Element(tag);
   const win = new Element();
+  if (supplementFailure) win.Exam3Review = {load: async () => { throw new Error('Network failure'); }};
   const requests = [];
   let finishRequest;
   const waiting = new Promise(resolve => { finishRequest = resolve; });
@@ -188,7 +189,8 @@ async function checkStaffIndex(withNames = false) {
   assert.strictEqual(cells[1].textContent, '2', 'Two unfilled S2 boxes');
   assert.match(rows[1].querySelectorAll('.staff-private')[0].textContent, /Unavailable.*403/);
   controls['#toggle-checkmarks'].listeners.click();
-  assert.strictEqual(requests.length, 3, 'Only failed rows are retried');
+  assert.strictEqual(requests.length, supplementFailure ? 4 : 3, 'Failed and partial rows are retried');
+  if (supplementFailure) assert.match(cells[0].children.at(-1).textContent, /Partial results: Exam 3 unavailable/);
   allHeaders[withNames ? 3 : 1].children[0].listeners.click();
   assert.strictEqual(allHeaders[withNames ? 3 : 1].attributes['aria-sort'], 'descending');
   assert.strictEqual(body.children[0].dataset.netid, 'abc123', 'Unavailable stays last');
@@ -228,6 +230,7 @@ async function checkStaffIndex(withNames = false) {
 (async () => {
   await checkStaffIndex();
   await checkStaffIndex(true);
+  await checkStaffIndex(false, true);
   const examData = JSON.parse(fs.readFileSync('fixtures/exam3/synthetic-student.json'));
   const integrated = await run(payload(6, []), {examData});
   assert.equal(integrated['#earned-total'].textContent, '4 of 9');

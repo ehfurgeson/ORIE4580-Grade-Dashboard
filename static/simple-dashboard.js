@@ -9,6 +9,24 @@
   const dashboard = document.querySelector('#dashboard');
   const endpoint = window.CHECKOFF_DATA_URL || 'checkoffs.json';
 
+  // Optional sources may augment a valid dashboard, but must never replace it
+  // with an error. Keep this boundary shared by student and staff views.
+  async function loadSupplements(data, base = '') {
+    const unavailable = [], absent = [];
+    const sources = window.Exam3Review
+      ? [{name: 'Exam 3', file: 'exam3.json', adapter: window.Exam3Review}] : [];
+    for (const source of sources) {
+      try {
+        const extra = await source.adapter.load(`${base}${source.file}`);
+        if (extra) data = source.adapter.merge(data, extra);
+        else absent.push(source.name);
+      } catch {
+        unavailable.push(source.name);
+      }
+    }
+    return {data, unavailable, absent};
+  }
+
   function validatePayload(data) {
     if (!data || typeof data !== 'object') throw new Error('The checkoff data is not an object.');
     if (![3, 4, 5, 6].includes(data.schema_version)) throw new Error('The checkoff data uses an unsupported schema.');
@@ -422,7 +440,7 @@
       replaceCells(row, [cell]);
     }
 
-    function fillRow(row, data, updatedAt) {
+    function fillRow(row, data, updatedAt, unavailable = []) {
       const allocations = data.standards.map(standard => allocateStandard(standard.checkmarks));
       const purple = allocations.reduce((sum, allocation) => sum + allocation.shiny.length +
         allocation.linked.filter(mark => mark.kind !== 'green').length, 0);
@@ -434,6 +452,11 @@
         cell.title = `Last synced: ${updatedAt.toLocaleString()}`;
         return cell;
       });
+      if (unavailable.length) {
+        const message = `Partial results: ${unavailable.join(', ')} unavailable. Hide and show checkmarks to retry.`;
+        totals[0].append(make('span', 'note', message));
+        totals.forEach(cell => { cell.title += ` · ${message}`; });
+      }
       const cells = standardIds.map(id => {
         const cell = privateCell();
         const index = data.standards.findIndex(standard => standard.id === id);
@@ -472,7 +495,7 @@
       if (loading) return;
       loading = true;
       const pending = rows.filter(row => !loaded.has(row));
-      for (const row of pending) rowMessage(row, 'Loading…');
+      for (const row of pending) if (!sortValues.has(row)) rowMessage(row, 'Loading…');
       async function worker() {
         while (pending.length) {
           const row = pending.shift();
@@ -487,9 +510,9 @@
                 data.standards.some(standard => !standardIds.includes(standard.id))) {
               throw new Error('The student summary does not match this index.');
             }
-            const exam = window.Exam3Review ? await window.Exam3Review.load(`./${row.dataset.netid}/exam3.json`) : null;
-            fillRow(row, exam ? window.Exam3Review.merge(data, exam) : data, updatedAt);
-            loaded.add(row);
+            const result = await loadSupplements(data, `./${row.dataset.netid}/`);
+            fillRow(row, result.data, updatedAt, result.unavailable);
+            if (!result.unavailable.length) loaded.add(row);
           } catch (error) {
             rowMessage(row, `Unavailable: ${error.message} Hide and show checkmarks to retry.`);
           }
@@ -540,18 +563,14 @@
     })
     .then(async data => {
       const validated = validatePayload(data);
-      let exam = null, examUnavailable = false;
-      if (window.Exam3Review) {
-        try { exam = await window.Exam3Review.load(); }
-        catch { examUnavailable = true; }
-      }
-      render(exam ? window.Exam3Review.merge(data, exam) : data, validated.updatedAt, validated.unmappedColumns);
-      if (!window.Exam3Review) return;
-      if (!exam) {
-        const overview = document.querySelector('#assignment-overview');
-        if (overview) {
+      const result = await loadSupplements(data);
+      render(result.data, validated.updatedAt, validated.unmappedColumns);
+      const overview = document.querySelector('#assignment-overview');
+      if (overview) {
+        for (const name of [...result.absent, ...result.unavailable]) {
           const row = make('div', 'assignment-row');
-          row.append(make('h3', '', 'Exam 3'), make('span', 'note', examUnavailable ? 'Unavailable — try refreshing.' : 'Not available yet'));
+          row.append(make('h3', '', name), make('span', 'note', result.unavailable.includes(name)
+            ? 'Unavailable — showing other results. Try refreshing.' : 'Not available yet'));
           overview.append(row);
         }
       }
