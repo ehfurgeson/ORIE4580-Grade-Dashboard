@@ -148,8 +148,8 @@ test('distribution summary has filled bins, step CDFs, axes and explicit titles 
   window.Exam3Review.render({schema_version: 1, exam: 3, questions: [{id: 'q7', title: 'Synthetic', normal_credit: 'met', answers: [], parts: [
     {label: '7.2', plots: [
       {kind: 'joint', x_labels: ['unused']},
-      {kind: 'histogram', title: 'Poisson(3)', discrete: true, edges: [-.5, .5, 1.5], density: [.4, .6], expected: [[0, .3], [1, .7]], sample_count: 1000},
-      {kind: 'cdf', title: 'Poisson(3)', discrete: true, observed: [[0, .4], [1, 1]], expected: [[0, .3], [1, 1]], domain: [0, 1]}
+      {id: 'poisson-3-histogram', kind: 'histogram', title: 'Poisson(3)', discrete: true, edges: [-.5, .5, 1.5], density: [.4, .6], expected: [[0, .3], [1, .7]], sample_count: 1000},
+      {id: 'poisson-3-cdf', kind: 'cdf', title: 'Poisson(3)', discrete: true, observed: [[0, .4], [1, 1]], expected: [[0, .3], [1, 1]], domain: [0, 1]}
     ]}]}]}, root);
   const all = node => [node, ...node.children.flatMap(all)];
   const nodes = all(root);

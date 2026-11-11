@@ -436,6 +436,9 @@ Distribution plots use filled histograms and step CDFs for discrete distribution
 with axes, explicit plot types, sample counts, and sampled/expected legends. Only
 CDFs and histograms are displayed; diagnostic tables are omitted. Re-export with
 the updated Examiner to use its curated summary and complete plot labels.
+Q7 plots have explicit IDs supplied by Examiner; the viewer orders those IDs
+without guessing distributions from titles or numeric data. Older Q7 exports
+without IDs show a request to re-export instead of an inferred summary.
 The student dashboard fetches `exam3.json` from the same student directory as
 `checkoffs.json`, with the existing same-origin authorization and no-store caching.
 Its decisions feed the Exam 3 assignment row, standard allocations, and staff

@@ -7,41 +7,19 @@
     return node;
   };
   const labels = {met: 'Correct', not_met: 'Incorrect', blank: 'Blank', not_checked: 'Not checked'};
-  // Q7 has a deliberately small summary. Older exports also contain interval
-  // diagnostics and unnamed histograms; select by their saved mathematical role.
+  const summaryOrder = {
+    '7.1': ['locations-histogram', 'locations-cdf', 'counts-histogram', 'counts-cdf'],
+    '7.2': ['poisson-0.5-histogram', 'poisson-0.5-cdf', 'poisson-3-histogram', 'poisson-3-cdf'],
+  };
   function summaryPlots(part) {
     const plots = part.plots || [];
-    const cdf = plots.filter(p => p.kind === 'cdf');
-    const hist = plots.filter(p => p.kind === 'histogram');
-    const named = (plot, title, discrete, extra = {}) => plot ? {...plot, title, discrete, ...extra} : null;
-    if (part.label === '7.1') {
-      const location = cdf.find(p => /^Event locations/i.test(p.title || ''));
-      const count = cdf.find(p => /^Events per realization/i.test(p.title || ''));
-      const locations = hist.find(p => /^Event locations/i.test(p.title || '') ||
-        (p.edges?.[0] === -5 && p.edges?.at(-1) === 5));
-      const counts = hist.find(p => /^Events per realization/i.test(p.title || '') ||
-        (p !== locations && p.expected?.some(([k, v]) => k === 25 && v > .07 && v < .09)));
-      return [
-        named(locations, 'Event locations', false, {expected: [[-5, .2], [0, 0], [5, .2]], expected_label: 'Expected |t| / 25', x_label: 'Event location'}),
-        named(location, 'Event locations', false, {x_label: 'Event location'}),
-        named(counts, 'Events per realization', true, {expected_label: 'Expected Poisson(25)', x_label: 'Number of events'}),
-        named(count, 'Events per realization', true, {x_label: 'Number of events'}),
-      ].filter(Boolean);
-    }
-    if (part.label === '7.2') {
-      return [0.5, 3].flatMap(mean => {
-        const matches = p => new RegExp(`^poisson(?:_dist)?\\(\\s*${String(mean).replace('.', '\\.')}\\s*[,)]`, 'i').test(p.title || '');
-        const histogram = hist.find(p => matches(p) || p.expected?.some(([k, v]) =>
-          k === 0 && Math.abs(v - Math.exp(-mean)) < 1e-8));
-        return [named(histogram, `Poisson(${mean})`, true, {expected_label: `Expected Poisson(${mean})`}),
-          named(cdf.find(matches), `Poisson(${mean})`, true)].filter(Boolean);
-      });
-    }
-    return plots.filter(p => ['cdf', 'histogram'].includes(p.kind));
+    const order = summaryOrder[part.label];
+    return order ? order.map(id => plots.find(plot => plot.id === id)).filter(Boolean) :
+      plots.filter(plot => ['cdf', 'histogram'].includes(plot.kind));
   }
   function plotFigure(plot, zoomable = true) {
     const histogram = plot.kind === 'histogram';
-    const discrete = plot.discrete === true || /poisson|events per realization/i.test(plot.title || '');
+    const discrete = plot.discrete === true;
     const title = (plot.title || 'Sample distribution').replace(/\s*·\s*(CDF|Histogram)$/i, '');
     const figure = make('figure');
     figure.append(make('figcaption', `${title} · ${histogram ? 'Histogram' : 'CDF'}`));
@@ -219,11 +197,13 @@
       const summaries = styled('div', question.id === 'q7' ? 'process-summary' : '');
       for (const part of question.parts) {
         const selectedPlots = summaryPlots(part);
-        if (!selectedPlots.length && !part.message) continue;
+        const oldSummary = summaryOrder[part.label] && part.plots?.some(plot => !plot.id);
+        if (!selectedPlots.length && !part.message && !oldSummary) continue;
         const evidence = styled('div', 'review-evidence');
         evidence.append(styled('h3', 'evidence-heading', `Q${part.label} · Code output`));
         const plots = styled('div', 'plot-grid'); selectedPlots.forEach(plot => plots.append(plotFigure(plot)));
         evidence.append(plots);
+        if (oldSummary) evidence.append(styled('p', 'review-message', 'Plot summary needs a fresh export from the updated Examiner.'));
         if (part.message) evidence.append(styled('p', 'review-message', part.message));
         summaries.append(evidence);
       }
