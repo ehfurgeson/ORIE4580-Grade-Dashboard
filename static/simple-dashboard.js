@@ -411,6 +411,7 @@
 
     function setShowing(value) {
       showing = value;
+      root.dataset.checkmarksVisible = String(value);
       if (!showing && !identityKeys.has(sortKey)) {
         // Grade-based ordering itself can disclose information after hiding.
         sortKey = 'netid';

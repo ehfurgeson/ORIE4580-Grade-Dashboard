@@ -96,13 +96,13 @@ def render_staff_index(netids: list[str]) -> str:
   <script src="../course-nav.js" defer></script>
 </head>
 <body>
-  <main class="simple-container staff-container" id="staff-index">
+  <main class="course-page simple-container staff-container" id="staff-index">
     <header class="course-header">
       <p class="eyebrow">ORIE 4580</p>
       <h1>Student dashboards</h1>
       <nav class="course-nav" aria-label="Course" data-root="../"><a data-page="dashboard" href="../" aria-current="page">Dashboard</a><a data-page="calculator" href="../grade_calculator/">Grade calculator</a><a data-page="exam3" aria-disabled="true" title="Open a student dashboard to view Exam 3">Exam 3</a></nav>
-      <p>Protected staff index. Select a NetID to open that student's dashboard.</p>
     </header>
+    <p class="page-intro">Protected staff index. Select a NetID to open that student's dashboard.</p>
     <section aria-labelledby="student-list-title">
       <h2 id="student-list-title">Students ({len(netids)})</h2>
       <div class="staff-controls">

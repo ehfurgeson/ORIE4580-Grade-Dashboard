@@ -11,7 +11,6 @@
 :root { color-scheme: light; --ink:#202124; --muted:#5f6368; --line:#dadce0; --purple:#6f42c1; --green:#137333; }
 * { box-sizing:border-box; }
 body { margin:0; background:#fff; color:var(--ink); font:15px/1.5 system-ui,sans-serif; }
-main { max-width:1080px; margin:auto; padding:32px 24px 60px; }
 h1 { font-size:24px; letter-spacing:-.03em; margin:0; } h2 { font-size:20px; margin:0; } p { margin:.5rem 0; }
 .muted, small { color:var(--muted); }
 button,select,input { font:inherit; color:inherit; border:1px solid #9aa0a6; background:white; padding:8px; }
@@ -38,7 +37,7 @@ th,td { padding:12px 10px; border-bottom:1px solid var(--line); vertical-align:m
 .mark.checkmark.empty-box:not(.open-slot) { color:#886000; background:#fff3bf; border-color:#d6a500; border-style:solid; }
 
 .pass { color:var(--green); } .fail { color:#8a4c00; } .chosen { background:#f6f3fb; } td small { display:block; font-size:11px; }
-@media(max-width:700px) { main { padding:20px 16px; } th,td { padding:10px 6px; } input[type=number] { width:58px; } }
+@media(max-width:700px) { th,td { padding:10px 6px; } input[type=number] { width:58px; } }
 .checkmark-grid th, .checkmark-grid td { padding:8px 4px; overflow-wrap:anywhere; }
 .checkmark-grid input[type=number] { width:100%; max-width:52px; min-width:0; padding:6px 3px; }
 .checkmark-grid .marks { gap:3px; }
@@ -54,7 +53,6 @@ th,td { padding:12px 10px; border-bottom:1px solid var(--line); vertical-align:m
 .cutoff-table th:first-child { width:16%; text-align:left; border-right:1px solid var(--line); }
 .cutoff-table .chosen { color:#185abc; background:#e8f0fe; font-weight:700; box-shadow:inset 3px 0 #185abc; }
 .cutoff-table .chosen th:first-child { padding-left:8px; color:#185abc; }
-header { flex-wrap:wrap; }
 .controls { display:grid; grid-template-columns:auto 58px 1fr; align-items:center; gap:8px; margin-top:24px; }
 .controls + noscript + section { margin-top:8px; }
 .controls #reset { justify-self:end; font-size:12px; padding:3px 8px; }
@@ -63,7 +61,7 @@ header { flex-wrap:wrap; }
 </style>
 </head>
 <body>
-<main>
+<main class="course-page">
 <header class="course-header"><p class="eyebrow">ORIE 4580</p><h1>Grade calculator</h1><nav class="course-nav" aria-label="Course" data-root="../"><a data-page="dashboard" href="../">Dashboard</a><a data-page="calculator" href="../grade_calculator/" aria-current="page">Grade calculator</a><a data-page="exam3" aria-disabled="true" title="Open a student dashboard to view Exam 3">Exam 3</a></nav></header>
 <div class="controls"><label for="count"># of standards</label><input id="count" type="number" min="1" max="30" step="1" value="5"><button id="reset">Reset</button></div>
 <noscript>Enable JavaScript to edit checkmarks.</noscript>

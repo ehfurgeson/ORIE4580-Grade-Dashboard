@@ -179,9 +179,11 @@ async function checkStaffIndex(withNames = false, supplementFailure = false) {
   assert.strictEqual(body.children[0].dataset.netid, 'abc123', 'NetID ascending');
   controls['#toggle-checkmarks'].listeners.click();
   assert.strictEqual(requests.length, 2);
+  assert.equal(root.dataset.checkmarksVisible, 'true', 'Staff layout widens when marks are shown');
   controls['#toggle-checkmarks'].listeners.click();
   finishRequest();
   await new Promise(resolve => setImmediate(resolve));
+  assert.equal(root.dataset.checkmarksVisible, 'false', 'Staff layout contracts when marks are hidden');
   assert(root.querySelectorAll('.staff-private').every(cell => cell.hidden),
     'Requests finishing after Hide must stay hidden');
   const cells = rows[0].querySelectorAll('.staff-private');
