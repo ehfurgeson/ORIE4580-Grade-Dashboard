@@ -1,3 +1,5 @@
+html { scrollbar-gutter: stable; }
+
 /* Shared page frame: the same measure, gutters, and header on every course page. */
 .course-page {
   box-sizing: border-box;
