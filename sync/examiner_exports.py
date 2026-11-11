@@ -98,4 +98,5 @@ def load_reviews(root: Path, netids: set[str]) -> dict[str, dict]:
                 versions[key] = stamp
             review['questions'] = sorted(merged.values(), key=lambda q: int(q['id'][1:]))
             review['exported_at'] = document['exported_at']
+            review['student'] = document['student']
     return reviews

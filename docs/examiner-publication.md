@@ -22,8 +22,16 @@ sudo -u orie4580-dashboard -g www-data .venv/bin/python -m scripts.pull_local_gr
 Use the same state and lock paths as the scheduled service (older installations
 may use `exam2-publication.json`). A missing state is an error, not a reason to
 fetch remote grades. The dashboard account needs traversal access to the source
-parents and read access to exports; the permissions instructions below apply.
+parents and read access to exports and PDFs. Examiner's full setup permission
+step grants both to `orie4580-dashboard`; routine `--update` preserves these grants.
 No systemd override or service restart is needed for this command.
+
+The pull also copies each exported student's scan from the sibling `pdfs/`
+directory into their protected `exam3.pdf`. Use `--pdfs /another/private/pdf-directory`
+to override that source. PDF filenames must match exported submission IDs.
+Scans are treated as immutable: the same submission ID reuses the published PDF
+without hashing, timestamp checks, or copying bytes again. Missing PDFs abort
+the staged release. Later scheduled refreshes preserve the imported PDFs.
 
 The command rebuilds the protected student tree from existing collected records
 under the normal refresh lock. It preserves both exam visibility settings and

@@ -20,6 +20,8 @@ def setup(tmp_path, monkeypatch, *, visible=False, require_hidden=False):
     record = merged()
     netid = record['student']['netid']
     batch(source, email=netid + '@cornell.edu')
+    (tmp_path / 'pdfs').mkdir()
+    (tmp_path / 'pdfs' / '123.pdf').write_bytes(b'%PDF-1.4 synthetic scan')
     state = {'schema_version': 1, 'visible': False, 'exam3_visible': visible,
              'collected_at': '2026-10-27T12:00:00Z', 'records': [record]}
     write_publication_state(state_path, state)
@@ -47,9 +49,20 @@ def test_offline_import_preserves_grades_visibility_and_state(tmp_path, monkeypa
     assert document['exported_at'] == '2026-11-11T01:00:00Z'
     assert (EXAM3_HIDDEN_RULE in (student / '.htaccess').read_text()) is not visible
     assert not list(output.rglob('manifest.json'))
+    pdf = student / 'exam3.pdf'
+    assert pdf.read_bytes() == b'%PDF-1.4 synthetic scan'
+    inode = pdf.stat().st_ino
+    # Filename identity is sufficient: the immutable source is not recopied.
+    (source.parent / 'pdfs' / '123.pdf').write_bytes(b'not copied again')
+    pull_local_grades.main()
+    assert pdf.stat().st_ino == inode
+    assert pdf.read_bytes() == b'%PDF-1.4 synthetic scan'
+    write_simple_release(visible_records(json.loads(state.read_text())['records'], False), output,
+                         exam3_visible=visible)
+    assert pdf.stat().st_ino == inode
 
 
-@pytest.mark.parametrize('failure', ['visible', 'missing_state', 'invalid_export', 'locked', 'empty'])
+@pytest.mark.parametrize('failure', ['visible', 'missing_state', 'invalid_export', 'locked', 'empty', 'missing_pdf'])
 def test_failed_import_preserves_live_release(tmp_path, monkeypatch, failure):
     source, state, output, lock, netid = setup(tmp_path, monkeypatch,
         visible=failure == 'visible', require_hidden=True)
@@ -64,6 +77,8 @@ def test_failed_import_preserves_live_release(tmp_path, monkeypatch, failure):
         shutil.rmtree(next(source.iterdir()))
     elif failure == 'locked':
         handle = _acquire_lock(lock)
+    elif failure == 'missing_pdf':
+        (source.parent / 'pdfs' / '123.pdf').unlink()
     try:
         with pytest.raises(SystemExit):
             pull_local_grades.main()

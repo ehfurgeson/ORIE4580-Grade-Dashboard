@@ -210,6 +210,7 @@ def write_simple_release(
     examiner_exports: str | Path | None = None,
     exam3_visible: bool = False,
     local_grades: str | Path | None = None,
+    examiner_pdfs: str | Path | None = None,
     local_imported_at: str | None = None,
 ) -> list[Path]:
     """Validate everything, build a new tree, then replace the prior release.
@@ -252,6 +253,19 @@ def write_simple_release(
         local_documents = load_local_grades(Path(source_path), seen,
                                            allow_empty_exam3=examiner_exports is not None)
 
+    pdf_sources = {}
+    if examiner_pdfs is not None:
+        if source_path is None:
+            raise ValueError("PDF import requires a local grades source")
+        pdf_root = Path(examiner_pdfs)
+        if pdf_root.is_symlink() or not pdf_root.is_dir():
+            raise ValueError("Examiner PDFs must be a real directory")
+        for path in pdf_root.iterdir():
+            if path.suffix.lower() == '.pdf':
+                if path.is_symlink() or not path.is_file() or path.stem in pdf_sources:
+                    raise ValueError("Examiner PDFs must have unique submission filenames and be regular files")
+                pdf_sources[path.stem] = path
+
     template = Path(template_path).read_text(encoding="utf-8")
     exam_template = (Path(__file__).resolve().parents[1] / "templates" / "exam3_student_review.html").read_text(encoding="utf-8")
     output = Path(output_dir)
@@ -277,6 +291,27 @@ def write_simple_release(
             for name in sorted({'exam3.json', 'exam3.pdf'} | local_documents.keys()):
                 previous = output / netid / name
                 target = student_dir / name
+                if name == 'exam3.pdf' and 'exam3.json' in local_documents and netid not in local_documents['exam3.json']:
+                    continue  # Retracting the review also retracts its scan.
+                if name == 'exam3.pdf' and examiner_pdfs is not None:
+                    document = local_documents['exam3.json'].get(netid)
+                    if document is None:
+                        continue
+                    identifier = document['student']['id']
+                    old_review = output / netid / 'exam3.json'
+                    if (output / netid).is_symlink() or previous.is_symlink() or old_review.is_symlink():
+                        raise ValueError("Existing Examiner review must be a regular protected file")
+                    same_submission = (previous.is_file() and old_review.is_file() and
+                        json.loads(old_review.read_text(encoding='utf-8')).get('student', {}).get('id') == identifier)
+                    if same_submission:
+                        os.link(previous, target)  # Immutable scans: reuse bytes across staged releases.
+                    else:
+                        source_pdf = pdf_sources.get(identifier)
+                        if source_pdf is None:
+                            raise ValueError(f"Missing Examiner PDF for submission {identifier}")
+                        shutil.copyfile(source_pdf, target)
+                    os.chmod(target, 0o640)
+                    continue
                 if name in local_documents:
                     if netid in local_documents[name]:
                         target.write_text(_payload({**local_documents[name][netid],
@@ -284,7 +319,18 @@ def write_simple_release(
                 elif previous.exists() or previous.is_symlink():
                     if (output / netid).is_symlink() or previous.is_symlink() or not previous.is_file():
                         raise ValueError("Existing Examiner review must be a regular protected file")
-                    shutil.copyfile(previous, target)
+                    if name == 'exam3.pdf':
+                        if 'exam3.json' in local_documents:
+                            old_review = output / netid / 'exam3.json'
+                            if old_review.is_symlink():
+                                raise ValueError("Existing Examiner review must be a regular protected file")
+                            current_id = local_documents['exam3.json'][netid]['student']['id']
+                            if (not old_review.is_file() or
+                                json.loads(old_review.read_text(encoding='utf-8')).get('student', {}).get('id') != current_id):
+                                continue
+                        os.link(previous, target)
+                    else:
+                        shutil.copyfile(previous, target)
                 if target.exists():
                     os.chmod(target, 0o640)
             (student_dir / "index.html").write_text(template, encoding="utf-8")

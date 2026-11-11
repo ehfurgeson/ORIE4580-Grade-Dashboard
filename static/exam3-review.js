@@ -186,7 +186,7 @@
         if (fields && typeof fields === 'object' && !Array.isArray(fields)) {
           for (const [label, value] of Object.entries(fields)) {
             const matches = images.filter(image => image.label === label); matches.forEach(image => used.add(image));
-            body.append(answerPair(typeof value === 'string' ? value : JSON.stringify(value, null, 2), matches, label, pdfUrl));
+            body.append(answerPair(value === null ? '' : typeof value === 'string' ? value : JSON.stringify(value, null, 2), matches, label, pdfUrl));
           }
         } else {
           images.forEach(image => used.add(image));

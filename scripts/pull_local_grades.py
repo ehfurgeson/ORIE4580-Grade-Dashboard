@@ -14,6 +14,7 @@ def main() -> None:
 
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument('source', type=Path, help="private exports directory containing completed batches")
+    parser.add_argument('--pdfs', type=Path, help="Examiner PDF directory (default: pdfs/ beside exports/)")
     parser.add_argument('--state', type=Path, required=True, help="same publication state used by scheduled refresh")
     parser.add_argument('--output', type=Path, required=True, help="protected students directory")
     parser.add_argument('--lock-file', type=Path, required=True, help="same lock used by scheduled refresh")
@@ -35,9 +36,11 @@ def main() -> None:
         if args.require_hidden and exam3_visible:
             raise ValueError("Exam 3 is visible; hide it with set_exam3_visibility before importing")
         imported_at = datetime.now(timezone.utc).isoformat()
+        pdfs = args.pdfs or args.source.parent / 'pdfs'
+        _require_private_state(pdfs, args.output, args.output.parent)
         paths = write_simple_release(visible_records(state['records'], state['visible']), args.output,
                                      local_grades=args.source, local_imported_at=imported_at,
-                                     exam3_visible=exam3_visible)
+                                     exam3_visible=exam3_visible, examiner_pdfs=pdfs)
     except (OSError, ValueError, KeyError, RuntimeError) as error:
         parser.error(str(error))
     finally:
