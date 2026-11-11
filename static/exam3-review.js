@@ -8,50 +8,78 @@
   };
   const labels = {met: 'Correct', not_met: 'Incorrect', blank: 'Blank', not_checked: 'Not checked'};
   function plotFigure(plot, zoomable = true) {
+    const histogram = plot.kind === 'histogram';
+    const discrete = plot.discrete === true || /poisson|events per realization/i.test(plot.title || '');
+    const title = (plot.title || 'Sample distribution').replace(/\s*·\s*(CDF|Histogram)$/i, '');
     const figure = make('figure');
-    figure.append(make('figcaption', plot.title || (plot.kind === 'histogram' ? 'Sample distribution' : 'Distribution check')));
-    if (plot.kind === 'joint') {
-      figure.append(make('p', `${plot.y_title || 'Row'} × ${plot.x_title || 'Column'} — observed / expected`));
-      const table = make('table'), header = make('tr');
-      header.append(make('th', ''));
-      plot.x_labels.forEach(label => header.append(make('th', label)));
-      table.append(header);
-      plot.observed.forEach((row, i) => {
-        const tr = make('tr'); tr.append(make('th', plot.y_labels[i]));
-        row.forEach((value, j) => tr.append(make('td', `${value.toFixed(1)} / ${plot.expected[i][j].toFixed(1)}`)));
-        table.append(tr);
-      });
-      figure.append(table); return figure;
-    }
+    figure.append(make('figcaption', `${title} · ${histogram ? 'Histogram' : 'CDF'}`));
     const ns = 'http://www.w3.org/2000/svg';
     const svg = document.createElementNS(ns, 'svg');
-    svg.setAttribute('viewBox', '0 0 640 260');
-    svg.setAttribute('role', 'img'); svg.setAttribute('aria-label', plot.title || 'Sample distribution');
-    const observed = plot.kind === 'histogram'
-      ? plot.density.flatMap((y, i) => [[plot.edges[i], y], [plot.edges[i + 1], y]]) : plot.observed;
+    const draw = (tag, attributes, text) => {
+      const node = document.createElementNS(ns, tag);
+      for (const [key, value] of Object.entries(attributes)) node.setAttribute(key, value);
+      if (text !== undefined) node.textContent = text;
+      svg.append(node); return node;
+    };
+    svg.setAttribute('viewBox', '0 0 600 360');
+    svg.setAttribute('role', 'img');
+    svg.setAttribute('aria-label', `${title}: ${histogram ? 'histogram' : 'cumulative distribution'}, sampled versus expected`);
+    svg.setAttribute('font-family', 'system-ui, sans-serif');
+    svg.setAttribute('font-size', '13');
     const expected = plot.expected || [];
+    const observed = histogram ? plot.density.map((v, i) => [plot.edges[i], v]) : plot.observed;
     const points = [...observed, ...expected];
     if (!points.length || points.some(p => p.length !== 2 || !p.every(Number.isFinite))) throw new Error('Invalid plot data.');
-    const low = Math.min(...points.map(p => p[0])), high = Math.max(...points.map(p => p[0]));
-    const top = Math.max(1e-10, ...points.map(p => p[1]));
-    const x = v => 45 + (v - low) / (high - low || 1) * 560;
-    const y = v => 220 - v / top * 190;
-    for (const [values, color, stepped] of [[expected, '#666', plot.discrete], [observed, '#1767bf', plot.kind === 'cdf']]) {
-      const path = document.createElementNS(ns, 'path');
-      path.setAttribute('d', values.map(([a, b], i) => i ? (stepped ? `H${x(a)} V${y(b)}` : `L${x(a)},${y(b)}`) : `M${x(a)},${y(b)}`).join(' '));
-      path.setAttribute('fill', 'none'); path.setAttribute('stroke', color); path.setAttribute('stroke-width', '2'); svg.append(path);
+    const low = histogram ? plot.edges[0] : (plot.domain?.[0] ?? Math.min(...points.map(p => p[0])));
+    const high = histogram ? plot.edges.at(-1) : (plot.domain?.[1] ?? Math.max(...points.map(p => p[0])));
+    const top = histogram ? Math.max(1e-10, ...points.map(p => p[1])) * 1.12 : 1;
+    const left = 72, right = 578, bottom = 276, upper = 34;
+    const x = v => left + (v - low) / (high - low || 1) * (right - left);
+    const y = v => bottom - v / top * (bottom - upper);
+    const fmt = v => Number(v.toPrecision(3)).toString();
+    draw('rect', {width: 600, height: 360, fill: '#fff'});
+    for (let i = 0; i <= 4; i++) {
+      const value = top * i / 4;
+      draw('path', {d: `M${left},${y(value)}H${right}`, stroke: '#e4e9ef'});
+      draw('text', {x: left - 10, y: y(value) + 4, 'text-anchor': 'end', fill: '#354456'}, fmt(value));
     }
-    for (const [value, px, py] of [[low, 45, 245], [high, 570, 245], [top, 0, 30], [0, 15, 220]]) {
-      const text = document.createElementNS(ns, 'text'); text.textContent = Number(value.toPrecision(4));
-      text.setAttribute('x', px); text.setAttribute('y', py); svg.append(text);
+    const ticks = [...new Set(Array.from({length: 5}, (_, i) => {
+      const value = low + (high - low) * i / 4;
+      return discrete ? Math.round(value) : value;
+    }))].filter(v => v >= low && v <= high);
+    for (const value of ticks) {
+      draw('path', {d: `M${x(value)},${bottom}v5`, stroke: '#354456'});
+      draw('text', {x: x(value), y: bottom + 22, 'text-anchor': 'middle', fill: '#354456'}, fmt(value));
     }
+    draw('path', {d: `M${left},${upper}V${bottom}H${right}`, fill: 'none', stroke: '#354456'});
+    draw('text', {x: left, y: 19, fill: '#354456'}, histogram ? (discrete ? 'Probability per integer bin' : 'Probability density') : 'Cumulative probability · P(X ≤ x)');
+    draw('text', {x: (left + right) / 2, y: 318, 'text-anchor': 'middle', fill: '#354456'}, plot.x_label || 'Sample value');
+    const path = (values, steps) => values.map(([a, b], i) => i ?
+      (steps ? `H${x(a)} V${y(b)}` : `L${x(a)},${y(b)}`) : `M${x(a)},${y(b)}`).join(' ');
+    if (histogram) {
+      plot.density.forEach((height, i) => draw('rect', {
+        x: x(plot.edges[i]), y: y(height), width: x(plot.edges[i + 1]) - x(plot.edges[i]),
+        height: bottom - y(height), fill: '#2666b5', 'fill-opacity': '.6', stroke: '#fff', 'stroke-width': '.5'}));
+    }
+    let reference = path(expected, discrete);
+    if (histogram && discrete && expected.length === plot.density.length) {
+      reference = expected.map(([, height], i) => `${i ? 'V' + y(height) : 'M' + x(plot.edges[0]) + ',' + y(height)}H${x(plot.edges[i + 1])}`).join(' ');
+    }
+    draw('path', {d: reference, fill: 'none', stroke: '#d07822', 'stroke-width': 2.5, 'stroke-dasharray': '7 4'});
+    if (!histogram) draw('path', {d: path(observed, true), fill: 'none', stroke: '#2666b5', 'stroke-width': 2});
+    draw('path', {d: 'M150,343H180', stroke: '#2666b5', 'stroke-width': histogram ? 10 : 2, 'stroke-opacity': histogram ? .6 : 1});
+    draw('text', {x: 188, y: 347, fill: '#354456'}, 'Sampled');
+    draw('path', {d: 'M320,343H350', stroke: '#d07822', 'stroke-width': 2.5, 'stroke-dasharray': '7 4'});
+    draw('text', {x: 358, y: 347, fill: '#354456'}, 'Expected');
     if (zoomable) {
       const button = styled('button', 'plot-button'); button.type = 'button';
-      button.setAttribute('aria-label', `Enlarge ${plot.title || 'code output plot'}`);
+      button.setAttribute('aria-label', `Enlarge ${title}`);
       button.append(svg); button.addEventListener('click', () => showZoom(plotFigure(plot, false)));
       figure.append(button);
     } else figure.append(svg);
-    figure.append(make('p', 'Blue: sampled · Gray: expected')); return figure;
+    if (Number.isInteger(plot.sample_count)) figure.append(make('p', `${plot.sample_count.toLocaleString()} samples` +
+      (plot.outside_count ? ` · ${plot.outside_count.toLocaleString()} outside the plotted range` : '')));
+    return figure;
   }
   function styled(tag, className, text) {
     const node = make(tag, text); node.className = className; return node;
@@ -160,7 +188,7 @@
         if (!part.plots.length && !part.message) continue;
         const evidence = styled('div', 'review-evidence');
         evidence.append(styled('h3', 'evidence-heading', `Q${part.label} · Code output`));
-        const plots = styled('div', 'plot-grid'); part.plots.forEach(plot => plots.append(plotFigure(plot)));
+        const plots = styled('div', 'plot-grid'); part.plots.filter(plot => ['cdf', 'histogram'].includes(plot.kind)).forEach(plot => plots.append(plotFigure(plot)));
         evidence.append(plots);
         if (part.message) evidence.append(styled('p', 'review-message', part.message));
         body.append(evidence);

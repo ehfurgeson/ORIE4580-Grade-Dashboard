@@ -4,10 +4,10 @@ const fs = require('node:fs');
 const vm = require('node:vm');
 const path = require('node:path');
 class Element {
-  constructor(tag) { this.tag = tag; this.children = []; this.textContent = ''; }
+  constructor(tag) { this.tag = tag; this.children = []; this.textContent = ''; this.attributes = {}; }
   append(...items) { this.children.push(...items); }
   replaceChildren(...items) { this.children = items; }
-  setAttribute() {}
+  setAttribute(key, value) { this.attributes[key] = value; }
   showModal() { this.open = true; }
   addEventListener(name, callback) { this[name] = callback; }
 }
@@ -137,4 +137,29 @@ for (const unavailableStatus of [403, 404]) test(`direct review URL with JSON st
   assert.equal(nodes['#status'].textContent, 'Exam 3 is not available yet.');
   assert.equal(nodes['#review'].children.length, 0, 'No results, scans, plots, question links, or PDF link');
   assert.deepEqual(requests.sort(), ['../checkoffs.json', '../exam3.json']);
+});
+
+test('distribution summary has filled bins, step CDFs, axes and explicit titles without tables', () => {
+  const window = {};
+  const document = {createElement: tag => new Element(tag), createElementNS: (_, tag) => new Element(tag),
+    createDocumentFragment: () => new Element('fragment'), querySelector: () => null};
+  vm.runInNewContext(fs.readFileSync(path.join(__dirname, '../static/exam3-review.js'), 'utf8'), {document, window});
+  const root = new Element('root');
+  window.Exam3Review.render({schema_version: 1, exam: 3, questions: [{id: 'q7', title: 'Synthetic', normal_credit: 'met', answers: [], parts: [
+    {label: '7.2', plots: [
+      {kind: 'joint', x_labels: ['unused']},
+      {kind: 'histogram', title: 'Poisson(3)', discrete: true, edges: [-.5, .5, 1.5], density: [.4, .6], expected: [[0, .3], [1, .7]], sample_count: 1000},
+      {kind: 'cdf', title: 'Poisson(3)', discrete: true, observed: [[0, .4], [1, 1]], expected: [[0, .3], [1, 1]], domain: [0, 1]}
+    ]}]}]}, root);
+  const all = node => [node, ...node.children.flatMap(all)];
+  const nodes = all(root);
+  assert.ok(!nodes.some(n => n.tag === 'table'));
+  assert.ok(nodes.some(n => n.textContent === 'Poisson(3) · Histogram'));
+  assert.ok(nodes.some(n => n.textContent === 'Poisson(3) · CDF'));
+  assert.ok(nodes.some(n => n.textContent === 'Cumulative probability · P(X ≤ x)'));
+  assert.equal(nodes.filter(n => n.tag === 'rect' && n.attributes.fill === '#2666b5').length, 2);
+  const svgs = nodes.filter(n => n.tag === 'svg');
+  const curves = all(svgs[1]).filter(n => n.tag === 'path' && ['#2666b5', '#d07822'].includes(n.attributes.stroke) && n.attributes.d.startsWith('M72'));
+  assert.equal(curves.length, 2);
+  assert.ok(curves.every(n => /H.*V/.test(n.attributes.d) && !n.attributes.d.includes('L')));
 });

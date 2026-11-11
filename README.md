@@ -432,6 +432,10 @@ output. Its answers and judgments are illustrative, not exam solutions.
 The review uses the dashboard stylesheet, large standard-labeled earned marks,
 compact answer/scan pairs, and a click-to-zoom scan overlay. Old exports without
 images still open; re-export from Examiner to include the aligned original work.
+Distribution plots use filled histograms and step CDFs for discrete distributions,
+with axes, explicit plot types, sample counts, and sampled/expected legends. Only
+CDFs and histograms are displayed; diagnostic tables are omitted. Re-export with
+the updated Examiner to use its curated summary and complete plot labels.
 The student dashboard fetches `exam3.json` from the same student directory as
 `checkoffs.json`, with the existing same-origin authorization and no-store caching.
 Its decisions feed the Exam 3 assignment row, standard allocations, and staff
