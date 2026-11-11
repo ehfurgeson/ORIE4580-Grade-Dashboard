@@ -13,7 +13,7 @@ from .combined_checkoffs import validate_combined_record
 from .simple_checkoffs import NETID_PATTERN
 from .standards import STANDARDS
 from .staff_roster import load_staff_roster
-from .examiner_exports import load_reviews
+from .local_grades import load_local_grades
 
 
 STAFF_USERS = (
@@ -209,6 +209,8 @@ def write_simple_release(
     retain_previous: bool = False,
     examiner_exports: str | Path | None = None,
     exam3_visible: bool = False,
+    local_grades: str | Path | None = None,
+    local_imported_at: str | None = None,
 ) -> list[Path]:
     """Validate everything, build a new tree, then replace the prior release.
 
@@ -238,13 +240,17 @@ def write_simple_release(
     if errors:
         raise ValueError("invalid simple records: " + "; ".join(errors))
 
-    reviews = None
-    if examiner_exports is not None:
-        source = Path(examiner_exports).resolve()
+    if local_grades is not None and examiner_exports is not None:
+        raise ValueError("Choose one local grades source")
+    local_documents = {}
+    source_path = local_grades if local_grades is not None else examiner_exports
+    if source_path is not None:
+        source = Path(source_path).resolve()
         destination = Path(output_dir).resolve()
         if source == destination or source.is_relative_to(destination) or destination.is_relative_to(source):
             raise ValueError("Examiner exports and student output must be separate trees")
-        reviews = load_reviews(Path(examiner_exports), seen)
+        local_documents = load_local_grades(Path(source_path), seen,
+                                           allow_empty_exam3=examiner_exports is not None)
 
     template = Path(template_path).read_text(encoding="utf-8")
     exam_template = (Path(__file__).resolve().parents[1] / "templates" / "exam3_student_review.html").read_text(encoding="utf-8")
@@ -268,12 +274,13 @@ def write_simple_release(
             student_dir.mkdir(mode=0o750)
             # A local rebuild (including the Exam 2 switch) preserves reviews.
             # Configured pulls reconstruct JSON from the authoritative exports.
-            for name in ('exam3.json', 'exam3.pdf'):
+            for name in sorted({'exam3.json', 'exam3.pdf'} | local_documents.keys()):
                 previous = output / netid / name
                 target = student_dir / name
-                if name == 'exam3.json' and reviews is not None:
-                    if netid in reviews:
-                        target.write_text(_payload({**reviews[netid], 'published_at': record['updated_at']}), encoding='utf-8')
+                if name in local_documents:
+                    if netid in local_documents[name]:
+                        target.write_text(_payload({**local_documents[name][netid],
+                            'published_at': local_imported_at or record['updated_at']}), encoding='utf-8')
                 elif previous.exists() or previous.is_symlink():
                     if (output / netid).is_symlink() or previous.is_symlink() or not previous.is_file():
                         raise ValueError("Existing Examiner review must be a regular protected file")

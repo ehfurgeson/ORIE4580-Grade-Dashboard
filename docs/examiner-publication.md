@@ -1,6 +1,47 @@
 # Publishing Examiner reviews
 
-The dashboard pulls completed Examiner 03 exports during its existing three-hour
+## One-time local grades pull
+
+Use `scripts.pull_local_grades` to import completed local exports without polling
+Google Sheets or Gradescope or changing the timer. It detects the format from the
+manifests; Examiner Exam 3 schema version 1 is the first supported adapter.
+Pass the **exports parent directory**, not an individual `student-*` batch.
+
+After installing the updated dashboard code, run:
+
+```sh
+cd /opt/orie4580-grade-dashboard
+sudo -u orie4580-dashboard -g www-data .venv/bin/python -m scripts.pull_local_grades \
+  /var/lib/examiner/exam_03/exports \
+  --state /var/lib/orie4580-dashboard/exam-publication.json \
+  --output /var/www/html/orie4580_fa26/students \
+  --lock-file /var/lib/orie4580-dashboard/refresh.lock \
+  --require-hidden
+```
+
+Use the same state and lock paths as the scheduled service (older installations
+may use `exam2-publication.json`). A missing state is an error, not a reason to
+fetch remote grades. The dashboard account needs traversal access to the source
+parents and read access to exports; the permissions instructions below apply.
+No systemd override or service restart is needed for this command.
+
+The command rebuilds the protected student tree from existing collected records
+under the normal refresh lock. It preserves both exam visibility settings and
+does not write the publication state or advance the overall grade timestamp.
+Each imported JSON gets a fresh `published_at`; its `exported_at` still records
+when Examiner exported it. `--require-hidden` refuses the import if Exam 3 is
+already visible. Omitting it preserves the current setting, including ON.
+
+An invalid/unsupported export or a concurrent refresh aborts without replacing
+the live release. An empty source is rejected to catch wrong paths. Each source
+is authoritative for its exam: omitted questions survive only if an earlier batch
+in that directory contains them. Other local exam files are preserved. To inspect
+hidden grades, privately download an imported student JSON and open it in the
+local `static/exam3-review.html` viewer; no activation is needed.
+
+## Scheduled collection
+
+The dashboard can pull completed Examiner 03 exports during its existing three-hour
 refresh. Every completed `student-*` batch in the configured directory is collected.
 Student access defaults to OFF until explicitly enabled with the visibility switch.
 This does not run Examiner checks, finalize decisions, or create exports.
@@ -12,6 +53,9 @@ protected release as `checkoffs.json`. The private manifest never reaches the we
 tree. The dashboard refresh timestamp remains the common publication time;
 `exported_at` describes source freshness and `published_at` records publication.
 No extra timer is needed. To publish early, start `orie4580-checkoffs.service`.
+Use `--local-grades /path/to/exports` for the same manifest-based importer during
+scheduled refreshes. The existing `--examiner-exports` option remains supported;
+both use the shared importer and protected release writer.
 
 Partial exports accumulate by question. The newest timestamp wins for a repeated
 student/question, including corrections from correct to incorrect. Skipped and

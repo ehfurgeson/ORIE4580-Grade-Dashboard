@@ -179,7 +179,9 @@ def main() -> None:
     parser.add_argument("--lock-file", type=Path, help="private nonblocking process lock")
     parser.add_argument('--exam-state', '--exam2-state', dest='exam_state', type=Path,
                         help="private collected dashboard and exam visibility state (--exam2-state is a compatibility alias)")
-    parser.add_argument('--examiner-exports', type=Path, help="private Examiner exports directory; publish completed Exam 3 batches")
+    local_source = parser.add_mutually_exclusive_group()
+    local_source.add_argument('--examiner-exports', type=Path, help="legacy Exam 3 exports directory")
+    local_source.add_argument('--local-grades', type=Path, help="private local grades directory; format detected from manifests")
     parser.add_argument(
         "--force-full-revalidation", action="store_true",
         help="perform every Lab source check while preserving verified positive results",
@@ -208,6 +210,8 @@ def main() -> None:
         _require_private_state(args.snapshot, args.output, args.copy_assets_to)
         if args.examiner_exports is not None:
             _require_private_state(args.examiner_exports, args.output, args.copy_assets_to or args.output.parent)
+        if args.local_grades is not None:
+            _require_private_state(args.local_grades, args.output, args.copy_assets_to or args.output.parent)
         if args.completion_cache is not None:
             _require_private_state(args.completion_cache, args.output, args.copy_assets_to)
         if args.lock_file is not None:
@@ -414,7 +418,8 @@ def main() -> None:
             })
         public_records = visible_records(combined, exam2_visible)
         paths = write_simple_release(public_records, args.output, retain_previous=False,
-                                     examiner_exports=args.examiner_exports, exam3_visible=exam3_visible)
+                                     examiner_exports=args.examiner_exports, local_grades=args.local_grades,
+                                     exam3_visible=exam3_visible)
         write_snapshot_atomic(snapshot, args.snapshot)
         if cache_active and args.completion_cache is not None:
             next_cache = build_completion_cache(
