@@ -22,8 +22,7 @@ test('tick and sparkle use centered vector geometry at every display size', () =
   assert.match(css, /mask: var\(--mark-symbol\) center \/ 100% 100% no-repeat/);
   assert.match(css, /border: calc\(var\(--checkmark-size\)/, 'Earned marks retain their colored rim');
   assert.match(symbols[1], /[CQ]/, 'Sparkle has softly curved sides');
-  assert.match(css, /shiny_purple[^}]*::before[^}]*animation:/s, 'Only the symbol shimmers');
-  assert.match(css, /prefers-reduced-motion: reduce/);
+  assert.doesNotMatch(css, /animation:|@keyframes/, 'Marks remain static');
 });
 
 test('standalone calculator embeds exactly the same styles without an external stylesheet', () => {

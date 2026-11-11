@@ -57,7 +57,7 @@ def main() -> None:
         )
         student_root = args.output / "students"
         paths = write_simple_release(combined, student_root)
-        for asset in ("simple-dashboard.js", "simple-style.css", "checkmarks.css", "checkmarks.js", "exam3-review.js", "exam3-review.css", "grade_calculator/index.html", "grade_calculator/.htaccess"):
+        for asset in ("simple-dashboard.js", "simple-style.css", "checkmarks.css", "exam3-review.js", "exam3-review.css", "grade_calculator/index.html", "grade_calculator/.htaccess"):
             (args.output / asset).parent.mkdir(parents=True, exist_ok=True)
             shutil.copy2(Path("static") / asset, args.output / asset)
     except (KeyError, OSError, RuntimeError, ValueError, json.JSONDecodeError) as error:
