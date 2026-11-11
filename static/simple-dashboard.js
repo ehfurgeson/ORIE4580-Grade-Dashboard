@@ -91,7 +91,7 @@
       const text = requirement.id === 'manual'
         ? (requirement.status === 'complete' ? 'Complete' : 'Incomplete')
         : requirement.id === 'exam_score'
-          ? ({ complete: 'Checkmark earned', incomplete: 'Below checkmark threshold', not_graded: 'Not available yet' }[requirement.status])
+          ? (requirement.outcome === 'blank' ? 'Blank' : { complete: 'Checkmark earned', incomplete: 'Checkmark not earned', not_graded: 'Not available yet' }[requirement.status])
           : autograderLabel(requirement.status);
       row.append(label, make('strong', 'source-requirement-status', text));
       if (requirement.id === 'manual' && requirement.details.length > 1) {
@@ -209,15 +209,20 @@
     const names = [...groups.keys()].sort((a, b) => a.localeCompare(b, undefined, { numeric: true }));
     for (const name of names) {
       const row = make('div', 'assignment-row');
-      row.append(make('h3', '', name));
+      const heading = make('h3', '', name);
+      if (name === 'Exam 3') {
+        const link = make('a', '', name); link.href = 'exam3/';
+        heading.replaceChildren(link);
+      }
+      row.append(heading);
       const slots = make('div', 'assignment-slots');
       for (const { mark, standard, allocation } of groups.get(name).sort((a, b) => a.question - b.question)) {
         const slot = make('a', 'assignment-slot');
-        slot.href = `#standard-${standard.id}`;
+        slot.href = mark.id?.startsWith('exam3-q') ? (mark.status === 'not_graded' ? 'exam3/' : `exam3/#q${mark.id.split('-q')[1]}`) : `#standard-${standard.id}`;
         const result = mark.status === 'complete' ? allocationLabel(mark, allocation)
           : mark.status === 'not_graded' ? 'Not available yet' : 'Checkmark not earned';
         slot.title = `${mark.label} · ${standard.id}: ${result}`;
-        slot.setAttribute('aria-label', `${slot.title}. View standard details.`);
+        slot.setAttribute('aria-label', `${slot.title}. View details.`);
         const symbol = mark.status === 'complete' ? renderCompactCheckmark(mark, result)
           : make('span', 'checkmark empty-box', mark.status === 'not_graded' ? '?' : '–');
         symbol.setAttribute('aria-hidden', 'true');
@@ -227,14 +232,14 @@
       row.append(slots);
       overview.append(row);
     }
-    if (names.length === 0) overview.append(make('p', 'note', 'No assignment checkmarks available yet.'));
+    if (names.length === 0 && !window.Exam3Review) overview.append(make('p', 'note', 'No assignment checkmarks available yet.'));
   }
 
   function renderCheckmark(checkmark, allocation) {
     const item = make('li', `mapped-checkoff ${checkmark.kind} ${checkmark.status}`);
     const earnedSymbol = checkmark.kind === 'shiny_purple' ? '✦' : '✓';
     const mark = make(
-      'span', `checkmark ${checkmark.kind}`,
+      'span', `checkmark ${checkmark.kind} ${checkmark.status === 'complete' ? 'earned' : 'unearned'}`,
       checkmark.status === 'complete' ? earnedSymbol : '–'
     );
     mark.setAttribute('aria-hidden', 'true');
@@ -482,7 +487,8 @@
                 data.standards.some(standard => !standardIds.includes(standard.id))) {
               throw new Error('The student summary does not match this index.');
             }
-            fillRow(row, data, updatedAt);
+            const exam = window.Exam3Review ? await window.Exam3Review.load(`./${row.dataset.netid}/exam3.json`) : null;
+            fillRow(row, exam ? window.Exam3Review.merge(data, exam) : data, updatedAt);
             loaded.add(row);
           } catch (error) {
             rowMessage(row, `Unavailable: ${error.message} Hide and show checkmarks to retry.`);
@@ -532,9 +538,23 @@
       if (!response.ok) throw new Error(`Request failed (${response.status}).`);
       return response.json();
     })
-    .then(data => {
+    .then(async data => {
       const validated = validatePayload(data);
-      render(data, validated.updatedAt, validated.unmappedColumns);
+      let exam = null, examUnavailable = false;
+      if (window.Exam3Review) {
+        try { exam = await window.Exam3Review.load(); }
+        catch { examUnavailable = true; }
+      }
+      render(exam ? window.Exam3Review.merge(data, exam) : data, validated.updatedAt, validated.unmappedColumns);
+      if (!window.Exam3Review) return;
+      if (!exam) {
+        const overview = document.querySelector('#assignment-overview');
+        if (overview) {
+          const row = make('div', 'assignment-row');
+          row.append(make('h3', '', 'Exam 3'), make('span', 'note', examUnavailable ? 'Unavailable — try refreshing.' : 'Not available yet'));
+          overview.append(row);
+        }
+      }
     })
     .catch(error => {
       statusElement.textContent = `Unable to load checkoffs. ${error.message} Please refresh or contact course staff.`;

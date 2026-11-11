@@ -1,5 +1,7 @@
 # Ubuntu Deployment
 
+For Examiner review exports on the same refresh timer, see [Examiner publication](examiner-publication.md).
+
 This guide covers the shortest safe release procedure for the existing ORIE 4580 Ubuntu server. For source mappings and future dashboard changes, see [`maintenance.md`](maintenance.md).
 
 ## 1. Current production layout
@@ -77,9 +79,12 @@ sudo install -o root -g www-data -m 0644 \
 sudo install -o root -g www-data -m 0644 \
   static/simple-style.css \
   /var/www/html/orie4580_fa26/simple-style.css
+sudo install -o root -g www-data -m 0644 \
+  static/checkmarks.css \
+  /var/www/html/orie4580_fa26/checkmarks.css
 ```
 
-Forward compatibility depends on that order: install schema-6 `simple-dashboard.js` and `simple-style.css`, then run the refresh that publishes schema-6 records. The new JavaScript deliberately tolerates schema-3–5 pages whose older HTML has no pending-mapping container during this rollout window. For rollback, use the reverse dependency order: restore the previous schema-3–5 student release first, then restore the previous JavaScript and CSS, and finally roll back the checkout/config as needed. Never serve schema-6 records to an older browser validator.
+Forward compatibility depends on that order: install schema-6 `simple-dashboard.js`, `simple-style.css`, and its shared `checkmarks.css`, then run the refresh that publishes schema-6 records. The new JavaScript deliberately tolerates schema-3–5 pages whose older HTML has no pending-mapping container during this rollout window. For rollback, use the reverse dependency order: restore the previous schema-3–5 student release first, then restore the previous JavaScript and CSS, and finally roll back the checkout/config as needed. Never serve schema-6 records to an older browser validator.
 
 `load_config` is strict: a hand-edited `gradescope.toml` that omits
 `seal_when_closed` on an assignment, or `seal_recheck_hours` under `[cache]`, is
@@ -137,7 +142,7 @@ systemctl list-timers orie4580-checkoffs.timer
 For the removal of descriptive standard keys and categories, the Google Sheet,
 Gradescope assignments, production TOML config, and `gradescope-snapshot.json`
 need no changes. Keep the snapshot in place. Install the updated
-`static/simple-dashboard.js` and `static/simple-style.css` at the web root before
+`static/simple-dashboard.js`, `static/simple-style.css`, `static/checkmarks.css`, `static/exam3-review.js`, and `static/exam3-review.css` at the web root before
 the first refresh so the browser can read the new record schemas.
 
 After stopping the timer and waiting for any running refresh to finish, update
@@ -199,18 +204,21 @@ If the log ends with `cannot carry pass evidence across a changed course or assi
 - [ ] The timer is active only after validation.
 
 
-## Standalone grade calculator (optional, manual publication)
+## Grade calculator
 
 The calculator source is `static/grade_calculator/index.html`. It contains its
 own CSS and JavaScript and reads no student data. Its intended public URL is
 `https://zivscully.orie.cornell.edu/orie4580_fa26/grade_calculator/`.
-Preparing this file does not publish it. The refresh service and its
-`--copy-assets-to` option do not install the calculator.
+The refresh service’s `--copy-assets-to` option and local canary builder copy
+this page and its directory-scoped `.htaccess` alongside the dashboard assets.
+The student dashboard links to this maintained copy. No separate hosted copy is needed.
 
 Before an explicitly authorized publication, run locally:
 
 ```sh
+python3 scripts/sync_calculator_checkmarks.py --check
 node tests/grade_calculator.test.js
+node --test tests/checkmark_geometry.test.cjs
 git diff --check
 ```
 
@@ -225,11 +233,17 @@ sudo install -d -o root -g www-data -m 0755 \
 sudo install -o root -g www-data -m 0644 \
   static/grade_calculator/index.html \
   /var/www/html/orie4580_fa26/grade_calculator/index.html
+sudo install -o root -g www-data -m 0644 \
+  static/grade_calculator/.htaccess \
+  /var/www/html/orie4580_fa26/grade_calculator/.htaccess
 ```
 
 The checked-in `apache/course-root-redirect.conf` matches only the exact course
 root, so this subdirectory does not need a redirect exception. Apache should
 serve its `index.html` through the existing `DirectoryIndex` configuration.
+The calculator’s `.htaccess` disables inherited authentication only in its own
+directory, permits public access, and disables directory listing. Apache must
+allow these overrides (`AuthConfig`, `Options`, and `Indexes`).
 Inspect the active virtual host and any inherited authentication rules before
 publication: the calculator should be public, while `students/` retains all
 existing authorization rules. Do not loosen course-wide or student rules to
@@ -307,3 +321,12 @@ sudo install -o orie4580-dashboard -g www-data -m 0600 /var/lib/orie4580-dashboa
 Use unique backup/output names if they already exist. Skip migration if there is no Exam 2 publication state, or if it already has the formal S7 wording. The script accepts the previous S1–S6 catalog or the temporary “Standard 7” label; it rejects an already-current catalog rather than silently applying twice. Migration reads no Google/Gradescope data and changes no served student tree. It preserves the current ON/OFF setting, adds empty S7, and removes Lab 7 headers from the pending list; it does not fabricate checkoffs.
 
 Run a successful normal combined refresh before using the Exam 2 visibility switch, so its private combined snapshot includes real Lab 7 results. Verify Q1 under S6 and Q2 under S7, both with only **Manual checkoff**, True earning green and False not earning green. Verify Exam 2 visibility remains as intended, owner/cross-user/staff authorization, and updated grade estimates. Re-enable the timer only after success. Old full-catalog row-import fixtures/releases also need regeneration with S7.
+
+## Exam 3 browser assets
+
+The generated student template and staff index load `exam3-review.js`; student
+pages also load `exam3-review.css`. Deploy both alongside the shared dashboard
+assets before serving the updated templates. Asset-copy options include them.
+The browser expects protected per-student `exam3.json` and `exam3.pdf` files.
+File production and preservation across student-tree refreshes are not implemented
+in this pass; do not assume that manually placed files survive a refresh.

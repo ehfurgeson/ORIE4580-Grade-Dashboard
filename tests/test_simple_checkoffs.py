@@ -335,8 +335,11 @@ def test_flat_styles_and_shiny_shimmer_are_accessible():
     simple = Path("static/simple-style.css").read_text()
     full = Path("static/style.css").read_text()
     assert "border-radius: 0 !important" in simple
-    assert "shiny-checkmark-shimmer" in full
-    assert "prefers-reduced-motion: reduce" in full
+    shared = Path("static/checkmarks.css").read_text()
+    assert '@import url("checkmarks.css")' in simple
+    assert '@import url("checkmarks.css")' in full
+    assert "shiny-checkmark-shimmer" in shared
+    assert "prefers-reduced-motion: reduce" in shared
 
 
 def test_retained_previous_release_supports_manual_rollback(tmp_path):

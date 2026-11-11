@@ -24,6 +24,9 @@ class Element {
     });
     this.children.push(...children);
   }
+  replaceChildren(...children) { this.children = []; this.append(...children); }
+  querySelector(selector) { return this.querySelectorAll('*').find(node => selector.startsWith('#') && node.id === selector.slice(1)) || null; }
+  closest(tag) { return this.tag === tag ? this : this.parent?.closest(tag); }
   prepend(...children) { this.children.unshift(...children); }
   setAttribute(name, value) { this.attributes[name] = value; }
   addEventListener(name, callback) { this.listeners[name] = callback; }
@@ -58,7 +61,7 @@ function payload(version, pending) {
   };
 }
 
-async function run(data, { legacyTemplate = false } = {}) {
+async function run(data, { legacyTemplate = false, examData = undefined } = {}) {
   const nodes = elements();
   nodes["#dashboard"].hidden = true;
   nodes["#unmapped-columns-section"].hidden = true;
@@ -66,23 +69,34 @@ async function run(data, { legacyTemplate = false } = {}) {
     delete nodes["#unmapped-columns-section"];
     delete nodes["#unmapped-columns"];
   }
+  if (examData !== undefined) {
+    nodes['#exam3-section'] = new Element('details');
+    nodes['#exam3-review'] = new Element();
+    nodes['#exam3-section'].append(nodes['#exam3-review']);
+  }
   const context = {
     window: {},
     document: {
       querySelector(selector) {
-        if (selector === '#staff-index') return null;
+        if (selector === '#staff-index' || selector === '#file' || selector === '#exam3-page') return null;
         if (selector === "#unmapped-columns-section" || selector === "#unmapped-columns") {
           return nodes[selector] || null;
         }
         assert(nodes[selector], `unexpected selector: ${selector}`);
         return nodes[selector];
       },
-      createElement(tag) { return new Element(tag); }
+      createElement(tag) { return new Element(tag); },
+      createElementNS(ns, tag) { return new Element(tag); },
+      createDocumentFragment() { return new Element("fragment"); }
     },
-    fetch: async () => ({ ok: true, json: async () => data }),
+    location: {hash: ''},
+    fetch: async url => url.endsWith('exam3.json')
+      ? {ok: examData !== null, status: examData === null ? 404 : 200, json: async () => examData}
+      : { ok: true, json: async () => data },
     console,
     setTimeout,
   };
+  if (examData !== undefined) vm.runInNewContext(fs.readFileSync("static/exam3-review.js", "utf8"), context);
   vm.runInNewContext(source, context, { filename: "simple-dashboard.js" });
   await new Promise(resolve => setImmediate(resolve));
   return nodes;
@@ -214,6 +228,17 @@ async function checkStaffIndex(withNames = false) {
 (async () => {
   await checkStaffIndex();
   await checkStaffIndex(true);
+  const examData = JSON.parse(fs.readFileSync('fixtures/exam3/synthetic-student.json'));
+  const integrated = await run(payload(6, []), {examData});
+  assert.equal(integrated['#earned-total'].textContent, '4 of 9');
+  assert.equal(integrated['#exam3-review'].children.length, 0, 'Main dashboard does not embed the review');
+  assert.equal(integrated['#assignment-overview'].children[0].children[0].children[0].href, 'exam3/');
+  const examSlots = integrated['#assignment-overview'].children[0].children[1].children;
+  assert.equal(examSlots.length, 9);
+  assert.equal(examSlots[0].href, 'exam3/#q1');
+  const absentExam = await run(payload(6, []), {examData: null});
+  assert.equal(absentExam['#earned-total'].textContent, '0 of 0');
+  assert.equal(absentExam['#assignment-overview'].children[0].children[1].textContent, 'Not available yet');
   const assignmentData = payload(6, []);
   const examMark = (id, status, kind = 'purple') => ({
     id, label: id, status, kind,

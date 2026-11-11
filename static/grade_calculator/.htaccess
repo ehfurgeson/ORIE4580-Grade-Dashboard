@@ -1,0 +1,8 @@
+# Public, self-contained calculator; no student data belongs in this directory.
+Options -Indexes
+DirectoryIndex index.html
+AuthType None
+<IfModule mod_shib.c>
+    ShibRequestSetting requireSession 0
+</IfModule>
+Require all granted

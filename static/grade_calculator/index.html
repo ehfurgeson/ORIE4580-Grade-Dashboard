@@ -4,6 +4,90 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>Checkmark to grade calculator</title>
+<!-- BEGIN SHARED CHECKMARK CSS -->
+<style>
+/* Shared by both dashboards and the exam viewer. Vary size, never the symbol treatment. */
+:root {
+  --mark-green: #137333;
+  --mark-purple: #6f42c1;
+  --mark-muted: #5f6368;
+}
+
+.checkmark {
+  --checkmark-size: 1.35rem;
+  display: inline-grid;
+  flex: 0 0 auto;
+  place-items: center;
+  width: var(--checkmark-size);
+  height: var(--checkmark-size);
+  box-sizing: border-box;
+  position: relative;
+  vertical-align: middle;
+  border: calc(var(--checkmark-size) * .06) solid var(--mark-color, var(--mark-muted));
+  border-radius: 0;
+  font-family: Arial, sans-serif;
+  font-size: calc(var(--checkmark-size) * .56);
+  font-weight: 800;
+  line-height: 1;
+  color: var(--mark-color, var(--mark-muted));
+  background: color-mix(in srgb, var(--mark-color, var(--mark-muted)) 9%, white);
+}
+
+.checkmark.green, .linked-box.green { --mark-color: var(--mark-green); }
+.checkmark.purple, .checkmark.shiny_purple,
+.linked-box.purple, .linked-box.shiny_purple { --mark-color: var(--mark-purple); }
+/* Shared vector silhouettes stay centered at every size, independent of fonts.
+   A steep tick and softly curved, vertically elongated sparkle use a 24×24 viewBox. */
+.checkmark:not(.unearned):not(.empty-box) { font-size: 0; }
+.checkmark:not(.unearned):not(.empty-box)::before {
+  content: "";
+  position: absolute;
+  inset: 0;
+  background: var(--mark-color);
+  --mark-symbol: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24'%3E%3Cpath d='M6.5 12L10.2 16.8L17.5 7.2' fill='none' stroke='white' stroke-width='2.4' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/svg%3E");
+  -webkit-mask: var(--mark-symbol) center / 100% 100% no-repeat;
+  mask: var(--mark-symbol) center / 100% 100% no-repeat;
+  pointer-events: none;
+}
+.checkmark.shiny_purple:not(.unearned):not(.empty-box)::before {
+  --mark-symbol: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24'%3E%3Cpath d='M11.8 4.8Q12 3.8 12.2 4.8C13 9.3 14.5 10.9 18.3 11.8Q19.2 12 18.3 12.2C14.5 13.1 13 14.7 12.2 19.2Q12 20.2 11.8 19.2C11 14.7 9.5 13.1 5.7 12.2Q4.8 12 5.7 11.8C9.5 10.9 11 9.3 11.8 4.8Z'/%3E%3C/svg%3E");
+}
+.checkmark.unearned, .checkmark.empty-box {
+  color: var(--mark-muted);
+  background: transparent;
+  border: calc(var(--checkmark-size) * .065) solid #9aa0a6;
+  font-size: calc(var(--checkmark-size) * .56);
+  font-weight: 400;
+}
+.checkmark.empty-box { border-style: dashed; }
+
+.linked-box {
+  min-width: 4rem;
+  padding: .15rem .4rem;
+  border: 1px solid var(--mark-color, #9aa0a6);
+  border-radius: 0;
+  text-align: center;
+  font-weight: 650;
+  color: var(--mark-color, var(--mark-muted));
+  background: color-mix(in srgb, var(--mark-color, var(--mark-muted)) 9%, white);
+}
+.linked-box.empty-box { color: var(--mark-muted); border-color: #9aa0a6; border-style: dashed; font-weight: 400; }
+
+/* Animate only the masked symbol; the pale tile and colored rim remain still. */
+.checkmark.shiny_purple:not(.unearned):not(.empty-box)::before {
+  background: linear-gradient(115deg, var(--mark-color) 35%, #d6c0ff 49%, var(--mark-color) 63%);
+  background-size: 300% 100%;
+  animation: shiny-checkmark-shimmer 2.8s ease-in-out infinite;
+}
+@keyframes shiny-checkmark-shimmer {
+  0%, 30% { background-position: 100% 0; }
+  75%, 100% { background-position: 0% 0; }
+}
+@media (prefers-reduced-motion: reduce) {
+  .checkmark.shiny_purple::before { animation: none !important; background: var(--mark-color) !important; }
+}
+</style>
+<!-- END SHARED CHECKMARK CSS -->
 <style>
 :root { color-scheme: light; --ink:#202124; --muted:#5f6368; --line:#dadce0; --purple:#6f42c1; --green:#137333; }
 * { box-sizing:border-box; }
@@ -24,25 +108,26 @@ input[type=number] { width:70px; }
 .checkmark-grid th:first-child { position:sticky; left:0; z-index:1; background:white; border-right:1px solid var(--line); padding-right:4px; }
 .checkmark-grid td:nth-child(5), .checkmark-grid th:nth-child(5) { border-left:1px solid var(--line); padding-left:6px; }
 .unused .mark:not(.open-slot) { opacity:.35; }
-.mark.open-slot { color:#aaa; border-style:dotted; background:transparent; }
+
 .box-legend { display:flex; flex-wrap:wrap; align-items:center; gap:8px 16px; margin-top:12px; font-size:13px; color:var(--muted); }
 .box-legend > span { display:inline-flex; align-items:center; gap:5px; }
 .current-totals { background:#f8f9fa; font-weight:650; }
 section { margin-top:28px; } .scroll { overflow-x:auto; } table { border-collapse:collapse; width:100%; text-align:left; margin-top:14px; }
 th,td { padding:12px 10px; border-bottom:1px solid var(--line); vertical-align:middle; } th { font-size:12px; color:var(--muted); } th:first-child,td:first-child { padding-left:0; }
-.marks { display:flex; flex-wrap:wrap; gap:5px; align-items:center; min-width:0; } .mark { display:inline-grid; place-items:center; width:28px; height:28px; flex:0 0 28px; border:1.5px solid currentColor; font:700 15px/1 system-ui,sans-serif; }
-.green { color:var(--green); background:#eef7f0; } .purple,.shiny { color:var(--purple); background:#f1edf8; } .empty { color:#886000; background:#fff3bf; border-color:#d6a500; }
+.marks { display:flex; flex-wrap:wrap; gap:5px; align-items:center; min-width:0; }
+.mark { --checkmark-size: 28px; }
+
 .pass { color:var(--green); } .fail { color:#8a4c00; } .chosen { background:#f6f3fb; } td small { display:block; font-size:11px; }
 @media(max-width:700px) { main { padding:20px 16px; } th,td { padding:10px 6px; } input[type=number] { width:58px; } }
 .checkmark-grid th, .checkmark-grid td { padding:8px 4px; overflow-wrap:anywhere; }
 .checkmark-grid input[type=number] { width:100%; max-width:52px; min-width:0; padding:6px 3px; }
 .checkmark-grid .marks { gap:3px; }
-.checkmark-grid .mark, .box-legend .mark { width:24px; height:24px; flex-basis:24px; }
+.checkmark-grid .mark, .box-legend .mark { --checkmark-size: 24px; }
 @media(max-width:420px) {
   .checkmark-grid th { font-size:10px; }
   .checkmark-grid th, .checkmark-grid td { padding:6px 2px; }
   .checkmark-grid input[type=number] { font-size:12px; }
-  .checkmark-grid .mark, .box-legend .mark { width:20px; height:20px; flex-basis:20px; }
+  .checkmark-grid .mark, .box-legend .mark { --checkmark-size: 20px; }
 }
 .cutoff-table { width:min(100%, 520px); table-layout:fixed; font-variant-numeric:tabular-nums; }
 .cutoff-table th, .cutoff-table td { padding:7px 6px; text-align:left; overflow-wrap:anywhere; }
@@ -55,12 +140,6 @@ header { flex-wrap:wrap; }
 .controls #reset { justify-self:end; font-size:12px; padding:3px 8px; }
 .controls label { font-size:13px; }
 .controls input[type=number] { width:58px; }
-/* A symmetric star avoids font-baseline differences between browsers. */
-.mark.shiny {
-  color:var(--purple);
-  background:color-mix(in srgb, var(--purple) 10%, white);
- }
-.mark.shiny svg { display:block; width:18px; height:18px; max-width:100%; max-height:100%; fill:currentColor; }
 </style>
 </head>
 <body>
@@ -70,7 +149,7 @@ header { flex-wrap:wrap; }
 <noscript>Enable JavaScript to edit checkmarks.</noscript>
 <section aria-label="Checkmarks">
 <div class="scroll" tabindex="0" role="region" aria-label="Checkmark grid"><table class="checkmark-grid"><colgroup><col><col class="input-col"><col class="input-col"><col class="input-col"><col class="linked-col"><col class="output-col"><col class="output-col"></colgroup><thead><tr><th scope="col" aria-label="Standard"></th><th scope="col">Green ✓</th><th scope="col">Purple ✓</th><th scope="col">Shiny purple ✦</th><th scope="col">Standards-linked boxes</th><th scope="col">Shiny overflow</th><th scope="col">Earned but unused</th></tr></thead><tbody id="standards"></tbody></table></div>
-<div class="box-legend" aria-label="Box legend"><span><span class="mark green" aria-hidden="true">✓</span> Green</span><span><span class="mark purple" aria-hidden="true">✓</span> Purple</span><span><span class="mark shiny" aria-hidden="true"><svg viewBox="0 0 24 24" aria-hidden="true" focusable="false"><path d="M12 2C12 8 8 12 2 12C8 12 12 16 12 22C12 16 16 12 22 12C16 12 12 8 12 2Z"/></svg></span> Shiny purple</span><span><span class="mark empty" aria-hidden="true">!</span> Missing</span></div>
+<div class="box-legend" aria-label="Box legend"><span><span class="mark checkmark green" aria-hidden="true">✓</span> Green</span><span><span class="mark checkmark purple" aria-hidden="true">✓</span> Purple</span><span><span class="mark checkmark shiny_purple" aria-hidden="true">✦</span> Shiny purple</span><span><span class="mark checkmark empty-box" aria-hidden="true">!</span> Missing</span></div>
 </section>
 <section aria-label="Tentative grade cutoffs">
 <div class="scroll"><table class="cutoff-table"><thead><tr><th scope="col">Grade</th><th scope="col">Standards with purple ≥</th><th scope="col">Total purple ≥</th><th scope="col">Shiny purple ≥</th><th scope="col">Missing ≤</th></tr></thead><tbody id="current-totals" class="current-totals"></tbody><tbody id="cutoffs"></tbody></table></div>
@@ -100,8 +179,7 @@ function evaluate(rows) {
 if (typeof document !== 'undefined') {
   const $ = id => document.getElementById(id);
   let rows = Array.from({length:5}, () => ({green:0,purple:0,shiny:0}));
-  const shinySymbol = '<svg viewBox="0 0 24 24" aria-hidden="true" focusable="false"><path d="M12 2C12 8 8 12 2 12C8 12 12 16 12 22C12 16 16 12 22 12C16 12 12 8 12 2Z"/></svg>';
-  function mark(kind) { const name = {empty:'Missing',green:'Green',purple:'Purple',shiny:'Shiny purple'}[kind]; return `<span class="mark ${kind}" role="img" aria-label="${name}" title="${name}">${kind === 'empty' ? '!' : kind === 'shiny' ? shinySymbol : '✓'}</span>`; }
+  function mark(kind) { const name = {empty:'Missing',green:'Green',purple:'Purple',shiny:'Shiny purple'}[kind]; return `<span class="mark checkmark ${kind === 'shiny' ? 'shiny_purple' : kind === 'empty' ? 'empty-box' : kind}" role="img" aria-label="${name}" title="${name}">${kind === 'empty' ? '!' : kind === 'shiny' ? '✦' : '✓'}</span>`; }
   function buildRows() {
     $('standards').innerHTML = rows.map((r,i) => `<tr><th scope="row">S${i+1}</th>${['green','purple','shiny'].map(k => `<td><input type="number" min="0" max="999" step="1" value="${r[k]}" data-row="${i}" data-kind="${k}" aria-label="S${i+1} ${k === 'shiny' ? 'shiny purple' : k} earned"></td>`).join('')}<td id="linked-${i}"></td><td id="overflow-${i}"></td><td id="unused-${i}" class="unused"></td></tr>`).join('');
   }
@@ -110,8 +188,8 @@ if (typeof document !== 'undefined') {
     $('current-totals').innerHTML = `<tr><th scope="row">Your scenario</th>${result.totals.map(v => `<td>${v}</td>`).join('')}</tr>`;
     result.allocations.forEach((a,i) => {
       $(`linked-${i}`).innerHTML = `<div class="marks">${a.linked.map(mark).join('')}</div>`;
-      $(`overflow-${i}`).innerHTML = `<div class="marks">${Array(a.overflow).fill('shiny').map(mark).join('')}${Array(Math.max(0, 3 - a.overflow)).fill('<span class="mark open-slot" role="img" aria-label="Empty overflow slot" title="Empty overflow slot"></span>').join('')}</div>`;
-      $(`unused-${i}`).innerHTML = `<div class="marks" aria-label="Earned but unused">${a.unused.map(mark).join('')}${Array(Math.max(0, 3 - a.unused.length)).fill('<span class="mark open-slot" role="img" aria-label="Empty unused slot" title="Empty unused slot"></span>').join('')}</div>`;
+      $(`overflow-${i}`).innerHTML = `<div class="marks">${Array(a.overflow).fill('shiny').map(mark).join('')}${Array(Math.max(0, 3 - a.overflow)).fill('<span class="mark checkmark empty-box open-slot" role="img" aria-label="Empty overflow slot" title="Empty overflow slot"></span>').join('')}</div>`;
+      $(`unused-${i}`).innerHTML = `<div class="marks" aria-label="Earned but unused">${a.unused.map(mark).join('')}${Array(Math.max(0, 3 - a.unused.length)).fill('<span class="mark checkmark empty-box open-slot" role="img" aria-label="Empty unused slot" title="Empty unused slot"></span>').join('')}</div>`;
     });
     $('cutoffs').innerHTML = result.cutoffs.map(c => `<tr class="${c.grade === result.grade ? 'chosen' : ''}"${c.grade === result.grade ? ' aria-current="true"' : ''}><th scope="row">${c.grade}</th>${c.limits.map(v => `<td>${v}</td>`).join('')}</tr>`).join('');
 

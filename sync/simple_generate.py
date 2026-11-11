@@ -13,6 +13,7 @@ from .combined_checkoffs import validate_combined_record
 from .simple_checkoffs import NETID_PATTERN
 from .standards import STANDARDS
 from .staff_roster import load_staff_roster
+from .examiner_exports import load_reviews
 
 
 STAFF_USERS = (
@@ -125,6 +126,7 @@ def render_staff_index(netids: list[str]) -> str:
       <p id="no-students" class="note" hidden>No matching students.</p>
     </section>
   </main>
+  <script src="../exam3-review.js" defer></script>
   <script src="../simple-dashboard.js" defer></script>
 </body>
 </html>
@@ -198,6 +200,7 @@ def write_simple_release(
     *,
     template_path: str | Path = "templates/simple_student_dashboard.html",
     retain_previous: bool = False,
+    examiner_exports: str | Path | None = None,
 ) -> list[Path]:
     """Validate everything, build a new tree, then replace the prior release.
 
@@ -227,7 +230,16 @@ def write_simple_release(
     if errors:
         raise ValueError("invalid simple records: " + "; ".join(errors))
 
+    reviews = None
+    if examiner_exports is not None:
+        source = Path(examiner_exports).resolve()
+        destination = Path(output_dir).resolve()
+        if source == destination or source.is_relative_to(destination) or destination.is_relative_to(source):
+            raise ValueError("Examiner exports and student output must be separate trees")
+        reviews = load_reviews(Path(examiner_exports), seen)
+
     template = Path(template_path).read_text(encoding="utf-8")
+    exam_template = (Path(__file__).resolve().parents[1] / "templates" / "exam3_student_review.html").read_text(encoding="utf-8")
     output = Path(output_dir)
     output.parent.mkdir(parents=True, exist_ok=True)
     staging = Path(tempfile.mkdtemp(prefix=f".{output.name}-staging-", dir=output.parent))
@@ -246,7 +258,25 @@ def write_simple_release(
             netid = record["student"]["netid"]
             student_dir = staging / netid
             student_dir.mkdir(mode=0o750)
+            # A local rebuild (including the Exam 2 switch) preserves reviews.
+            # Configured pulls reconstruct JSON from the authoritative exports.
+            for name in ('exam3.json', 'exam3.pdf'):
+                previous = output / netid / name
+                target = student_dir / name
+                if name == 'exam3.json' and reviews is not None:
+                    if netid in reviews:
+                        target.write_text(_payload({**reviews[netid], 'published_at': record['updated_at']}), encoding='utf-8')
+                elif previous.exists() or previous.is_symlink():
+                    if (output / netid).is_symlink() or previous.is_symlink() or not previous.is_file():
+                        raise ValueError("Existing Examiner review must be a regular protected file")
+                    shutil.copyfile(previous, target)
+                if target.exists():
+                    os.chmod(target, 0o640)
             (student_dir / "index.html").write_text(template, encoding="utf-8")
+            exam_dir = student_dir / "exam3"
+            exam_dir.mkdir(mode=0o750)
+            (exam_dir / "index.html").write_text(exam_template, encoding="utf-8")
+            os.chmod(exam_dir / "index.html", 0o640)
             (student_dir / "checkoffs.json").write_text(_payload(record), encoding="utf-8")
             (student_dir / ".htaccess").write_text(
                 HTACCESS_TEMPLATE.format(netid=netid), encoding="utf-8"

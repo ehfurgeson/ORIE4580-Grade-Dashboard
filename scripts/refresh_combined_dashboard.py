@@ -178,6 +178,7 @@ def main() -> None:
     parser.add_argument("--completion-cache", type=Path, help="private positive-only cache")
     parser.add_argument("--lock-file", type=Path, help="private nonblocking process lock")
     parser.add_argument("--exam2-state", type=Path, help="private collected dashboard and Exam 2 visibility state")
+    parser.add_argument('--examiner-exports', type=Path, help="private Examiner exports directory; publish completed Exam 3 batches")
     parser.add_argument(
         "--force-full-revalidation", action="store_true",
         help="perform every Lab source check while preserving verified positive results",
@@ -204,6 +205,8 @@ def main() -> None:
         _validate_exam2_preview(args)
         selected_netid = _selected_netid(args.student_id, args.all_students)
         _require_private_state(args.snapshot, args.output, args.copy_assets_to)
+        if args.examiner_exports is not None:
+            _require_private_state(args.examiner_exports, args.output, args.copy_assets_to or args.output.parent)
         if args.completion_cache is not None:
             _require_private_state(args.completion_cache, args.output, args.copy_assets_to)
         if args.lock_file is not None:
@@ -408,7 +411,8 @@ def main() -> None:
                 "collected_at": timestamp, "records": combined,
             })
         public_records = visible_records(combined, exam2_visible)
-        paths = write_simple_release(public_records, args.output, retain_previous=False)
+        paths = write_simple_release(public_records, args.output, retain_previous=False,
+                                     examiner_exports=args.examiner_exports)
         write_snapshot_atomic(snapshot, args.snapshot)
         if cache_active and args.completion_cache is not None:
             next_cache = build_completion_cache(
@@ -418,7 +422,8 @@ def main() -> None:
 
         if args.copy_assets_to is not None:
             args.copy_assets_to.mkdir(parents=True, exist_ok=True)
-            for asset in ("simple-dashboard.js", "simple-style.css"):
+            for asset in ("simple-dashboard.js", "simple-style.css", "checkmarks.css", "exam3-review.js", "exam3-review.css", "grade_calculator/index.html", "grade_calculator/.htaccess"):
+                (args.copy_assets_to / asset).parent.mkdir(parents=True, exist_ok=True)
                 shutil.copy2(Path("static") / asset, args.copy_assets_to / asset)
     except (GradescopeAdapterError, KeyError, OSError, RuntimeError, ValueError, json.JSONDecodeError) as error:
         parser.error(str(error))

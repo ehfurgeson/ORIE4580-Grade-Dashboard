@@ -1,5 +1,7 @@
 # ORIE 4580 Grade Dashboard
 
+Examiner review publishing: see [the pull setup and permissions guide](docs/examiner-publication.md).
+
 A small Zola frontend and Python publishing pipeline for the Fall 2026 standards-based grade dashboard. The UI allocates green, purple, and shiny-purple checkmarks to the syllabus checkbox system and shows the first currently satisfied grading threshold.
 
 > **Deployment status:** the combined Google Sheets + Gradescope + Exam 1 pipeline passed a class-scale staging refresh for 174 unique NetIDs and all generated schema-v4 records validated. Deploy one manual Ubuntu refresh and pass the owner/cross-user/explicit-staff Shibboleth authorization matrix before enabling the production timer.
@@ -223,7 +225,7 @@ students/ehf38/
 
 Generate student pages with `scripts.refresh_combined_dashboard` as shown above. Sheet rows must be merged with Gradescope results before publication; the manual-only publisher has been removed. Malformed checkbox values in mapped columns, unsafe NetIDs, and duplicate NetIDs fail closed.
 
-Deploy `static/simple-dashboard.js` and `static/simple-style.css` as public assets under the course root, then publish the protected student tree. An owner page is available at:
+Deploy `static/simple-dashboard.js`, `static/simple-style.css`, `static/checkmarks.css`, `static/exam3-review.js`, and `static/exam3-review.css` as public assets under the course root, then publish the protected student tree. An owner page is available at:
 
 ```text
 https://zivscully.orie.cornell.edu/orie4580_fa26/students/ehf38/
@@ -305,7 +307,7 @@ sudo systemctl enable --now orie4580-checkoffs.timer
 
 ### Authorization-only update
 
-The staff-only `/students/` index supports NetID and name search and a **Show checkmarks** button. Checkmark columns start hidden; **Hide checkmarks**, Escape, switching tabs, or returning to the page hides them again. On first reveal, it reads the existing protected student JSON files (six requests at a time), respecting published Exam 2 visibility. Each row shows counted purple marks (including shiny purple), missing linked boxes, each standard's two linked boxes, and shiny overflow. Click any column heading to sort, and click again to reverse. Standard columns sort by purple boxes (including shiny), then purple + green boxes, then shiny purple boxes. Unavailable values stay last. Hiding checkmarks resets grade-based ordering to NetID for privacy; name sorting is retained. Standards outside a student's course catalog show N/A. Failed summaries show an error instead of zero totals; hide and show again to retry. Reload to pick up newly synced results. This page uses the existing `simple-dashboard.js` and `simple-style.css` assets, which need to be updated along with the generated index.
+The staff-only `/students/` index supports NetID and name search and a **Show checkmarks** button. Checkmark columns start hidden; **Hide checkmarks**, Escape, switching tabs, or returning to the page hides them again. On first reveal, it reads the existing protected student JSON files (six requests at a time), respecting published Exam 2 visibility. Each row shows counted purple marks (including shiny purple), missing linked boxes, each standard's two linked boxes, and shiny overflow. Click any column heading to sort, and click again to reverse. Standard columns sort by purple boxes (including shiny), then purple + green boxes, then shiny purple boxes. Unavailable values stay last. Hiding checkmarks resets grade-based ordering to NetID for privacy; name sorting is retained. Standards outside a student's course catalog show N/A. Failed summaries show an error instead of zero totals; hide and show again to retry. Reload to pick up newly synced results. This page uses the existing `simple-dashboard.js`, `simple-style.css`, `checkmarks.css`, and `exam3-review.js` assets, which need to be updated along with the generated index.
 
 Staff authorization and the protected staff index can be updated without fetching Google Sheets or Gradescope and without changing any student HTML or JSON:
 
@@ -419,3 +421,35 @@ tests/                 Python tests
 ```
 
 Run `python -m pytest -q && zola check` before sharing or deploying changes.
+
+## Exam 3 review
+
+Open `static/exam3-review.html` and select an individual JSON file produced by
+Examiner's **Preview student JSON** export. The file is read locally in the browser;
+no upload or server is needed. `fixtures/exam3/synthetic-student.json` is an invented
+Q1–Q9 example with embedded scan images, correct/incorrect/blank outcomes, and code
+output. Its answers and judgments are illustrative, not exam solutions.
+
+The review uses the dashboard stylesheet, large standard-labeled earned marks,
+compact answer/scan pairs, and a click-to-zoom scan overlay. Old exports without
+images still open; re-export from Examiner to include the aligned original work.
+The student dashboard fetches `exam3.json` from the same student directory as
+`checkoffs.json`, with the existing same-origin authorization and no-store caching.
+Its decisions feed the Exam 3 assignment row, standard allocations, and staff
+summaries. Assignment links open a separate `exam3/` review page. Missing files show “Not
+available yet”; invalid/unreadable files show Exam 3 as unavailable. No fetched
+Examiner data is written back to `checkoffs.json`.
+
+The review page links to `exam3.pdf` in that same directory; zoom overlays link
+to the source PDF page for their scan. Its header shows NetID and the export time
+as Last synced. The publisher creates the static `exam3/index.html` page shell. Question headings
+remain visible when collapsed; all questions start collapsed. The standalone file picker remains available for
+local inspection.
+
+This pass does not place or preserve `exam3.json`/`exam3.pdf` during directory
+refresh. The existing publisher still replaces the student tree; file delivery
+and preservation are a separate follow-up.
+
+All dashboard marks use `static/checkmarks.css`. The separately hosted calculator
+keeps an exact inline copy: run `python scripts/sync_calculator_checkmarks.py`
+after editing that stylesheet, and `--check` to verify it has not drifted.
