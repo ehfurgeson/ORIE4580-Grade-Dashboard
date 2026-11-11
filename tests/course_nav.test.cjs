@@ -13,7 +13,7 @@ function run(path, root) {
 test('navigation preserves the student across exam and calculator pages', () => {
   for (const [path, root] of [['/course/students/abc123/', '../../'], ['/course/students/abc123/exam3/', '../../../'], ['/course/grade_calculator/?student=abc123', '../']]) {
     const links = run(path, root);
-    assert.equal(links.dashboard.href, 'https://example.org/course/students/abc123/');
+    assert.equal(links.dashboard.href, 'https://example.org/course/');
     assert.equal(links.exam3.href, 'https://example.org/course/students/abc123/exam3/');
     assert.equal(links.calculator.href, 'https://example.org/course/grade_calculator/?student=abc123');
   }
@@ -21,5 +21,11 @@ test('navigation preserves the student across exam and calculator pages', () => 
 test('public calculator does not guess an identity or accept arbitrary destinations', () => {
   for (const query of ['', '?student=https://evil.example', '?student=../../staff']) {
     assert.equal(run('/course/grade_calculator/' + query, '../').exam3.href, undefined);
+  }
+});
+
+test('staff list and public calculator use the authenticated dashboard redirect', () => {
+  for (const path of ['/course/students/', '/course/grade_calculator/']) {
+    assert.equal(run(path, '../').dashboard.href, 'https://example.org/course/');
   }
 });
