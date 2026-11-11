@@ -4,83 +4,16 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>Checkmark to grade calculator</title>
-<!-- BEGIN SHARED CHECKMARK CSS -->
-<style>
-/* Shared by both dashboards and the exam viewer. Vary size, never the symbol treatment. */
-:root {
-  --mark-green: #137333;
-  --mark-purple: #6f42c1;
-  --mark-muted: #5f6368;
-}
-
-.checkmark {
-  --checkmark-size: 1.35rem;
-  display: inline-grid;
-  flex: 0 0 auto;
-  place-items: center;
-  width: var(--checkmark-size);
-  height: var(--checkmark-size);
-  box-sizing: border-box;
-  position: relative;
-  vertical-align: middle;
-  border: calc(var(--checkmark-size) * .06) solid var(--mark-color, var(--mark-muted));
-  border-radius: 0;
-  font-family: Arial, sans-serif;
-  font-size: calc(var(--checkmark-size) * .56);
-  font-weight: 800;
-  line-height: 1;
-  color: var(--mark-color, var(--mark-muted));
-  background: color-mix(in srgb, var(--mark-color, var(--mark-muted)) 9%, white);
-}
-
-.checkmark.green, .linked-box.green { --mark-color: var(--mark-green); }
-.checkmark.purple, .checkmark.shiny_purple,
-.linked-box.purple, .linked-box.shiny_purple { --mark-color: var(--mark-purple); }
-/* Shared vector silhouettes stay centered at every size, independent of fonts.
-   A steep tick and softly curved, vertically elongated sparkle use a 24×24 viewBox. */
-.checkmark:not(.unearned):not(.empty-box) { font-size: 0; }
-.checkmark:not(.unearned):not(.empty-box)::before {
-  content: "";
-  position: absolute;
-  inset: 0;
-  background: var(--mark-color);
-  --mark-symbol: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24'%3E%3Cpath d='M6.5 12L10.2 16.8L17.5 7.2' fill='none' stroke='white' stroke-width='2.4' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/svg%3E");
-  -webkit-mask: var(--mark-symbol) center / 100% 100% no-repeat;
-  mask: var(--mark-symbol) center / 100% 100% no-repeat;
-  pointer-events: none;
-}
-.checkmark.shiny_purple:not(.unearned):not(.empty-box)::before {
-  --mark-symbol: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24'%3E%3Cpath d='M11.8 4.8Q12 3.8 12.2 4.8C13 9.3 14.5 10.9 18.3 11.8Q19.2 12 18.3 12.2C14.5 13.1 13 14.7 12.2 19.2Q12 20.2 11.8 19.2C11 14.7 9.5 13.1 5.7 12.2Q4.8 12 5.7 11.8C9.5 10.9 11 9.3 11.8 4.8Z'/%3E%3C/svg%3E");
-}
-.checkmark.unearned, .checkmark.empty-box {
-  color: var(--mark-muted);
-  background: transparent;
-  border: calc(var(--checkmark-size) * .065) solid #9aa0a6;
-  font-size: calc(var(--checkmark-size) * .56);
-  font-weight: 400;
-}
-.checkmark.empty-box { border-style: dashed; }
-
-.linked-box {
-  min-width: 4rem;
-  padding: .15rem .4rem;
-  border: 1px solid var(--mark-color, #9aa0a6);
-  border-radius: 0;
-  text-align: center;
-  font-weight: 650;
-  color: var(--mark-color, var(--mark-muted));
-  background: color-mix(in srgb, var(--mark-color, var(--mark-muted)) 9%, white);
-}
-.linked-box.empty-box { color: var(--mark-muted); border-color: #9aa0a6; border-style: dashed; font-weight: 400; }
-</style>
-<!-- END SHARED CHECKMARK CSS -->
+<link rel="stylesheet" href="../checkmarks.css">
+<link rel="stylesheet" href="../course-nav.css">
+<script src="../course-nav.js" defer></script>
 <style>
 :root { color-scheme: light; --ink:#202124; --muted:#5f6368; --line:#dadce0; --purple:#6f42c1; --green:#137333; }
 * { box-sizing:border-box; }
 body { margin:0; background:#fff; color:var(--ink); font:15px/1.5 system-ui,sans-serif; }
 main { max-width:1080px; margin:auto; padding:32px 24px 60px; }
 h1 { font-size:24px; letter-spacing:-.03em; margin:0; } h2 { font-size:20px; margin:0; } p { margin:.5rem 0; }
-header { display:flex; align-items:center; justify-content:space-between; gap:16px; } .muted, small { color:var(--muted); }
+.muted, small { color:var(--muted); }
 button,select,input { font:inherit; color:inherit; border:1px solid #9aa0a6; background:white; padding:8px; }
 button { cursor:pointer; } button:hover { background:#f1edf8; border-color:var(--purple); }
 :focus-visible { outline:3px solid var(--purple); outline-offset:3px; }
@@ -131,7 +64,7 @@ header { flex-wrap:wrap; }
 </head>
 <body>
 <main>
-<header><h1>Checkmark to grade calculator</h1></header>
+<header class="course-header"><p class="eyebrow">ORIE 4580</p><h1>Grade calculator</h1><nav class="course-nav" aria-label="Course" data-root="../"><a data-page="dashboard" href="../">Dashboard</a><a data-page="calculator" href="../grade_calculator/" aria-current="page">Grade calculator</a><a data-page="exam3" aria-disabled="true" title="Open a student dashboard to view Exam 3">Exam 3</a></nav></header>
 <div class="controls"><label for="count"># of standards</label><input id="count" type="number" min="1" max="30" step="1" value="5"><button id="reset">Reset</button></div>
 <noscript>Enable JavaScript to edit checkmarks.</noscript>
 <section aria-label="Checkmarks">

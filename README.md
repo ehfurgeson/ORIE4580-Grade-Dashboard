@@ -45,9 +45,8 @@ The browser requests the relative URL `students/me/grades.json`, so local and st
 
 ## Standalone grade calculator
 
-Open `static/grade_calculator/index.html` directly in a browser, or serve `static/` and visit
-`/grade_calculator/`. This self-contained page needs no student data, network calls,
-or build. Edit earned counts (five standards by default, with an adjustable
+Serve `static/` and visit `/grade_calculator/`. The calculator loads shared
+checkmark and navigation assets, but needs no student data or build. Edit earned counts (five standards by default, with an adjustable
 standard count) to update linked
 boxes, shiny overflow, unused marks, and tentative grade cutoffs. The currently
 satisfied grade is highlighted. Reset clears all counts.
@@ -450,6 +449,7 @@ This pass does not place or preserve `exam3.json`/`exam3.pdf` during directory
 refresh. The existing publisher still replaces the student tree; file delivery
 and preservation are a separate follow-up.
 
-All dashboard marks use `static/checkmarks.css`. The separately hosted calculator
-keeps an exact inline copy: run `python scripts/sync_calculator_checkmarks.py`
-after editing that stylesheet, and `--check` to verify it has not drifted.
+All dashboard and calculator marks load `static/checkmarks.css` directly.
+Dashboard, calculator, and Exam 3 share `course-nav.css` and `course-nav.js`.
+Calculator links carry a validated student NetID solely for navigation; access
+to student data remains controlled by Apache.

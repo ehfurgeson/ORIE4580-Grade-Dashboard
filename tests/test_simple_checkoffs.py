@@ -331,15 +331,15 @@ def test_frontend_renders_mapped_text_without_inner_html():
     assert "innerHTML" not in script
 
 
-def test_flat_styles_and_shiny_shimmer_are_accessible():
+def test_flat_styles_and_static_shiny_marks_are_shared():
     simple = Path("static/simple-style.css").read_text()
     full = Path("static/style.css").read_text()
     assert "border-radius: 0 !important" in simple
     shared = Path("static/checkmarks.css").read_text()
     assert '@import url("checkmarks.css")' in simple
     assert '@import url("checkmarks.css")' in full
-    assert "shiny-checkmark-shimmer" in shared
-    assert "prefers-reduced-motion: reduce" in shared
+    assert "animation:" not in shared
+    assert "@keyframes" not in shared
 
 
 def test_retained_previous_release_supports_manual_rollback(tmp_path):

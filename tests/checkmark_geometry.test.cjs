@@ -25,10 +25,8 @@ test('tick and sparkle use centered vector geometry at every display size', () =
   assert.doesNotMatch(css, /animation:|@keyframes/, 'Marks remain static');
 });
 
-test('standalone calculator embeds exactly the same styles without an external stylesheet', () => {
+test('calculator loads the shared styles directly', () => {
   const html = fs.readFileSync(path.join(root, 'static/grade_calculator/index.html'), 'utf8');
-  const embedded = html.match(/<!-- BEGIN SHARED CHECKMARK CSS -->\s*<style>\n([\s\S]*?)<\/style>/)[1];
-  assert.equal(embedded.trim(), css.trim());
-  assert.doesNotMatch(html, /<link[^>]+rel=["']stylesheet/);
-  assert.doesNotMatch(html, /<svg/, 'Calculator must not retain its old independent sparkle');
+  assert.match(html, /href="\.\.\/checkmarks.css"/);
+  assert.doesNotMatch(html, /BEGIN SHARED CHECKMARK CSS|<svg/);
 });

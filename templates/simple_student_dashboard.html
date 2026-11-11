@@ -5,14 +5,16 @@
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <title>ORIE 4580 Standards Dashboard</title>
   <link rel="stylesheet" href="../../simple-style.css">
+  <link rel="stylesheet" href="../../course-nav.css">
+  <script src="../../course-nav.js" defer></script>
 </head>
 <body>
   <main class="simple-container">
-    <header>
+    <header class="course-header">
       <p class="eyebrow">ORIE 4580</p>
       <h1>Standards Dashboard</h1>
-      <nav aria-label="Course tools"><a href="../../grade_calculator/">Grade calculator</a></nav>
       <p id="dashboard-description">Your lab progress, mapped to the standards it demonstrates.</p>
+      <nav class="course-nav" aria-label="Course" data-root="../../"><a data-page="dashboard" href="./" aria-current="page">Dashboard</a><a data-page="calculator" href="../../grade_calculator/">Grade calculator</a><a data-page="exam3" href="exam3/">Exam 3</a></nav>
     </header>
     <p id="status" class="status" role="status" aria-live="polite">Loading your checkoffs…</p>
     <section id="dashboard" aria-labelledby="standards-title" hidden>

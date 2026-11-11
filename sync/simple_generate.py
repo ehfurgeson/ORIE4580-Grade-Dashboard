@@ -92,12 +92,15 @@ def render_staff_index(netids: list[str]) -> str:
   <meta name="robots" content="noindex, nofollow, noarchive">
   <title>ORIE 4580 Staff Dashboard Index</title>
   <link rel="stylesheet" href="../simple-style.css">
+  <link rel="stylesheet" href="../course-nav.css">
+  <script src="../course-nav.js" defer></script>
 </head>
 <body>
   <main class="simple-container staff-container" id="staff-index">
-    <header>
+    <header class="course-header">
       <p class="eyebrow">ORIE 4580</p>
       <h1>Student dashboards</h1>
+      <nav class="course-nav" aria-label="Course" data-root="../"><a data-page="dashboard" href="../" aria-current="page">Dashboard</a><a data-page="calculator" href="../grade_calculator/">Grade calculator</a><a data-page="exam3" aria-disabled="true" title="Open a student dashboard to view Exam 3">Exam 3</a></nav>
       <p>Protected staff index. Select a NetID to open that student's dashboard.</p>
     </header>
     <section aria-labelledby="student-list-title">

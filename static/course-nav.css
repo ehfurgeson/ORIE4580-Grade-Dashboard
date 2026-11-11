@@ -1,0 +1,9 @@
+.course-header { display: block; }
+.course-header .eyebrow { margin: 0 0 .25rem; color: #5f6368; font-size: .75rem; font-weight: 650; letter-spacing: .08em; text-transform: uppercase; }
+.course-header h1 { margin: 0; }
+.course-nav { display: flex; flex-wrap: wrap; gap: .3rem; margin-top: 1rem; }
+.course-nav a { display: inline-flex; padding: .4rem .7rem; border: 1px solid transparent; color: #5f6368; font: 500 .85rem/1.5 system-ui, sans-serif; text-decoration: none; }
+.course-nav a[href]:hover { color: #6f42c1; background: #f6f3fb; }
+.course-nav a[aria-current="page"] { color: #6f42c1; background: #f1edf8; border-color: #d7c8f1; }
+.course-nav a[aria-disabled="true"] { opacity: .55; }
+.course-nav a:focus-visible { outline: 2px solid #6f42c1; outline-offset: 2px; }

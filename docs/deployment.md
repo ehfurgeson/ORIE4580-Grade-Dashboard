@@ -209,8 +209,8 @@ If the log ends with `cannot carry pass evidence across a changed course or assi
 
 ## Grade calculator
 
-The calculator source is `static/grade_calculator/index.html`. It contains its
-own CSS and JavaScript and reads no student data. Its intended public URL is
+The calculator source is `static/grade_calculator/index.html`. It loads shared
+checkmark and navigation assets and reads no student data. Its intended public URL is
 `https://zivscully.orie.cornell.edu/orie4580_fa26/grade_calculator/`.
 The refresh service’s `--copy-assets-to` option and local canary builder copy
 this page and its directory-scoped `.htaccess` alongside the dashboard assets.
@@ -219,18 +219,20 @@ The student dashboard links to this maintained copy. No separate hosted copy is 
 Before an explicitly authorized publication, run locally:
 
 ```sh
-python3 scripts/sync_calculator_checkmarks.py --check
 node tests/grade_calculator.test.js
 node --test tests/checkmark_geometry.test.cjs
 git diff --check
 ```
 
 After transferring the reviewed source to the server checkout, the following
-commands install only the calculator. They do not require a student refresh,
+commands install the calculator and its shared assets. They do not require a student refresh,
 timer interruption, or changes to the course-root redirect:
 
 ```sh
 cd /opt/orie4580-grade-dashboard
+sudo install -o root -g www-data -m 0644 \
+  static/checkmarks.css static/course-nav.css static/course-nav.js \
+  /var/www/html/orie4580_fa26/
 sudo install -d -o root -g www-data -m 0755 \
   /var/www/html/orie4580_fa26/grade_calculator
 sudo install -o root -g www-data -m 0644 \
