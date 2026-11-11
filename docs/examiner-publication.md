@@ -112,21 +112,22 @@ reader ACL. Existing exports need the recursive ACL command above. The dashboard
 gets no write permission to Examiner data. Do not give the web server access to
 the export source. Preserve Examiner's own runtime access during migration.
 
-Enable pulling with `sudo systemctl edit orie4580-checkoffs.service`:
-
-```ini
-[Service]
-Environment="ORIE4580_REFRESH_FLAGS=--examiner-exports /var/lib/examiner/exam3/exports"
-```
-
-If `ORIE4580_REFRESH_FLAGS` already has flags, include them in the same value.
-Then run:
+The checked-in `deployment/orie4580-checkoffs.service` includes
+`--local-grades /var/lib/examiner/exam_03/exports` directly in `ExecStart`.
+Install it to enable local pulls on the regular refresh timer:
 
 ```sh
+cd /opt/orie4580-grade-dashboard
+sudo install -o root -g root -m 0644 deployment/orie4580-checkoffs.service /etc/systemd/system/orie4580-checkoffs.service
 sudo systemctl daemon-reload
-sudo systemctl start orie4580-checkoffs.service
-sudo journalctl -u orie4580-checkoffs.service -n 60 --no-pager
+sudo systemctl enable --now orie4580-checkoffs.timer
+systemctl cat orie4580-checkoffs.service
 ```
+
+If an old drop-in sets `--local-grades` or `--examiner-exports` in
+`ORIE4580_REFRESH_FLAGS`, remove that source flag from the drop-in; retain any
+unrelated validation flags. No source override is needed for this installation.
+To refresh immediately, run `sudo systemctl start orie4580-checkoffs.service`.
 
 First verify this with synthetic export batches and a staging output directory.
 Check that the service can read a newly generated batch, that the matching student
