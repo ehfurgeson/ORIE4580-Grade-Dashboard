@@ -189,3 +189,12 @@ title_mapping_override = false
 # The first closed run performs one final full check, then the recorded result
 # for every roster member is served without any further Gradescope reads.
 seal_when_closed = false
+
+[assignments."9030150"]
+opportunity_id = "lab9-q1"
+contract_version = "lab9-q1-v1"
+expected_score = "3"
+expected_test_count = 3
+expected_test_maxima = ["1", "1", "1"]
+title_mapping_override = false
+seal_when_closed = false

@@ -21,13 +21,17 @@ def migrate_lab7_state(state: dict) -> dict:
     for record in records:
         standards = record.get("standards", [])
         ids = [s.get("id") for s in standards]
-        if ids == list(STANDARDS)[:-1]:
+        if ids == list(STANDARDS)[:6]:
             record["standards"].append({"id":"S7", "name":STANDARDS["S7"], "checkmarks":[]})
-        elif ids == list(STANDARDS) and standards[-1].get("name") == "Standard 7":
-            standards[-1]["name"] = STANDARDS["S7"]
+        elif ids == list(STANDARDS)[:7] and standards[6].get("name") == "Standard 7":
+            standards[6]["name"] = STANDARDS["S7"]
         else:
             raise ValueError("migration requires S1–S6 or the temporary S7 label")
-        record["unmapped_columns"] = [name for name in record["unmapped_columns"] if name not in {"Lab 7 - Q1", "Lab 7 - Q2"}]
+        record["standards"].extend(
+            {"id": sid, "name": STANDARDS[sid], "checkmarks": []}
+            for sid in list(STANDARDS)[7:]
+        )
+        record["unmapped_columns"] = [name for name in record["unmapped_columns"] if name not in {"Lab 7 - Q1", "Lab 7 - Q2", "Lab 8 - Q1", "Lab 9 - Q1", "Lab 9 - Q2"}]
     return migrated
 
 

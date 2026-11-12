@@ -1,5 +1,7 @@
 # Ubuntu Deployment
 
+For the current Lab 8/9 release, follow [Lab 8 and Lab 9 activation](#lab-8-and-lab-9-activation) before the first refresh, including private publication-state migration and Gradescope snapshot retirement.
+
 For an existing installation using `exam2-publication.json`, follow the
 [shared publication-state rename](exam-publication-migration.md) before restarting refreshes.
 
@@ -59,7 +61,7 @@ Review, commit, and push the tracked changes:
 
 ```sh
 git add README.md docs deployment fixtures scripts static sync templates tests
-git commit -m "Add Lab 5 dashboard mappings"
+git commit -m "Add Lab 8 and Lab 9 dashboard mappings"
 git push origin main
 ```
 
@@ -82,7 +84,7 @@ git pull --ff-only origin main
 
 Do not continue if the checkout has unexpected local changes or the pull is not fast-forward.
 
-No dependency changed for Lab 5. For a future release that changes `requirements.txt`, run:
+No dependency changed for Labs 8/9. For a future release that changes `requirements.txt`, run:
 
 ```sh
 .venv/bin/python -m pip install -r requirements.txt
@@ -121,7 +123,7 @@ Validate the checked-in configuration and source on Ubuntu:
 .venv/bin/pytest -q
 ```
 
-For the Lab 5 release, the first command must still print `10`; Lab 5 has no Gradescope assignments. The Lab 6 release adds two autograded assignments, so the first command must print `12`.
+For the Lab 5 release, the first command must still print `10`; Lab 5 has no Gradescope assignments. The Lab 6 release added two autograded assignments (`12` total). The current Lab 8/9 release adds Lab 9 Q1, so the first command must print `13`.
 
 When a release changes the Gradescope assignment contract — a new autograded assignment, or a bumped contract version — retire the previous private snapshot before the first refresh. An unknown quarantined column and a mapped manual-only column do not change that contract: they need no Gradescope configuration, and the existing snapshot must not be retired merely because either appeared. The completion cache is invalid after a contract change, so the refresh falls back to `/var/lib/orie4580-dashboard/gradescope-snapshot.json` and aborts with `cannot carry pass evidence across a changed course or assignment contract` if that file still describes the previous contract. Moving it aside lets the full crawl become the new baseline and seed the cache:
 
@@ -353,3 +355,21 @@ assets before serving the updated templates. Asset-copy options include them.
 The browser expects protected per-student `exam3.json` and `exam3.pdf` files.
 File production and preservation across student-tree refreshes are not implemented
 in this pass; do not assume that manually placed files survive a refresh.
+
+## Lab 8 and Lab 9 activation
+
+This release activates manual-only `Lab 8 - Q1` → S8 and `Lab 9 - Q2` → S9, plus autograded `Lab 9 - Q1` → S7. The reviewed config now contains **13** Lab assignments, including `9030150` (3 points, three 1-point tests). Mapping v7 rebuilds the completion cache automatically. The catalog has nine standards and eighteen linked boxes; existing grading rules are unchanged.
+
+Follow the normal preflight and update procedure above, with the timer stopped and any running refresh finished. Back up config, private state, and the current student release outside the web root. Install the reviewed Gradescope config and browser assets. Because Lab 9 Q1 changes the assignment set, retire the old `gradescope-snapshot.json` to a unique backup before the first refresh; do not reuse pass evidence from the previous contract. No dependencies changed.
+
+If private publication state has the approved S1–S7 catalog, migrate it **before** refresh; the refresh loads and validates that state before recollection. Run from the updated checkout, using new output and backup filenames:
+
+```sh
+sudo env PYTHONDONTWRITEBYTECODE=1 .venv/bin/python -m scripts.migrate_lab89_publication /var/lib/orie4580-dashboard/exam-publication.json /var/lib/orie4580-dashboard/exam-publication.lab89-migrated.json
+sudo cp -p /var/lib/orie4580-dashboard/exam-publication.json /var/lib/orie4580-dashboard/exam-publication.pre-lab89.json
+sudo install -o orie4580-dashboard -g www-data -m 0600 /var/lib/orie4580-dashboard/exam-publication.lab89-migrated.json /var/lib/orie4580-dashboard/exam-publication.json
+```
+
+The script reads no network sources and does not change served pages. It preserves Exam 2/3 visibility, collection timestamps, and existing marks, adds empty S8/S9, and removes only the three activated pending headers. It rejects other catalogs, changed wording, and malformed state. Skip migration if no state exists or it already has the current S1–S9 catalog. For a still-pre-Lab-7 deployment, the historical `migrate_lab7_publication` now expands to the current catalog directly; do not run both migrations on the same state.
+
+Run a normal full combined refresh before toggling visibility or rebuilding from saved records. Verify Lab 8 Q1 under S8 and Lab 9 Q2 under S9 each list only **Manual checkoff**, while Lab 9 Q1 under S7 lists **Manual checkoff** and **Autograder**, requiring both for green. Review pending headers, updated grade estimates, preserved exam visibility and Exam 3 files, and owner/cross-user/staff authorization. Re-enable the timer only after a successful refresh and these checks. Old full-catalog row-import releases must also be regenerated with S8/S9.

@@ -61,7 +61,7 @@ Because Lab 6 adds autograded assignments, the Gradescope assignment contract ch
 
 ### 1.4 Lab 7 manual-only opportunities
 
-`Lab 7 - Q1` maps to S6 (`lab7-q1`), and `Lab 7 - Q2` maps to S7 (`lab7-q2`). Both are manual-only green opportunities. No Gradescope rule or contract change is required. `LAB_MAPPING_VERSION` is now `lab-mapping-v6`, so the positive Lab cache is rebuilt; retain the existing Gradescope assignment snapshot.
+`Lab 7 - Q1` maps to S6 (`lab7-q1`), and `Lab 7 - Q2` maps to S7 (`lab7-q2`). Both are manual-only green opportunities. No Gradescope rule or contract change is required. The Lab 7 release used `LAB_MAPPING_VERSION = "lab-mapping-v6"`, so the positive Lab cache is rebuilt; retain the existing Gradescope assignment snapshot.
 
 S7 uses the owner-approved (log-)likelihood and likelihood-maximization description. Its manual checkoff requires at least six total (sub)questions from the Canvas Likelihood Drills; Q1 requires completing the Lab question and asking for a checkoff. The grade formulas now use seven standards (fourteen linked boxes); their constants and rules are unchanged. A newly empty standard can lower the estimated grade.
 
@@ -322,3 +322,9 @@ limit still applies to the whole refresh, including all polling waits.
 - [ ] Full tests, JavaScript syntax check, Zola check, and `git diff --check` pass.
 - [ ] One-student live preview validates.
 - [ ] Changes are ready for the process in [`deployment.md`](deployment.md).
+
+## 7. Lab 8 and Lab 9 activation
+
+Lab 8 Q1 is manual-only S8. Lab 9 Q1 is autograded S7; Lab 9 Q2 is manual-only S9. The exact Sheet columns and all 174 rows were audited on November 12, 2026 with valid True/False values. `Lab 9, Q1` is Gradescope `9030150`, 3 points, three tests with ordered maxima `[1, 1, 1]`, verified from three processed submissions. See `standards.md` for the approved requirements.
+
+This release adds S8 and S9 with the handout wording, advances `LAB_MAPPING_VERSION` to `lab-mapping-v7`, and adds only `lab9-q1-v1` to the Gradescope allowlist (13 assignments). Existing assignment contract versions stay unchanged. Retire the old private Lab snapshot because the assignment set changes; the positive completion cache rebuilds automatically. Migrate private S1–S7 publication state with `scripts.migrate_lab89_publication` before refresh, preserving both exam visibility flags. It adds empty S8/S9 and removes only the three newly mapped pending headers, without inventing credit. Current records use nine standards and eighteen linked boxes with unchanged grading rules. Follow [the release procedure](deployment.md#lab-8-and-lab-9-activation).

@@ -230,6 +230,20 @@ async function checkStaffIndex(withNames = false, supplementFailure = false) {
 }
 
 (async () => {
+  const labs89 = payload(6, []);
+  labs89.standards.push(...['S8', 'S9'].map(id => ({id, name: `Standard ${id}`, checkmarks: []})));
+  const manual = {id: 'manual', label: 'Manual checkoff', source: 'google_sheet', status: 'complete', details: []};
+  for (const [sid, id, autograded] of [['S8', 'lab8-q1', false], ['S7', 'lab9-q1', true], ['S9', 'lab9-q2', false]]) {
+    labs89.standards.find(s => s.id === sid).checkmarks.push({
+      id, label: id, kind: 'green', status: 'complete', requirements: [manual, ...(autograded ? [{
+        id: 'autograder', label: 'Autograder', source: 'gradescope', status: 'passed', details: []
+      }] : [])]
+    });
+  }
+  const labs89Nodes = await run(labs89);
+  assert.strictEqual(labs89Nodes['#dashboard'].hidden, false);
+  assert.strictEqual(labs89Nodes['#standards'].children.length, 9);
+  assert.strictEqual(labs89Nodes['#earned-total'].textContent, '3 of 3');
   await checkStaffIndex();
   await checkStaffIndex(true);
   await checkStaffIndex(false, true);

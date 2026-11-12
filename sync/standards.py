@@ -8,6 +8,8 @@ STANDARDS = {
     'S5': "I can apply confidence intervals in practical situations, handling concerns such as non-independence, multiple hypotheses, and multiple stages of study.",
     'S6': "I can state the defining features of Poisson samplers, use them to construct new samplers, and use them to check if a given sampler is valid.",
     'S7': "I can write down the (log-)likelihood function of a sampler, and I can use calculus to find parameters that maximize simple (log-)likelihood functions.",
+    'S8': "I can model a scenario as a Markov chain or event-driven simulation by specifying what the system state is and how the state changes over time.",
+    'S9': "I can combine multiple sources of evidence and my own reasoning to make practical decisions about how to model or optimize a process.",
 }
 
 COURSES = {'ORIE 4580', 'ORIE 5580', 'ORIE 5581'}

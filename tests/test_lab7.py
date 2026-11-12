@@ -22,7 +22,7 @@ def test_lab7_manual_marks_map_to_s6_s7_without_gradescope():
     for index,record in enumerate(combined):
         assert validate_combined_record(record)==[]
         assert record["unmapped_columns"]==[]
-        assert len(record["standards"])==len(STANDARDS)==7
+        assert len(record["standards"])==len(STANDARDS)==9
         marks={s["id"]:s["checkmarks"] for s in record["standards"]}
         for sid,opp in (("S6","lab7-q1"),("S7","lab7-q2")):
             mark=marks[sid][0]
@@ -37,19 +37,20 @@ def test_old_publication_state_migration_preserves_visibility_without_inventing_
     from sync.gradescope_exam2 import EXAM2_OPPORTUNITIES
     import copy
     marks=[{"id":o["id"],"label":o["label"],"kind":o["kind"],"status":"not_graded","requirements":[{"id":"exam_score","label":"Exam 2 question score","source":"gradescope_exam","status":"not_graded","details":[]}]} for o in EXAM2_OPPORTUNITIES]
-    record={"schema_version":6,"updated_at":"2026-10-27T00:00:00Z","worksheet":"fake","student":{"netid":"abc123"},"unmapped_columns":["Lab 7 - Q1","Lab 7 - Q2","Lab 8 - Q1"],"standards":[{"id":sid,"name":name,"checkmarks":[m for m,o in zip(marks,EXAM2_OPPORTUNITIES) if o["standard_id"]==sid]} for sid,name in STANDARDS.items() if sid!="S7"]}
+    record={"schema_version":6,"updated_at":"2026-10-27T00:00:00Z","worksheet":"fake","student":{"netid":"abc123"},"unmapped_columns":["Lab 7 - Q1","Lab 7 - Q2","Lab 10 - Q1"],"standards":[{"id":sid,"name":name,"checkmarks":[m for m,o in zip(marks,EXAM2_OPPORTUNITIES) if o["standard_id"]==sid]} for sid,name in STANDARDS.items() if sid in list(STANDARDS)[:6]]}
     state={"schema_version":1,"visible":True,"collected_at":record["updated_at"],"records":[record]}
     before=copy.deepcopy(state)
     migrated=migrate_lab7_state(state)
     assert state==before
     assert migrated["visible"] is True
-    assert migrated["records"][0]["standards"][-1]=={"id":"S7","name":STANDARDS["S7"],"checkmarks":[]}
-    assert migrated["records"][0]["unmapped_columns"]==["Lab 8 - Q1"]
+    assert migrated["records"][0]["standards"][6]=={"id":"S7","name":STANDARDS["S7"],"checkmarks":[]}
+    assert migrated["records"][0]["unmapped_columns"]==["Lab 10 - Q1"]
     path=tmp_path/"migrated.json"
     write_publication_state(path,migrated)
     assert load_publication_state(path)==migrated
     placeholder=copy.deepcopy(migrated)
-    placeholder["records"][0]["standards"][-1]["name"]="Standard 7"
+    placeholder["records"][0]["standards"] = placeholder["records"][0]["standards"][:7]
+    placeholder["records"][0]["standards"][6]["name"]="Standard 7"
     upgraded=migrate_lab7_state(placeholder)
     assert upgraded==migrated
-    assert placeholder["records"][0]["standards"][-1]["name"]=="Standard 7"
+    assert placeholder["records"][0]["standards"][6]["name"]=="Standard 7"

@@ -114,6 +114,16 @@
       "id": "S7",
       "name": "I can write down the (log-)likelihood function of a sampler, and I can use calculus to find parameters that maximize simple (log-)likelihood functions.",
       "opportunities": []
+    },
+    {
+      "id": "S8",
+      "name": "I can model a scenario as a Markov chain or event-driven simulation by specifying what the system state is and how the state changes over time.",
+      "opportunities": []
+    },
+    {
+      "id": "S9",
+      "name": "I can combine multiple sources of evidence and my own reasoning to make practical decisions about how to model or optimize a process.",
+      "opportunities": []
     }
   ]
 }
