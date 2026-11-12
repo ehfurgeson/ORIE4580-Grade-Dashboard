@@ -21,6 +21,24 @@ This guide covers the shortest safe release procedure for the existing ORIE 4580
 
 Real student JSON must never be copied into Git, `static/`, or `public/`.
 
+## Rebuild presentation from saved data
+
+After pulling code, run from `/opt/orie4580-grade-dashboard`:
+
+```sh
+sudo sh scripts/rebuild_dashboard.sh
+```
+
+This installs all shared assets and the calculator, then regenerates the staff
+index, student dashboards, and Exam 3 page shells. It preserves both visibility
+settings and existing Exam 3 JSON/PDF files. It holds the normal refresh lock and
+refuses to run while a refresh is active. No timer pause is needed.
+
+It does not pull Git, run Examiner exports, import new export batches, or fetch
+Google/Gradescope data. Use the normal refresh service to collect new data.
+Hard-refresh the browser afterward. Assets and pages are installed sequentially,
+so this is a presentation deployment, not an atomic whole-site rollback mechanism.
+
 ## 2. Minimal deployment for an existing server
 
 The normal release path is Git plus one production refresh. The publisher builds the full replacement first and swaps it into place only after validation, so a failed refresh preserves the current student tree.
