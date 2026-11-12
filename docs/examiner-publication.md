@@ -33,6 +33,10 @@ Scans are treated as immutable: the same submission ID reuses the published PDF
 without hashing, timestamp checks, or copying bytes again. Missing PDFs abort
 the staged release. Later scheduled refreshes preserve the imported PDFs.
 
+If source scans were corrected, rerun the same command with `--refresh-pdfs`
+to replace cached PDFs even when submission IDs have not changed. This copies
+the source PDFs as-is; it does not remove pages or change PDF page references.
+
 The command rebuilds the protected student tree from existing collected records
 under the normal refresh lock. It preserves both exam visibility settings and
 does not write the publication state or advance the overall grade timestamp.

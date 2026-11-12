@@ -211,6 +211,7 @@ def write_simple_release(
     exam3_visible: bool = False,
     local_grades: str | Path | None = None,
     examiner_pdfs: str | Path | None = None,
+    refresh_examiner_pdfs: bool = False,
     local_imported_at: str | None = None,
 ) -> list[Path]:
     """Validate everything, build a new tree, then replace the prior release.
@@ -253,6 +254,8 @@ def write_simple_release(
         local_documents = load_local_grades(Path(source_path), seen,
                                            allow_empty_exam3=examiner_exports is not None)
 
+    if refresh_examiner_pdfs and examiner_pdfs is None:
+        raise ValueError("Refreshing PDFs requires an Examiner PDF directory")
     pdf_sources = {}
     if examiner_pdfs is not None:
         if source_path is None:
@@ -303,7 +306,7 @@ def write_simple_release(
                         raise ValueError("Existing Examiner review must be a regular protected file")
                     same_submission = (previous.is_file() and old_review.is_file() and
                         json.loads(old_review.read_text(encoding='utf-8')).get('student', {}).get('id') == identifier)
-                    if same_submission:
+                    if same_submission and not refresh_examiner_pdfs:
                         os.link(previous, target)  # Immutable scans: reuse bytes across staged releases.
                     else:
                         source_pdf = pdf_sources.get(identifier)

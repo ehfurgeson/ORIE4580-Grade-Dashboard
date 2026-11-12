@@ -97,3 +97,22 @@ def test_manifest_selects_adapter_and_rejects_unknown_exam(tmp_path):
     manifest.write_text(json.dumps(value))
     with pytest.raises(ValueError, match='Unsupported'):
         load_local_grades(tmp_path, {'abc123'})
+
+
+def test_explicit_pdf_refresh_replaces_cached_scan(tmp_path, monkeypatch):
+    source, state, output, lock, netid = setup(tmp_path, monkeypatch)
+    pull_local_grades.main()
+    original_state = state.read_bytes()
+    pdf = output / netid / 'exam3.pdf'
+    original_inode = pdf.stat().st_ino
+    (source.parent / 'pdfs' / '123.pdf').write_bytes(b'%PDF-1.4 corrected synthetic scan')
+    monkeypatch.setattr(sys, 'argv', [*sys.argv, '--refresh-pdfs'])
+    pull_local_grades.main()
+    assert pdf.read_bytes() == b'%PDF-1.4 corrected synthetic scan'
+    assert pdf.stat().st_ino != original_inode
+    assert state.read_bytes() == original_state
+    (source.parent / 'pdfs' / '123.pdf').unlink()
+    before = {p.relative_to(output): p.read_bytes() for p in output.rglob('*') if p.is_file()}
+    with pytest.raises(SystemExit):
+        pull_local_grades.main()
+    assert before == {p.relative_to(output): p.read_bytes() for p in output.rglob('*') if p.is_file()}
