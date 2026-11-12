@@ -373,3 +373,47 @@ sudo install -o orie4580-dashboard -g www-data -m 0600 /var/lib/orie4580-dashboa
 The script reads no network sources and does not change served pages. It preserves Exam 2/3 visibility, collection timestamps, and existing marks, adds empty S8/S9, and removes only the three activated pending headers. It rejects other catalogs, changed wording, and malformed state. Skip migration if no state exists or it already has the current S1–S9 catalog. For a still-pre-Lab-7 deployment, the historical `migrate_lab7_publication` now expands to the current catalog directly; do not run both migrations on the same state.
 
 Run a normal full combined refresh before toggling visibility or rebuilding from saved records. Verify Lab 8 Q1 under S8 and Lab 9 Q2 under S9 each list only **Manual checkoff**, while Lab 9 Q1 under S7 lists **Manual checkoff** and **Autograder**, requiring both for green. Review pending headers, updated grade estimates, preserved exam visibility and Exam 3 files, and owner/cross-user/staff authorization. Re-enable the timer only after a successful refresh and these checks. Old full-catalog row-import releases must also be regenerated with S8/S9.
+
+### Recovering from Lab 8/9 deployment errors
+
+If pytest reports many `PermissionError` failures for
+`/var/lib/orie4580-dashboard/student-names.csv`, the tests are trying to read the
+server's private staff roster as your login user. `tests/conftest.py` isolates
+that path in each test's temporary directory. Update to the code containing this
+fixture and rerun `.venv/bin/pytest -q` as your normal user. Do not run pytest as
+root, change production roster permissions, or discard the roster to fix tests.
+Production still validates the configured private roster and reports access errors.
+
+If the service reports `invalid collected dashboard: unmapped_columns contains a
+mapped header; record must contain every currently defined standard`, its saved
+publication state has the previous catalog and quarantined Lab headers. The
+service validates that state before fetching sources, so repeated starts cannot
+repair it. This error is separate from the test roster permissions.
+
+Stop the timer, confirm no refresh is running, and inspect the effective unit:
+
+```sh
+sudo systemctl stop orie4580-checkoffs.timer
+sudo systemctl show orie4580-checkoffs.service -p ActiveState -p SubState -p ExecStart
+```
+
+Use the actual state path shown after `--exam-state` (or its older alias
+`--exam2-state`). For an S1–S7 state, run the Lab 8/9 migration commands above
+against that file, using unused output and backup names. The migration preserves
+existing marks and both exam visibility choices. Do not delete the publication
+state; a missing state resets visibility defaults. If the migration rejects the
+source catalog, stop and inspect the catalog rather than installing partial output.
+
+Validate the installed state without printing student data (substitute the
+actual state path if different):
+
+```sh
+sudo -u orie4580-dashboard -g www-data .venv/bin/python -c 'from sync.exam_publication import load_publication_state; s = load_publication_state("/var/lib/orie4580-dashboard/exam-publication.json"); assert s is not None; print("Publication state valid; standards:", len(s["records"][0]["standards"])); print("Exam 2 visible:", s["visible"]); print("Exam 3 visible:", s.get("exam3_visible", False))'
+```
+
+Confirm the installed Gradescope config has 13 assignments. If you already moved
+the old Gradescope snapshot aside for this release, leave that backup in place;
+do not restore it or repeat the move onto an existing backup. Then reset the
+failed service and run one manual refresh as above. The service must complete
+with `Result=success` and `ExecMainStatus=0` before re-enabling the timer. A failure
+at this startup validation step leaves the served student release unchanged.
