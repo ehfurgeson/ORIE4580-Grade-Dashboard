@@ -21,7 +21,7 @@
 .answer-column { min-width: 0; }
 .math-pair > .answer-column:first-child { display: flex; align-items: baseline; gap: .8rem; }
 .answer-number { color: var(--muted); font-size: .8rem; min-width: 2.4rem; }
-.math-pair .answer-text { flex: 1; padding: .5rem .65rem; }
+.math-pair .answer-text { padding: .5rem .65rem; }
 .code-pair { align-items: start; }
 .answer-column > h3, .evidence-heading { color: var(--muted); font-size: .75rem; letter-spacing: .06em; text-transform: uppercase; }
 .answer-text { margin: 0; padding: .65rem; background: var(--soft); border: 1px solid var(--line); white-space: pre-wrap; overflow-wrap: anywhere; font: .825rem/1.5 ui-monospace, SFMono-Regular, Menlo, monospace; }
@@ -94,3 +94,6 @@ a:focus-visible, summary:focus-visible, input:focus-visible { outline: 2px solid
 .math-pair .answer-label { flex: 0 0 auto; }
 .part-heading { display: flex; flex-wrap: wrap; align-items: baseline; gap: .5rem; margin-bottom: .75rem; }
 .part-heading .evidence-heading { margin: 0; }
+
+.answer-content { flex: 1; min-width: 0; }
+.correct-answer { margin: .35rem 0 0; color: var(--muted); font-size: .8rem; line-height: 1.45; }

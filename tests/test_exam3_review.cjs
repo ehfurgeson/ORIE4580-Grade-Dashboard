@@ -173,12 +173,13 @@ test('part badges show math judgments and code judgments without plots', () => {
   vm.runInNewContext(fs.readFileSync(path.join(__dirname, '../static/exam3-review.js'), 'utf8'), {window, document});
   window.Exam3Review.render({schema_version: 1, exam: 3, questions: [
     {id: 'q1', title: 'Math', normal_credit: 'not_met', answers: [{format: 'json', text: JSON.stringify({answers: {'1.1': 'x', '1.2': '', '1.3': 'y'}})}],
-      parts: [{label: '1.1', outcome: 'met'}, {label: '1.2', outcome: 'blank'}, {label: '1.3', outcome: 'not_met'}]},
+      parts: [{label: '1.1', outcome: 'met', correct_answer: '1/2'}, {label: '1.2', outcome: 'blank'}, {label: '1.3', outcome: 'not_met'}]},
     {id: 'q2', title: 'Code', normal_credit: 'met', shiny_credit: 'blank', answers: [{format: 'pseudocode', text: 'staff edits'}],
       parts: [{label: '2.1', outcome: 'met', plots: []}, {label: '2.2', outcome: 'blank', plots: []}]}
   ]});
   const all = node => [node, ...node.children.flatMap(all)];
   const rendered = all(nodes['#review']);
+  assert.ok(rendered.some(node => node.className === 'correct-answer' && node.textContent === 'Correct answer: 1/2'));
   const math = rendered.filter(node => node.className === 'answer-label');
   assert.deepEqual(math.map(node => node.children[1].textContent), ['Correct', 'Blank', 'Incorrect']);
   const code = rendered.filter(node => node.className === 'part-heading');

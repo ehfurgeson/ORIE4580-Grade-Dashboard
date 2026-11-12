@@ -139,7 +139,7 @@
     });
     figure.append(button); return figure;
   }
-  function answerPair(text, images, label, pdfUrl, outcome) {
+  function answerPair(text, images, label, pdfUrl, outcome, correctAnswer) {
     const pair = styled('div', `answer-pair ${label ? 'math-pair' : 'code-pair'}`);
     const parsed = styled('div', 'answer-column');
     if (label && label !== 'Answer') {
@@ -148,7 +148,12 @@
       if (Object.hasOwn(labels, outcome)) partLabel.append(styled('span', `outcome ${outcome}`, labels[outcome]));
       parsed.append(partLabel);
     }
-    parsed.append(styled('pre', 'answer-text', text));
+    const content = styled('div', 'answer-content');
+    content.append(styled('pre', 'answer-text', text));
+    if (typeof correctAnswer === 'string' && correctAnswer.trim()) {
+      content.append(styled('p', 'correct-answer', `Correct answer: ${correctAnswer}`));
+    }
+    parsed.append(content);
     const scans = styled('div', 'answer-column');
     if (!images.length) scans.append(styled('p', 'review-message', 'No scan included in this export.'));
     images.forEach(image => scans.append(scanFigure(image, pdfUrl)));
@@ -192,7 +197,7 @@
           for (const [label, value] of Object.entries(fields)) {
             mathLabels.add(label);
             const matches = images.filter(image => image.label === label); matches.forEach(image => used.add(image));
-            body.append(answerPair(value === null ? '' : typeof value === 'string' ? value : JSON.stringify(value, null, 2), matches, label, pdfUrl, question.parts.find(part => part.label === label)?.outcome));
+            body.append(answerPair(value === null ? '' : typeof value === 'string' ? value : JSON.stringify(value, null, 2), matches, label, pdfUrl, question.parts.find(part => part.label === label)?.outcome, question.parts.find(part => part.label === label)?.correct_answer));
           }
         } else {
           images.forEach(image => used.add(image));
