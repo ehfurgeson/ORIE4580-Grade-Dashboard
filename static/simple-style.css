@@ -109,7 +109,7 @@ header > p:last-child { margin: .4rem 0 0; color: var(--muted); }
 .checkmark-summary { padding: 1rem 0; border-bottom: 1px solid var(--line); }
 .assignment-summary { padding: 1rem 0; border-bottom: 1px solid var(--line); }
 .assignment-row { display: flex; align-items: center; gap: .75rem; padding: .45rem 0; }
-.assignment-row h3 { flex: 0 0 4.5rem; align-self: end; margin: 0 0 .2rem; font-size: .85rem; line-height: 1.35rem; }
+.assignment-row h3 { flex: 0 0 5rem; align-self: end; margin: 0 0 .2rem; font-size: .85rem; line-height: 1.35rem; white-space: nowrap; }
 .assignment-slots { display: flex; gap: .4rem; overflow-x: auto; padding: .2rem; }
 .assignment-slot { display: grid; justify-items: center; gap: .15rem; flex: 0 0 auto; text-decoration: none; color: inherit; }
 .assignment-standard { font-size: .65rem; line-height: 1; color: var(--muted); }
