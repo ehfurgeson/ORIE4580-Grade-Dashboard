@@ -3,7 +3,7 @@ const assert = require('node:assert/strict');
 const fs = require('node:fs');
 const vm = require('node:vm');
 function run(path, root) {
-  const links = Object.fromEntries(['dashboard', 'calculator', 'exam3'].map(key => [key, {removeAttribute() {}}]));
+  const links = Object.fromEntries(['dashboard', 'calculator', 'exam3', 'exam_retry'].map(key => [key, {removeAttribute() {}, setAttribute(name, value) { this[name] = value; }}]));
   const nav = {dataset: {root}, querySelector: selector => links[selector.match(/"(.*?)"/)[1]]};
   const url = new URL(path, 'https://example.org');
   vm.runInNewContext(fs.readFileSync('static/course-nav.js', 'utf8'), {document: {querySelector: () => nav},
@@ -11,10 +11,12 @@ function run(path, root) {
   return links;
 }
 test('navigation preserves the student across exam and calculator pages', () => {
-  for (const [path, root] of [['/course/students/abc123/', '../../'], ['/course/students/abc123/exam3/', '../../../'], ['/course/grade_calculator/?student=abc123', '../']]) {
+  for (const [path, root] of [['/course/students/abc123/', '../../'], ['/course/students/abc123/exam3/', '../../../'], ['/course/students/abc123/exam_retry/', '../../../'], ['/course/grade_calculator/?student=abc123', '../']]) {
     const links = run(path, root);
     assert.equal(links.dashboard.href, 'https://example.org/course/');
     assert.equal(links.exam3.href, 'https://example.org/course/students/abc123/exam3/');
+    assert.equal(links.exam_retry.href, 'https://example.org/course/students/abc123/exam_retry/');
+    if (path.endsWith('/exam_retry/')) assert.equal(links.exam_retry['aria-current'], 'page');
     assert.equal(links.calculator.href, 'https://example.org/course/grade_calculator/?student=abc123');
   }
 });

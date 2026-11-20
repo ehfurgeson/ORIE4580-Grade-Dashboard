@@ -9,10 +9,13 @@
   nav.querySelector('[data-page="dashboard"]').href = root.href;
   if (student) {
     nav.querySelector('[data-page="calculator"]').href = new URL(`grade_calculator/?student=${student}`, root).href;
-    const exam = nav.querySelector('[data-page="exam3"]');
-    // Exam Retry's page is Exam 3's, retitled: its link stays on itself.
-    if (pathMatch?.[2] !== 'exam_retry') exam.href = new URL(`students/${student}/exam3/`, root).href;
-    exam.removeAttribute('aria-disabled');
-    exam.removeAttribute('title');
+    for (const page of ['exam3', 'exam_retry']) {
+      const exam = nav.querySelector(`[data-page="${page}"]`);
+      if (!exam) continue;
+      exam.href = new URL(`students/${student}/${page}/`, root).href;
+      exam.removeAttribute('aria-disabled');
+      exam.removeAttribute('title');
+      if (pathMatch?.[2] === page) exam.setAttribute('aria-current', 'page');
+    }
   }
 })();

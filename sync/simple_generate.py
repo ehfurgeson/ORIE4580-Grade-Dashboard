@@ -280,7 +280,8 @@ def write_simple_release(
     # Exam Retry's page is Exam 3's, pointed at its own files.
     retry_template = (exam_template.replace('data-exam="3"', 'data-exam="retry"')
                       .replace('exam3.json', 'exam_retry.json').replace('exam3.pdf', 'exam_retry.pdf')
-                      .replace('Exam 3', 'Exam Retry'))
+                      .replace('<title>Exam 3', '<title>Exam Retry')
+                      .replace('<h1>Exam 3</h1>', '<h1>Exam Retry</h1>'))
     output = Path(output_dir)
     output.parent.mkdir(parents=True, exist_ok=True)
     staging = Path(tempfile.mkdtemp(prefix=f".{output.name}-staging-", dir=output.parent))
