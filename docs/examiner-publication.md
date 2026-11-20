@@ -13,7 +13,8 @@ for the exam you want to import. The example uses Exam 3.
 ```sh
 cd /opt/orie4580-grade-dashboard
 sudo -u orie4580-dashboard -g www-data .venv/bin/python -m scripts.pull_local_grades \
-  /var/lib/examiner/exam_03/exports \
+  /var/cache/examiner-exports \
+  --pdfs /var/lib/examiner/exam_03/pdfs \
   --state /var/lib/orie4580-dashboard/exam-publication.json \
   --output /var/www/html/orie4580_fa26/students \
   --lock-file /var/lib/orie4580-dashboard/refresh.lock \
@@ -27,9 +28,10 @@ parents and read access to exports and PDFs. Examiner's full setup permission
 step grants both to `orie4580-dashboard`; routine `--update` preserves these grants.
 No systemd override or service restart is needed for this command.
 
-The pull also copies each exported student's scan from the sibling `pdfs/`
-directory into their protected exam PDF. Use `--pdfs /another/private/pdf-directory`
-to override that source. PDF filenames must match exported submission IDs.
+The pull also copies each exported student's scan into their protected exam PDF.
+With a separate export cache, pass the scan directory using `--pdfs`. For a
+bundle with `exports/` and `pdfs/` side by side, the sibling `pdfs/` is the
+default. PDF filenames must match exported submission IDs.
 Scans are treated as immutable: the same submission ID reuses the published PDF
 without hashing, timestamp checks, or copying bytes again. Missing PDFs abort
 the staged release. Later scheduled refreshes preserve the imported PDFs.
@@ -77,12 +79,12 @@ timestamps abort. Students absent from the dashboard roster are not published.
 Missing or malformed configured sources fail the refresh and preserve the live
 student tree. `.building-*` directories are ignored.
 
-The source directory is authoritative: to retract a question, remove **all** batches
-containing it from that directory (archive outside it), then refresh. An empty
-configured directory removes every published Exam 3 JSON. Omitting the option
-instead preserves existing reviews; it does not retract them. Local rebuilds,
-including the Exam 2 visibility switch, also preserve reviews. Manually replacing
-a protected `exam3.json` lasts until the next configured pull.
+The source directory is authoritative. To retract a question, remove every batch
+containing it from that directory, then refresh. If `--local-grades` points to
+an empty directory, the refresh fails and preserves the previous release.
+The legacy `--examiner-exports` flag treats an empty directory as a retraction
+of all Exam 3 reviews. Refreshes with neither flag preserve the published
+reviews, as do local rebuilds including the Exam 2 visibility switch.
 
 The JSON embeds cropped scans. This importer does not publish original PDFs;
 previously installed `exam3.pdf` files are preserved by refreshes. Those PDFs must
@@ -90,49 +92,35 @@ be placed and removed separately if used by the viewer.
 
 ## Server layout and permissions
 
-Keep installed code under `/opt` and mutable exam content under `/var/lib`.
-For example, move the **whole** existing exam content root to
-`/var/lib/examiner/exam3`, preserving hidden files and permissions, and change
-Examiner's `--content-dir` (or its service's configured content path). Stop
-Examiner during the copy, retain the old directory until verified, and restart
-with the new path. The source path and Examiner runtime account depend on your
-installation and are intentionally not guessed here.
-
-Do not disable the dashboard's `ProtectHome=true` or grant it access to raw scans,
-grading outputs, or your home directory. Give its service account traversal access
-to the parent directories and read access only to `exports`. After migration,
-create `exports` as the Examiner runtime account, then apply these ACLs as root
-(Ubuntu's `acl` package supplies `setfacl`):
-
-```sh
-sudo setfacl -m u:orie4580-dashboard:--x /var/lib/examiner /var/lib/examiner/exam3
-sudo setfacl -R -m u:orie4580-dashboard:r-X /var/lib/examiner/exam3/exports
-sudo setfacl -m d:u:orie4580-dashboard:r-x /var/lib/examiner/exam3/exports
-```
-
-The default ACL is inherited by new batches. The updated Examiner exporter keeps
-unfinished batches private, then sets completed directories to `0750` and JSON
-files to `0640` before renaming them into place; this also enables the inherited
-reader ACL. Existing exports need the recursive ACL command above. The dashboard
-gets no write permission to Examiner data. Do not give the web server access to
-the export source. Preserve Examiner's own runtime access during migration.
+The default Examiner installation writes export batches to
+`/var/cache/examiner-exports` and keeps scans in `/var/lib/examiner/exam_03/pdfs`.
+Examiner's setup grants the dashboard service account read-only access to the
+export cache, including future batches. The one-time pull also needs read access
+to the source PDFs. The scheduled import reads the export cache alone. Keep the
+cache private and outside the web root.
 
 The checked-in `deployment/orie4580-checkoffs.service` includes
-`--local-grades /var/lib/examiner/exam_03/exports` directly in `ExecStart`.
-Install it to enable local pulls on the regular refresh timer:
+`--local-grades /var/cache/examiner-exports` directly in `ExecStart`.
+For an existing installation, populate the cache with the completed Exam 3
+batches from the former `exports/` directory before switching the service.
+Partial batches can each contain unique student/question pairs. Keep the former
+directory until a refresh from the new location succeeds and coverage is verified.
+Install the updated unit. If a refresh is already running, let it finish before
+starting the verification run.
 
 ```sh
 cd /opt/orie4580-grade-dashboard
 sudo install -o root -g root -m 0644 deployment/orie4580-checkoffs.service /etc/systemd/system/orie4580-checkoffs.service
 sudo systemctl daemon-reload
-sudo systemctl enable --now orie4580-checkoffs.timer
-systemctl cat orie4580-checkoffs.service
+systemctl show orie4580-checkoffs.service -p ExecStart -p Environment
 ```
 
 If an old drop-in sets `--local-grades` or `--examiner-exports` in
 `ORIE4580_REFRESH_FLAGS`, remove that source flag from the drop-in; retain any
-unrelated validation flags. No source override is needed for this installation.
-To refresh immediately, run `sudo systemctl start orie4580-checkoffs.service`.
+unrelated validation flags. Once the effective service points to the cache,
+run `sudo systemctl start orie4580-checkoffs.service` and check its result.
+Resume the timer with `sudo systemctl start orie4580-checkoffs.timer` if it was
+paused for the cutover.
 
 First verify this with synthetic export batches and a staging output directory.
 Check that the service can read a newly generated batch, that the matching student
@@ -170,10 +158,22 @@ relying on the switch; it has not been deployed merely by editing this repositor
 ## Exam Retry (Examinator)
 
 Examinator's `deploy/export-dashboard.py` writes the same format with exam
-`'retry'` (questions `q1`-`q7`, one per standard S1-S7). Import it with the same
-command as above, pointed at its exports directory; it publishes
-`exam_retry.json` and `exam_retry.pdf` beside Exam 3's, and every rebuild keeps
-them. Its visibility is its own flag, off until released:
+`'retry'` (questions `q1`-`q7`, one per standard S1-S7). The Retry bundle is at
+`/var/cache/examinator-dashboard/exam_retry/`. The import reads `exports/` and
+its sibling `pdfs/` from that directory and publishes `exam_retry.json` and
+`exam_retry.pdf` in each student's protected directory.
+
+```sh
+cd /opt/orie4580-grade-dashboard
+sudo -u orie4580-dashboard -g www-data .venv/bin/python -m scripts.pull_local_grades \
+  /var/cache/examinator-dashboard/exam_retry/exports \
+  --state /var/lib/orie4580-dashboard/exam-publication.json \
+  --output /var/www/html/orie4580_fa26/students \
+  --lock-file /var/lib/orie4580-dashboard/refresh.lock \
+  --require-hidden
+```
+
+Release Exam Retry after the import succeeds.
 
 ```sh
 sudo -u orie4580-dashboard -g www-data .venv/bin/python -m scripts.set_exam_retry_visibility on /var/lib/orie4580-dashboard/exam-publication.json /var/www/html/orie4580_fa26/students --lock-file /var/lib/orie4580-dashboard/refresh.lock

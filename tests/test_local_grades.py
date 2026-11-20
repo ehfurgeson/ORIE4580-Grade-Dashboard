@@ -35,6 +35,12 @@ def setup(tmp_path, monkeypatch, *, visible=False, require_hidden=False):
 @pytest.mark.parametrize('visible', [False, True])
 def test_offline_import_preserves_grades_visibility_and_state(tmp_path, monkeypatch, visible):
     source, state, output, lock, netid = setup(tmp_path, monkeypatch, visible=visible)
+    pdfs = source.parent / 'pdfs'
+    cache = tmp_path / 'cache'
+    cache.mkdir()
+    source = source.rename(cache / 'examiner-exports')
+    sys.argv[1] = str(source)
+    sys.argv.extend(['--pdfs', str(pdfs)])
     old_state = state.read_bytes()
     student = output / netid
     old_grades = (student / 'checkoffs.json').read_bytes()
@@ -53,7 +59,7 @@ def test_offline_import_preserves_grades_visibility_and_state(tmp_path, monkeypa
     assert pdf.read_bytes() == b'%PDF-1.4 synthetic scan'
     inode = pdf.stat().st_ino
     # Filename identity is sufficient: the immutable source is not recopied.
-    (source.parent / 'pdfs' / '123.pdf').write_bytes(b'not copied again')
+    (pdfs / '123.pdf').write_bytes(b'not copied again')
     pull_local_grades.main()
     assert pdf.stat().st_ino == inode
     assert pdf.read_bytes() == b'%PDF-1.4 synthetic scan'

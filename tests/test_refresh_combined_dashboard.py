@@ -71,6 +71,13 @@ def test_service_allows_google_students_missing_from_gradescope():
     assert "--maximum-missing-gradescope-students" not in unit
 
 
+def test_service_imports_examiner_batches_from_export_cache():
+    from pathlib import Path
+    unit = Path("deployment/orie4580-checkoffs.service").read_text()
+    command = next(line for line in unit.splitlines() if line.startswith("ExecStart="))
+    assert "--local-grades /var/cache/examiner-exports " in command
+
+
 def test_unmapped_warning_metadata_is_worksheet_wide_and_contains_no_values():
     records = [
         {"student": {"netid": "abc123"}, "unmapped_columns": ["Lab 10 - Q2", "Lab 10 - Q1"]},
