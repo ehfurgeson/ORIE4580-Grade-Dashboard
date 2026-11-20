@@ -104,7 +104,12 @@ def render_staff_index(netids: list[str]) -> str:
     <header class="course-header">
       <p class="eyebrow">ORIE 4580</p>
       <h1>Student dashboards</h1>
-      <nav class="course-nav" aria-label="Course" data-root="../"><a data-page="dashboard" href="../" aria-current="page">Dashboard</a><a data-page="calculator" href="../grade_calculator/">Grade calculator</a><a data-page="exam3" aria-disabled="true" title="Open a student dashboard to view Exam 3">Exam 3</a></nav>
+      <nav class="course-nav" aria-label="Course" data-root="../">
+        <a data-page="dashboard" href="../" aria-current="page">Dashboard</a>
+        <a data-page="calculator" href="../grade_calculator/">Grade calculator</a>
+        <a data-page="exam3" aria-disabled="true" title="Open a student dashboard to view Exam 3">Exam 3</a>
+        <a data-page="exam_retry" aria-disabled="true" title="Open a student dashboard to view Exam Retry">Exam Retry</a>
+      </nav>
     </header>
     <p class="page-intro">Protected staff index. Select a NetID to open that student's dashboard.</p>
     <section aria-labelledby="student-list-title">
