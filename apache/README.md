@@ -1,6 +1,6 @@
 # Apache configuration
 
-These files contain authentication and authorization rules only. They contain no grade data.
+These files configure authentication, authorization, and caching for the course dashboard.
 
 ## Authenticated course-root redirect
 
@@ -9,6 +9,12 @@ These files contain authentication and authorization rules only. They contain no
 Install the snippet inside the active HTTPS `<VirtualHost *:443>`, normally with an `Include` directive. Do not put this rule only in `.htaccess`: authentication and rewrite processing occur in different phases. Keep the generated `students/<netid>/.htaccess` rules. The redirect is navigation, not authorization.
 
 Keep `R=302` during testing. Verify the course-root redirect with a named staff account and a student. The generated parent and student `.htaccess` rules remain the authorization boundary.
+
+The same HTTPS include sets `Cache-Control: no-cache` on `course-nav.js`,
+`simple-dashboard.js`, and `exam-review.js` at the course root so browsers
+revalidate these scripts before reuse. After updating the active include, run
+`sudo apache2ctl configtest` and `sudo systemctl reload apache2`. Check the
+response headers for these scripts after the reload.
 
 ## Positive course-group test
 

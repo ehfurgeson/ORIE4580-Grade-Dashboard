@@ -27,7 +27,7 @@ web_root=/var/www/html/orie4580_fa26
 install -o root -g www-data -m 0644 \
     static/simple-dashboard.js static/simple-style.css static/checkmarks.css \
     static/course-nav.css static/course-nav.js \
-    static/exam3-review.js static/exam3-review.css "$web_root/"
+    static/exam-review.js static/exam-review.css "$web_root/"
 install -d -o root -g www-data -m 0755 "$web_root/grade_calculator"
 install -o root -g www-data -m 0644 \
     static/grade_calculator/index.html static/grade_calculator/.htaccess \

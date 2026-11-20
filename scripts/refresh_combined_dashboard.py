@@ -418,6 +418,12 @@ def main() -> None:
             print(f"[5/6] {exam2.message}; Exam 2 caching=disabled; visibility={'on' if exam2_visible else 'off'}", flush=True)
         print("[6/6] Validating and atomically publishing the new release...", flush=True)
 
+        if args.copy_assets_to is not None:
+            args.copy_assets_to.mkdir(parents=True, exist_ok=True)
+            for asset in ("simple-dashboard.js", "simple-style.css", "checkmarks.css", "course-nav.css", "course-nav.js", "exam-review.js", "exam-review.css", "grade_calculator/index.html", "grade_calculator/.htaccess"):
+                (args.copy_assets_to / asset).parent.mkdir(parents=True, exist_ok=True)
+                shutil.copy2(Path("static") / asset, args.copy_assets_to / asset)
+
         # Save private publication state first; positive optimization caches remain last.
         # A crash before the cache write causes extra work on the next run, not
         # an incorrectly awarded checkmark.
@@ -437,12 +443,6 @@ def main() -> None:
                 config, snapshot, exam.verified_completions, sealed=active_seals
             )
             write_completion_cache_atomic(next_cache, args.completion_cache)
-
-        if args.copy_assets_to is not None:
-            args.copy_assets_to.mkdir(parents=True, exist_ok=True)
-            for asset in ("simple-dashboard.js", "simple-style.css", "checkmarks.css", "course-nav.css", "course-nav.js", "exam3-review.js", "exam3-review.css", "grade_calculator/index.html", "grade_calculator/.htaccess"):
-                (args.copy_assets_to / asset).parent.mkdir(parents=True, exist_ok=True)
-                shutil.copy2(Path("static") / asset, args.copy_assets_to / asset)
     except (GradescopeAdapterError, KeyError, OSError, RuntimeError, ValueError, json.JSONDecodeError) as error:
         parser.error(str(error))
     finally:

@@ -123,5 +123,5 @@ sudo -u orie4580-dashboard -g www-data .venv/bin/python -m scripts.set_exam_retr
 `--require-hidden` checks the visibility of the exam being imported. Another exam
 in this format is a row in `sync/local_grades.py` `ADAPTERS`, in
 `sync/simple_generate.py` `REVIEW_PDFS` (and its page and hidden rule), in
-`static/exam3-review.js` `exams` and `static/simple-dashboard.js` sources, plus
+`static/exam-review.js` `exams` and `static/simple-dashboard.js` sources, plus
 its own visibility flag.

@@ -281,6 +281,7 @@
       return {...standard, checkmarks: marks};
     })};
   }
+  // Keep the browser API stable for cached dashboard scripts across asset releases.
   window.Exam3Review = {render, load, merge, validate, openQuestion,
     questionStandards: exam => exams[exam].standards};
   const page = document.querySelector('#exam3-page');

@@ -164,7 +164,7 @@ systemctl list-timers orie4580-checkoffs.timer
 For the removal of descriptive standard keys and categories, the Google Sheet,
 Gradescope assignments, production TOML config, and `gradescope-snapshot.json`
 need no changes. Keep the snapshot in place. Install the updated
-`static/simple-dashboard.js`, `static/simple-style.css`, `static/checkmarks.css`, `static/exam3-review.js`, and `static/exam3-review.css` at the web root before
+`static/simple-dashboard.js`, `static/simple-style.css`, `static/checkmarks.css`, `static/exam-review.js`, and `static/exam-review.css` at the web root before
 the first refresh so the browser can read the new record schemas.
 
 After stopping the timer and waiting for any running refresh to finish, update
@@ -262,8 +262,8 @@ sudo install -o root -g www-data -m 0644 \
   /var/www/html/orie4580_fa26/grade_calculator/.htaccess
 ```
 
-The checked-in `apache/course-root-redirect.conf` matches only the exact course
-root, so this subdirectory does not need a redirect exception. Apache should
+The redirect rules in `apache/course-root-redirect.conf` match only the exact
+course root, so this subdirectory does not need a redirect exception. Apache should
 serve its `index.html` through the existing `DirectoryIndex` configuration.
 The calculator’s `.htaccess` disables inherited authentication only in its own
 directory, permits public access, and disables directory listing. Apache must
@@ -348,8 +348,8 @@ Run a successful normal combined refresh before using the Exam 2 visibility swit
 
 ## Local exam review assets
 
-The generated student template and staff index load `exam3-review.js`; student
-pages also load `exam3-review.css`. Deploy both alongside the shared dashboard
+The generated student template and staff index load `exam-review.js`; student
+pages also load `exam-review.css`. Deploy both alongside the shared dashboard
 assets before serving the updated templates. Asset-copy options include them.
 Review pages load each exam's protected per-student JSON and link to its PDF.
 See [local exam publication](examiner-publication.md) for import and visibility commands.

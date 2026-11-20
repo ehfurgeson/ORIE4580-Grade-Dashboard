@@ -146,7 +146,7 @@ def render_staff_index(netids: list[str]) -> str:
       <p id="no-students" class="note" hidden>No matching students.</p>
     </section>
   </main>
-  <script src="../exam3-review.js" defer></script>
+  <script src="../exam-review.js" defer></script>
   <script src="../simple-dashboard.js?v=roster-columns-2" defer></script>
 </body>
 </html>

@@ -15,7 +15,7 @@ test('local viewer renders answer text safely and clears rejected files', async 
   const nodes = Object.fromEntries(['#file', '#status', '#review'].map(id => [id, new Element(id)]));
   const document = {createElement: tag => new Element(tag), createElementNS: (_, tag) => new Element(tag),
     createDocumentFragment: () => new Element('fragment'), querySelector: id => nodes[id]};
-  vm.runInNewContext(fs.readFileSync(path.join(__dirname, '../static/exam3-review.js'), 'utf8'), {document, window: {}});
+  vm.runInNewContext(fs.readFileSync(path.join(__dirname, '../static/exam-review.js'), 'utf8'), {document, window: {}});
   const answer = '<script>alert(1)</script> # staff comment';
   const data = {schema_version: 1, exam: 3, student: {id: 'synthetic', first: 'Test', last: 'Student'}, questions: [
     {id: 'q2', title: 'Code', normal_credit: 'met', shiny_credit: 'not_met', answers: [{format: 'pseudocode', text: answer}], parts: [
@@ -59,7 +59,7 @@ test('local viewer renders answer text safely and clears rejected files', async 
 test('exam3 adapter merges once and distinguishes hidden or missing files from failures', async () => {
   const window = {}, requests = [];
   let response = {status: 404};
-  vm.runInNewContext(fs.readFileSync(path.join(__dirname, '../static/exam3-review.js'), 'utf8'), {
+  vm.runInNewContext(fs.readFileSync(path.join(__dirname, '../static/exam-review.js'), 'utf8'), {
     window, document: {querySelector: () => null},
     fetch: async (url, options) => {requests.push({url, options}); return response;}
   });
@@ -97,7 +97,7 @@ test('dedicated page loads metadata and offers correct page links from zoom over
     createElementNS: (_, tag) => new Element(tag), createDocumentFragment: () => new Element('fragment')};
   const exam = JSON.parse(fs.readFileSync(path.join(__dirname, '../fixtures/exam3/synthetic-student.json')));
   exam.questions[0].images[0].page = 4;
-  vm.runInNewContext(fs.readFileSync(path.join(__dirname, '../static/exam3-review.js'), 'utf8'), {
+  vm.runInNewContext(fs.readFileSync(path.join(__dirname, '../static/exam-review.js'), 'utf8'), {
     document, window: {}, location: {hash: ''}, fetch: async url => ({ok: true, status: 200,
       json: async () => url === '../exam3.json' ? exam : {student: {netid: 'abc123'}, updated_at: exam.exported_at}})
   });
@@ -134,7 +134,7 @@ for (const [exam, name, filename, status] of unavailableReviews) test(`${name} r
   const source = `../${filename}.json`;
   nodes['#exam3-page'].dataset = {exam: String(exam), source, checkoffs: '../checkoffs.json', pdf: `../${filename}.pdf`};
   const requests = [];
-  vm.runInNewContext(fs.readFileSync(path.join(__dirname, '../static/exam3-review.js'), 'utf8'), {
+  vm.runInNewContext(fs.readFileSync(path.join(__dirname, '../static/exam-review.js'), 'utf8'), {
     document: {querySelector: id => nodes[id]}, window: {}, location: {hash: '#q2'},
     fetch: async url => {
       requests.push(url);
@@ -153,7 +153,7 @@ test('distribution summary has filled bins, step CDFs, axes and explicit titles 
   const window = {};
   const document = {createElement: tag => new Element(tag), createElementNS: (_, tag) => new Element(tag),
     createDocumentFragment: () => new Element('fragment'), querySelector: () => null};
-  vm.runInNewContext(fs.readFileSync(path.join(__dirname, '../static/exam3-review.js'), 'utf8'), {document, window});
+  vm.runInNewContext(fs.readFileSync(path.join(__dirname, '../static/exam-review.js'), 'utf8'), {document, window});
   const root = new Element('root');
   window.Exam3Review.render({schema_version: 1, exam: 3, questions: [{id: 'q7', title: 'Synthetic', normal_credit: 'met', answers: [], parts: [
     {label: '7.2', plots: [
@@ -180,7 +180,7 @@ test('part badges show math judgments and code judgments without plots', () => {
   const document = {querySelector: id => nodes[id], createElement: tag => new Element(tag),
     createDocumentFragment: () => new Element('fragment')};
   const window = {};
-  vm.runInNewContext(fs.readFileSync(path.join(__dirname, '../static/exam3-review.js'), 'utf8'), {window, document});
+  vm.runInNewContext(fs.readFileSync(path.join(__dirname, '../static/exam-review.js'), 'utf8'), {window, document});
   window.Exam3Review.render({schema_version: 1, exam: 3, questions: [
     {id: 'q1', title: 'Math', normal_credit: 'not_met', answers: [{format: 'json', text: JSON.stringify({answers: {'1.1': 'x', '1.2': '', '1.3': 'y'}})}],
       parts: [{label: '1.1', outcome: 'met', correct_answer: '1/2'}, {label: '1.2', outcome: 'blank'}, {label: '1.3', outcome: 'not_met'}]},

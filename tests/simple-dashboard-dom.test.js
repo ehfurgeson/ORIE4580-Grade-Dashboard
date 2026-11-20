@@ -98,7 +98,7 @@ async function run(data, { legacyTemplate = false, examData = undefined, retryDa
     console,
     setTimeout,
   };
-  if (examData !== undefined) vm.runInNewContext(fs.readFileSync("static/exam3-review.js", "utf8"), context);
+  if (examData !== undefined) vm.runInNewContext(fs.readFileSync("static/exam-review.js", "utf8"), context);
   vm.runInNewContext(source, context, { filename: "simple-dashboard.js" });
   await new Promise(resolve => setImmediate(resolve));
   return nodes;

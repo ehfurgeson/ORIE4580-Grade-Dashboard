@@ -224,7 +224,7 @@ students/ehf38/
 
 Generate student pages with `scripts.refresh_combined_dashboard` as shown above. Sheet rows must be merged with Gradescope results before publication; the manual-only publisher has been removed. Malformed checkbox values in mapped columns, unsafe NetIDs, and duplicate NetIDs fail closed.
 
-Deploy `static/simple-dashboard.js`, `static/simple-style.css`, `static/checkmarks.css`, `static/exam3-review.js`, and `static/exam3-review.css` as public assets under the course root, then publish the protected student tree. An owner page is available at:
+Deploy `static/simple-dashboard.js`, `static/simple-style.css`, `static/checkmarks.css`, `static/exam-review.js`, and `static/exam-review.css` as public assets under the course root, then publish the protected student tree. An owner page is available at:
 
 ```text
 https://zivscully.orie.cornell.edu/orie4580_fa26/students/ehf38/
@@ -306,7 +306,7 @@ sudo systemctl enable --now orie4580-checkoffs.timer
 
 ### Authorization-only update
 
-The staff-only `/students/` index supports searching the roster and a **Show checkmarks** button. Checkmark columns start hidden; **Hide checkmarks**, Escape, switching tabs, or returning to the page hides them again. On first reveal, it reads the existing protected student JSON files (six requests at a time), respecting published Exam 2 visibility. Each row shows counted purple marks (including shiny purple), missing linked boxes, each standard's two linked boxes, and shiny overflow. Click any column heading to sort, and click again to reverse. Standard columns sort by purple boxes (including shiny), then purple + green boxes, then shiny purple boxes. Unavailable values stay last. Hiding checkmarks resets grade-based ordering to NetID for privacy and preserves sorting by roster columns. Standards outside a student's course catalog show N/A. Failed summaries show an error instead of zero totals; hide and show again to retry. Reload to pick up newly synced results. This page uses the existing `simple-dashboard.js`, `simple-style.css`, `checkmarks.css`, and `exam3-review.js` assets, which need to be updated along with the generated index.
+The staff-only `/students/` index supports searching the roster and a **Show checkmarks** button. Checkmark columns start hidden; **Hide checkmarks**, Escape, switching tabs, or returning to the page hides them again. On first reveal, it reads the existing protected student JSON files (six requests at a time), respecting published Exam 2 visibility. Each row shows counted purple marks (including shiny purple), missing linked boxes, each standard's two linked boxes, and shiny overflow. Click any column heading to sort, and click again to reverse. Standard columns sort by purple boxes (including shiny), then purple + green boxes, then shiny purple boxes. Unavailable values stay last. Hiding checkmarks resets grade-based ordering to NetID for privacy and preserves sorting by roster columns. Standards outside a student's course catalog show N/A. Failed summaries show an error instead of zero totals; hide and show again to retry. Reload to pick up newly synced results. This page uses the existing `simple-dashboard.js`, `simple-style.css`, `checkmarks.css`, and `exam-review.js` assets, which need to be updated along with the generated index.
 
 Staff authorization and the protected staff index can be updated without fetching Google Sheets or Gradescope and without changing any student HTML or JSON:
 
@@ -425,7 +425,7 @@ Run `python -m pytest -q && zola check` before sharing or deploying changes.
 
 ## Local exam reviews
 
-Open `static/exam3-review.html` and select an individual JSON file produced by
+Open `static/exam-review.html` and select an individual JSON file produced by
 the exam exporter. The file is read locally in the browser;
 no upload or server is needed. `fixtures/exam3/synthetic-student.json` is an invented
 Q1–Q9 example with embedded scan images, correct/incorrect/blank outcomes, and code
