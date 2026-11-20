@@ -13,7 +13,7 @@ class StaffRosterTests(unittest.TestCase):
             with patch('sync.staff_roster.STAFF_ROSTER_PATH', path):
                 self.assertIsNone(load_staff_roster())
                 path.write_text('\ufeffNetID,First Name,Last Name\nABC123,Zoë,"Smith, Jr."\n', encoding='utf-8')
-                self.assertEqual(load_staff_roster(), {'abc123': ('Zoë', 'Smith, Jr.')})
+                self.assertEqual(load_staff_roster(), {'abc123': ('Zoë', 'Smith, Jr.', '')})
                 path.write_text('NetID,First Name,Last Name\n', encoding='utf-8')
                 self.assertEqual(load_staff_roster(), {})
 

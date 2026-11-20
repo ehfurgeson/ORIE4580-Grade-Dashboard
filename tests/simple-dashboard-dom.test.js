@@ -125,11 +125,14 @@ async function checkStaffIndex(withNames = false, supplementFailure = false) {
     rows.forEach((row, index) => {
       row.dataset.firstName = ['Zoe', 'Alice'][index];
       row.dataset.lastName = ['Adams', 'Brown'][index];
+      row.dataset.class = ['5581', '4580'][index];
       const first = new Element('td');
       first.textContent = row.dataset.firstName;
       const last = new Element('td');
       last.textContent = row.dataset.lastName;
-      row.append(first, last);
+      const classCell = new Element('td');
+      classCell.textContent = row.dataset.class;
+      row.append(first, last, classCell);
     });
   }
   const body = new Element('tbody');
@@ -138,12 +141,12 @@ async function checkStaffIndex(withNames = false, supplementFailure = false) {
   if (withNames) {
     const keys = ['netid', 'purple', 'missing', 'S1', 'S2', 'shiny'];
     allHeaders.forEach((header, index) => { header.dataset.sort = keys[index]; });
-    const names = ['firstName', 'lastName'].map(key => {
+    const rosterHeaders = ['firstName', 'lastName', 'class'].map(key => {
       const header = new Element('th');
       header.dataset.sort = key;
       return header;
     });
-    allHeaders.splice(1, 0, ...names);
+    allHeaders.splice(1, 0, ...rosterHeaders);
   }
   root.append(...allHeaders, body);
   root.querySelector = selector => selector === 'tbody' ? body : controls[selector];
@@ -195,11 +198,12 @@ async function checkStaffIndex(withNames = false, supplementFailure = false) {
   controls['#toggle-checkmarks'].listeners.click();
   assert.strictEqual(requests.length, supplementFailure ? 4 : 3, 'Failed and partial rows are retried');
   if (supplementFailure) assert.match(cells[0].children.at(-1).textContent, /Partial results: Exam 3, Exam Retry unavailable/);
-  allHeaders[withNames ? 3 : 1].children[0].listeners.click();
-  assert.strictEqual(allHeaders[withNames ? 3 : 1].attributes['aria-sort'], 'descending');
+  const purpleHeader = allHeaders[withNames ? 4 : 1];
+  purpleHeader.children[0].listeners.click();
+  assert.strictEqual(purpleHeader.attributes['aria-sort'], 'descending');
   assert.strictEqual(body.children[0].dataset.netid, 'abc123', 'Unavailable stays last');
-  allHeaders[withNames ? 3 : 1].children[0].listeners.click();
-  assert.strictEqual(allHeaders[withNames ? 3 : 1].attributes['aria-sort'], 'ascending');
+  purpleHeader.children[0].listeners.click();
+  assert.strictEqual(purpleHeader.attributes['aria-sort'], 'ascending');
   assert.strictEqual(body.children[0].dataset.netid, 'abc123', 'Unavailable stays last ascending');
   assert.strictEqual(cells[2].children.length, 1, 'Only linked boxes in standard cells');
   doc.listeners.keydown({ key: 'Escape' });
@@ -224,6 +228,11 @@ async function checkStaffIndex(withNames = false, supplementFailure = false) {
     assert.strictEqual(body.children[0].dataset.netid, 'abc123', 'First name descending');
     allHeaders[2].children[0].listeners.click();
     assert.strictEqual(body.children[0].dataset.netid, 'abc123', 'Last name ascending');
+    assert.strictEqual(rows[0].children[2].textContent, '5581', 'Loading preserves Class cells');
+    allHeaders[3].children[0].listeners.click();
+    assert.strictEqual(body.children[0].dataset.netid, 'xy99', 'Class ascending');
+    doc.listeners.keydown({ key: 'Escape' });
+    assert.strictEqual(allHeaders[3].attributes['aria-sort'], 'ascending', 'Hide preserves Class sorting');
     controls['#student-search'].value = 'alice brown';
     controls['#student-search'].listeners.input();
     assert.strictEqual(rows[0].hidden, true);

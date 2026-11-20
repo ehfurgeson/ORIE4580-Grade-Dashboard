@@ -322,12 +322,12 @@ The command validates all student directory names before writing, atomically rep
 ### Private staff roster
 
 Optionally install a UTF-8 CSV outside the web root at
-`/var/lib/orie4580-dashboard/student-names.csv`, with these exact headers:
+`/var/lib/orie4580-dashboard/student-names.csv`, with `Class` as an optional fourth column.
 
 ```csv
-NetID,First Name,Last Name
-abc123,Alice,Example
-xy99,Xavier,Example
+NetID,First Name,Last Name,Class
+abc123,Alice,Example,4580
+xy99,Xavier,Example,5581
 ```
 
 ```sh
@@ -338,15 +338,15 @@ sudo install -o orie4580-dashboard -g www-data -m 0600 \
 
 The private CSV is read automatically by both normal publication (including the
 Exam 2 visibility switch) and the authorization/index updater. It is never copied
-into the served tree. Only the staff-protected index includes the names; student
-HTML and JSON are unchanged. First Name and Last Name are separately sortable,
-and search matches names as well as NetIDs.
+into the served tree. Only the staff-protected index displays the roster fields.
+First Name, Last Name, and Class are separately sortable. Search matches names
+as well as NetIDs.
 
 When the CSV exists, the index lists only NetIDs present in both the CSV and the
 student output. Students omitted from the CSV keep their folders, authorization,
 and dashboards. CSV entries without a dashboard are not listed. A header-only
 CSV lists nobody. Without a CSV, the original full NetID list remains with blank
-name columns. NetIDs are trimmed and lowercased; duplicates and malformed rows
+name and Class cells. NetIDs are trimmed and lowercased; duplicates and malformed rows
 fail the update rather than silently falling back to the full list.
 
 After installing or editing the CSV, rebuild the index without fetching grades

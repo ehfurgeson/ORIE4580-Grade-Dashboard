@@ -81,11 +81,13 @@ def render_staff_index(netids: list[str]) -> str:
     )
     rows = []
     for netid in sorted(netids):
-        first, last = (escape(name, quote=True) for name in (roster or {}).get(netid, ('', '')))
+        fields = (roster or {}).get(netid, ('', '', ''))
+        first, last, class_name = (escape(value, quote=True) for value in fields)
         rows.append(
-            f'<tr data-netid="{netid}" data-first-name="{first}" data-last-name="{last}">'
+            f'<tr data-netid="{netid}" data-first-name="{first}" data-last-name="{last}" '
+            f'data-class="{class_name}">'
             f'<td class="staff-line-number"></td><th scope="row"><a href="./{netid}/">{netid}</a></th>'
-            f'<td class="staff-name">{first}</td><td class="staff-name">{last}</td></tr>'
+            f'<td class="staff-name">{first}</td><td class="staff-name">{last}</td><td>{class_name}</td></tr>'
         )
     links = "\n".join(rows)
     return f"""<!doctype html>
@@ -128,6 +130,7 @@ def render_staff_index(netids: list[str]) -> str:
         <thead><tr><th class="staff-line-number" scope="col" aria-label="Line number"></th><th scope="col" data-sort="netid">NetID</th>
           <th scope="col" data-sort="firstName">First Name</th>
           <th scope="col" data-sort="lastName">Last Name</th>
+          <th scope="col" data-sort="class">Class</th>
           <th scope="col" data-sort="purple" class="staff-private" hidden>Total purple</th>
           <th scope="col" data-sort="missing" class="staff-private" hidden>Total missing</th>
           {headings}
