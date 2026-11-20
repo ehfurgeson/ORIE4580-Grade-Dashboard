@@ -32,7 +32,6 @@ def load_reviews(root: Path, netids: set[str], *, exam=3) -> dict[str, dict]:
 
     ``exam`` is the exports' exam: 3 (Examiner) or 'retry' (Examinator, same format).
 
-    The configured root is authoritative. Removing all batches retracts reviews.
     Unknown roster members are ignored, but their export identity is still checked.
     """
     if not root.is_dir() or root.is_symlink():
@@ -46,7 +45,7 @@ def load_reviews(root: Path, netids: set[str], *, exam=3) -> dict[str, dict]:
         manifest = _read(folder / 'manifest.json', exam)
         batches.append((_timestamp(manifest.get('exported_at')), folder, manifest))
     batches.sort(key=lambda batch: (batch[0], batch[1].name))
-    reviews, versions = {}, {}
+    reviews = {}
     for stamp, folder, manifest in batches:
         entries = manifest.get('entries')
         if not isinstance(entries, list) or not entries:
@@ -90,15 +89,37 @@ def load_reviews(root: Path, netids: set[str], *, exam=3) -> dict[str, dict]:
                     raise ValueError("Exam credit decision is not finalized")
             if netid not in netids:
                 continue
-            review = reviews.setdefault(netid, {**document, 'questions': []})
+            review = reviews.setdefault(netid, {**document, 'questions': [], 'question_exported_at': {}})
             merged = {q['id']: q for q in review['questions']}
+            versions = review['question_exported_at']
             for question in questions:
-                key = (netid, question['id'])
-                if versions.get(key) == stamp and merged[question['id']] != question:
+                qid = question['id']
+                if qid in versions and _timestamp(versions[qid]) == stamp and merged[qid] != question:
                     raise ValueError("Conflicting exam exports have the same timestamp")
-                merged[question['id']] = question
-                versions[key] = stamp
+                merged[qid] = question
+                versions[qid] = document['exported_at']
             review['questions'] = sorted(merged.values(), key=lambda q: int(q['id'][1:]))
             review['exported_at'] = document['exported_at']
             review['student'] = document['student']
     return reviews
+
+
+def merge_review(previous: dict, incoming: dict) -> dict:
+    """Keep the published version of each question until a newer export supplies it."""
+    merged = {question['id']: question for question in previous['questions']}
+    previous_versions = previous.get('question_exported_at', {})
+    versions = {qid: previous_versions.get(qid, previous['exported_at']) for qid in merged}
+    updated = False
+    for question in incoming['questions']:
+        qid = question['id']
+        stamp = incoming['question_exported_at'][qid]
+        if qid in versions and _timestamp(versions[qid]) >= _timestamp(stamp):
+            continue
+        merged[qid] = question
+        versions[qid] = stamp
+        updated = True
+    if not updated:
+        return previous
+    newest = max((incoming, previous), key=lambda document: _timestamp(document['exported_at']))
+    return {**newest, 'questions': sorted(merged.values(), key=lambda q: int(q['id'][1:])),
+            'question_exported_at': versions}

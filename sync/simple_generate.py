@@ -13,6 +13,7 @@ from .combined_checkoffs import validate_combined_record
 from .simple_checkoffs import NETID_PATTERN
 from .standards import STANDARDS
 from .staff_roster import load_staff_roster
+from .examiner_exports import merge_review
 from .local_grades import load_local_grades
 
 
@@ -63,7 +64,6 @@ EXAM3_HIDDEN_RULE = '\n<FilesMatch "^exam3\\.(json|pdf)$">\n    Require all deni
 EXAM_RETRY_HIDDEN_RULE = EXAM3_HIDDEN_RULE.replace('exam3', 'exam_retry')
 # Each exam review's JSON and its scan; both are preserved across rebuilds.
 REVIEW_PDFS = {'exam3.json': 'exam3.pdf', 'exam_retry.json': 'exam_retry.pdf'}
-PDF_REVIEWS = {pdf: review for review, pdf in REVIEW_PDFS.items()}
 
 def render_staff_index(netids: list[str]) -> str:
     """Render a protected staff index from validated canonical NetIDs."""
@@ -211,6 +211,60 @@ def update_authorization_files(output_dir: str | Path) -> list[Path]:
     return written
 
 
+def _exam_pdfs(root: Path) -> dict[str, Path]:
+    if root.is_symlink():
+        raise ValueError("Exam PDFs must come from a real directory")
+    try:
+        files = list(root.iterdir())
+    except FileNotFoundError:
+        return {}
+    except NotADirectoryError:
+        raise ValueError("Exam PDFs must come from a real directory") from None
+    pdfs = {}
+    for path in files:
+        if path.suffix.lower() == '.pdf':
+            if path.is_symlink() or not path.is_file() or path.stem in pdfs:
+                raise ValueError("Exam PDFs must have unique submission filenames and be regular files")
+            pdfs[path.stem] = path
+    return pdfs
+
+
+def _stage_exam_review(previous: Path, target: Path, review: str, pdf: str,
+                       incoming: dict | None, pdf_sources: dict[str, Path], *,
+                       published_at: str, replace: bool, require_pdf: bool, refresh_pdf: bool) -> None:
+    old_review, old_pdf = previous / review, previous / pdf
+    for path in (old_review, old_pdf):
+        if path.is_symlink() or (path.exists() and (previous.is_symlink() or not path.is_file())):
+            raise ValueError("Existing exam review must be a regular protected file")
+    target_review, target_pdf = target / review, target / pdf
+    if incoming is None:
+        if old_review.is_file():
+            shutil.copyfile(old_review, target_review)
+            target_review.chmod(0o640)
+        if old_pdf.is_file():
+            os.link(old_pdf, target_pdf)
+            target_pdf.chmod(0o640)
+        return
+
+    saved = json.loads(old_review.read_text(encoding='utf-8')) if old_review.is_file() else None
+    document = merge_review(saved, incoming) if saved is not None and not replace else incoming
+    if document is saved:
+        shutil.copyfile(old_review, target_review)
+    else:
+        target_review.write_text(_payload({**document, 'published_at': published_at}), encoding='utf-8')
+    target_review.chmod(0o640)
+
+    identifier = document['student']['id']
+    if old_pdf.is_file() and saved is not None and saved.get('student', {}).get('id') == identifier and not refresh_pdf:
+        os.link(old_pdf, target_pdf)
+        target_pdf.chmod(0o640)
+    elif identifier in pdf_sources:
+        shutil.copyfile(pdf_sources[identifier], target_pdf)
+        target_pdf.chmod(0o640)
+    elif require_pdf:
+        raise ValueError(f"Missing exam PDF for submission {identifier}")
+
+
 def write_simple_release(
     records: list[dict[str, Any]],
     output_dir: str | Path,
@@ -221,6 +275,7 @@ def write_simple_release(
     exam3_visible: bool = False,
     exam_retry_visible: bool = False,
     local_grades: str | Path | None = None,
+    local_grade_sources: dict[Path, Path] | None = None,
     examiner_pdfs: str | Path | None = None,
     refresh_examiner_pdfs: bool = False,
     local_imported_at: str | None = None,
@@ -253,32 +308,30 @@ def write_simple_release(
     if errors:
         raise ValueError("invalid simple records: " + "; ".join(errors))
 
-    if local_grades is not None and examiner_exports is not None:
-        raise ValueError("Choose one local grades source")
+    if sum(source is not None for source in (local_grades, examiner_exports, local_grade_sources)) > 1:
+        raise ValueError("Choose one local grades import mode")
     local_documents = {}
+    pdf_sources = {}
     source_path = local_grades if local_grades is not None else examiner_exports
-    if source_path is not None:
-        source = Path(source_path).resolve()
-        destination = Path(output_dir).resolve()
-        if source == destination or source.is_relative_to(destination) or destination.is_relative_to(source):
-            raise ValueError("Local exam exports and student output must be separate trees")
-        local_documents = load_local_grades(Path(source_path), seen,
-                                           allow_empty_exam3=examiner_exports is not None)
-
     if refresh_examiner_pdfs and examiner_pdfs is None:
         raise ValueError("Refreshing PDFs requires an exam PDF directory")
-    pdf_sources = {}
-    if examiner_pdfs is not None:
-        if source_path is None:
-            raise ValueError("PDF import requires a local grades source")
-        pdf_root = Path(examiner_pdfs)
-        if pdf_root.is_symlink() or not pdf_root.is_dir():
-            raise ValueError("Exam PDFs must come from a real directory")
-        for path in pdf_root.iterdir():
-            if path.suffix.lower() == '.pdf':
-                if path.is_symlink() or not path.is_file() or path.stem in pdf_sources:
-                    raise ValueError("Exam PDFs must have unique submission filenames and be regular files")
-                pdf_sources[path.stem] = path
+    if examiner_pdfs is not None and source_path is None:
+        raise ValueError("PDF import requires a local grades source")
+    sources: dict[Path, Path | None] = dict(local_grade_sources or {})
+    if source_path is not None:
+        sources[Path(source_path)] = Path(examiner_pdfs) if examiner_pdfs is not None else None
+    destination = Path(output_dir).resolve()
+    legacy = examiner_exports is not None
+    for source, pdf_root in sources.items():
+        for path in (p.resolve() for p in (source, pdf_root) if p is not None):
+            if path.is_relative_to(destination) or destination.is_relative_to(path):
+                raise ValueError("Local exam sources and student output must be separate trees")
+        documents = load_local_grades(source, seen, allow_empty_exam3=legacy, optional=not legacy)
+        if local_documents.keys() & documents.keys():
+            raise ValueError("Configure one local grades source per exam")
+        local_documents.update(documents)
+        if pdf_root is not None and documents:
+            pdf_sources[next(iter(documents))] = _exam_pdfs(pdf_root)
 
     template = Path(template_path).read_text(encoding="utf-8")
     exam_template = (Path(__file__).resolve().parents[1] / "templates" / "exam3_student_review.html").read_text(encoding="utf-8")
@@ -305,54 +358,14 @@ def write_simple_release(
             netid = record["student"]["netid"]
             student_dir = staging / netid
             student_dir.mkdir(mode=0o750)
-            # A local rebuild (including the Exam 2 switch) preserves reviews.
-            # Configured pulls reconstruct JSON from the authoritative exports.
-            for name in sorted(REVIEW_PDFS.keys() | PDF_REVIEWS.keys() | local_documents.keys()):
-                previous = output / netid / name
-                target = student_dir / name
-                review = PDF_REVIEWS.get(name)  # The review a scan belongs to (None: not a scan).
-                if review in local_documents and netid not in local_documents[review]:
-                    continue  # Retracting the review also retracts its scan.
-                if review in local_documents and examiner_pdfs is not None:
-                    document = local_documents[review].get(netid)
-                    if document is None:
-                        continue
-                    identifier = document['student']['id']
-                    old_review = output / netid / review
-                    if (output / netid).is_symlink() or previous.is_symlink() or old_review.is_symlink():
-                        raise ValueError("Existing exam review must be a regular protected file")
-                    same_submission = (previous.is_file() and old_review.is_file() and
-                        json.loads(old_review.read_text(encoding='utf-8')).get('student', {}).get('id') == identifier)
-                    if same_submission and not refresh_examiner_pdfs:
-                        os.link(previous, target)  # Immutable scans: reuse bytes across staged releases.
-                    else:
-                        source_pdf = pdf_sources.get(identifier)
-                        if source_pdf is None:
-                            raise ValueError(f"Missing exam PDF for submission {identifier}")
-                        shutil.copyfile(source_pdf, target)
-                    os.chmod(target, 0o640)
+            for review, pdf in REVIEW_PDFS.items():
+                incoming = local_documents.get(review, {}).get(netid)
+                if legacy and review in local_documents and incoming is None:
                     continue
-                if name in local_documents:
-                    if netid in local_documents[name]:
-                        target.write_text(_payload({**local_documents[name][netid],
-                            'published_at': local_imported_at or record['updated_at']}), encoding='utf-8')
-                elif previous.exists() or previous.is_symlink():
-                    if (output / netid).is_symlink() or previous.is_symlink() or not previous.is_file():
-                        raise ValueError("Existing exam review must be a regular protected file")
-                    if review is not None:
-                        if review in local_documents:
-                            old_review = output / netid / review
-                            if old_review.is_symlink():
-                                raise ValueError("Existing exam review must be a regular protected file")
-                            current_id = local_documents[review][netid]['student']['id']
-                            if (not old_review.is_file() or
-                                json.loads(old_review.read_text(encoding='utf-8')).get('student', {}).get('id') != current_id):
-                                continue
-                        os.link(previous, target)
-                    else:
-                        shutil.copyfile(previous, target)
-                if target.exists():
-                    os.chmod(target, 0o640)
+                _stage_exam_review(output / netid, student_dir, review, pdf, incoming,
+                                   pdf_sources.get(review, {}), published_at=local_imported_at or record['updated_at'],
+                                   replace=legacy, require_pdf=examiner_pdfs is not None,
+                                   refresh_pdf=refresh_examiner_pdfs)
             (student_dir / "index.html").write_text(template, encoding="utf-8")
             for exam_dir, page in ((student_dir / "exam3", exam_template), (student_dir / "exam_retry", retry_template)):
                 exam_dir.mkdir(mode=0o750)

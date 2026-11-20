@@ -31,12 +31,16 @@ def main() -> None:
         if any(path.resolve().is_relative_to(args.source.resolve()) for path in (args.state, args.lock_file)):
             raise ValueError("Publication state and lock must be outside the exports directory")
         handle = _acquire_lock(args.lock_file)
+        format_key = local_format(args.source, optional=True)
+        if format_key is None:
+            print(f"No completed exports in {args.source}. Published reviews are unchanged.")
+            return
         state = load_publication_state(args.state)
         if state is None:
             raise ValueError("No collected dashboard state; use the state path from the scheduled refresh")
         exam3_visible = state.get('exam3_visible', False)
         exam_retry_visible = state.get('exam_retry_visible', False)
-        retry = ADAPTERS[local_format(args.source)][0] == 'exam_retry.json'
+        retry = ADAPTERS[format_key][0] == 'exam_retry.json'
         exam, visible = ("Exam Retry", exam_retry_visible) if retry else ("Exam 3", exam3_visible)
         if args.require_hidden and visible:
             raise ValueError(f"{exam} is visible; hide it with set_exam{'_retry' if retry else '3'}_visibility before importing")

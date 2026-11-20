@@ -63,12 +63,15 @@ def test_offline_import_preserves_grades_visibility_and_state(tmp_path, monkeypa
     pull_local_grades.main()
     assert pdf.stat().st_ino == inode
     assert pdf.read_bytes() == b'%PDF-1.4 synthetic scan'
+    pdfs.rename(tmp_path / 'removed-pdfs')
+    pull_local_grades.main()
+    assert pdf.stat().st_ino == inode
     write_simple_release(visible_records(json.loads(state.read_text())['records'], False), output,
                          exam3_visible=visible)
     assert pdf.stat().st_ino == inode
 
 
-@pytest.mark.parametrize('failure', ['visible', 'missing_state', 'invalid_export', 'locked', 'empty', 'missing_pdf'])
+@pytest.mark.parametrize('failure', ['visible', 'missing_state', 'invalid_export', 'locked', 'missing_pdf'])
 def test_failed_import_preserves_live_release(tmp_path, monkeypatch, failure):
     source, state, output, lock, netid = setup(tmp_path, monkeypatch,
         visible=failure == 'visible', require_hidden=True)
@@ -78,9 +81,6 @@ def test_failed_import_preserves_live_release(tmp_path, monkeypatch, failure):
         state.unlink()
     elif failure == 'invalid_export':
         next(source.glob('student-*/123.json')).write_text('{}')
-    elif failure == 'empty':
-        import shutil
-        shutil.rmtree(next(source.iterdir()))
     elif failure == 'locked':
         handle = _acquire_lock(lock)
     elif failure == 'missing_pdf':
@@ -92,6 +92,20 @@ def test_failed_import_preserves_live_release(tmp_path, monkeypatch, failure):
         if handle:
             handle.close()
     assert before == {p.relative_to(output): p.read_bytes() for p in output.rglob('*') if p.is_file()}
+
+
+def test_manual_pull_is_a_noop_without_a_completed_batch(tmp_path, monkeypatch, capsys):
+    source, state, output, lock, netid = setup(tmp_path, monkeypatch)
+    pull_local_grades.main()
+    review = output / netid / 'exam3.json'
+    original = review.read_bytes()
+    source.rename(tmp_path / 'removed-export-cache')
+    pull_local_grades.main()
+    source.mkdir()
+    (source / '.building-incomplete').mkdir()
+    pull_local_grades.main()
+    assert review.read_bytes() == original
+    assert capsys.readouterr().out.count('No completed exports') == 2
 
 
 def test_manifest_selects_adapter_and_rejects_unknown_exam(tmp_path):
@@ -128,9 +142,7 @@ def test_exam_retry_imports_beside_exam3_and_is_hidden_until_released(tmp_path, 
     source, state, output, lock, netid = setup(tmp_path, monkeypatch, visible=True)
     pull_local_grades.main()
     retry = tmp_path / 'retry' / 'exports'
-    folder = batch(retry, email=netid + '@cornell.edu')
-    for path in folder.iterdir():
-        path.write_text(path.read_text().replace('"exam": 3', '"exam": "retry"'))
+    batch(retry, email=netid + '@cornell.edu', exam='retry')
     (tmp_path / 'retry' / 'pdfs').mkdir()
     (tmp_path / 'retry' / 'pdfs' / '123.pdf').write_bytes(b'%PDF-1.4 synthetic retry scan')
     monkeypatch.setattr(sys, 'argv', ['pull_local_grades', str(retry), '--state', str(state), '--output', str(output),

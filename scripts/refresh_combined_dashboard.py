@@ -181,7 +181,10 @@ def main() -> None:
                         help="private collected dashboard and exam visibility state (--exam2-state is a compatibility alias)")
     local_source = parser.add_mutually_exclusive_group()
     local_source.add_argument('--examiner-exports', type=Path, help="legacy Exam 3 exports directory")
-    local_source.add_argument('--local-grades', type=Path, help="private local grades directory; format detected from manifests")
+    local_source.add_argument('--local-grades', type=Path, action='append', metavar='EXPORTS',
+                              help="optional local export cache, detected from manifests; repeat for multiple exams")
+    parser.add_argument('--local-grade-pdfs', type=Path, action='append', nargs=2, default=[],
+                        metavar=('EXPORTS', 'PDFS'), help="scan directory override for a --local-grades source")
     parser.add_argument(
         "--force-full-revalidation", action="store_true",
         help="perform every Lab source check while preserving verified positive results",
@@ -210,8 +213,14 @@ def main() -> None:
         _require_private_state(args.snapshot, args.output, args.copy_assets_to)
         if args.examiner_exports is not None:
             _require_private_state(args.examiner_exports, args.output, args.copy_assets_to or args.output.parent)
-        if args.local_grades is not None:
-            _require_private_state(args.local_grades, args.output, args.copy_assets_to or args.output.parent)
+        sources = {path: path.parent / 'pdfs' for path in args.local_grades or []}
+        overrides = dict(args.local_grade_pdfs)
+        if overrides.keys() - sources.keys() or len(overrides) != len(args.local_grade_pdfs):
+            raise ValueError("Set at most one --local-grade-pdfs override per --local-grades source")
+        sources.update(overrides)
+        for exports, pdfs in sources.items():
+            for path in (exports, pdfs):
+                _require_private_state(path, args.output, args.copy_assets_to or args.output.parent)
         if args.completion_cache is not None:
             _require_private_state(args.completion_cache, args.output, args.copy_assets_to)
         if args.lock_file is not None:
@@ -420,7 +429,7 @@ def main() -> None:
             })
         public_records = visible_records(combined, exam2_visible)
         paths = write_simple_release(public_records, args.output, retain_previous=False,
-                                     examiner_exports=args.examiner_exports, local_grades=args.local_grades,
+                                     examiner_exports=args.examiner_exports, local_grade_sources=sources or None,
                                      exam3_visible=exam3_visible, exam_retry_visible=exam_retry_visible)
         write_snapshot_atomic(snapshot, args.snapshot)
         if cache_active and args.completion_cache is not None:
