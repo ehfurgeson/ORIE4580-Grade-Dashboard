@@ -192,8 +192,9 @@ def update_authorization_files(output_dir: str | Path) -> list[Path]:
     written: list[Path] = []
     for student_dir in student_dirs:
         path = student_dir / ".htaccess"
-        _replace_text_atomic(path, HTACCESS_TEMPLATE.format(netid=student_dir.name)
-                             + (EXAM3_HIDDEN_RULE if EXAM3_HIDDEN_RULE in path.read_text() else ""))
+        existing = path.read_text()
+        hidden_rules = ''.join(rule for rule in (EXAM3_HIDDEN_RULE, EXAM_RETRY_HIDDEN_RULE) if rule in existing)
+        _replace_text_atomic(path, HTACCESS_TEMPLATE.format(netid=student_dir.name) + hidden_rules)
         written.append(path)
     _replace_text_atomic(
         output / "index.html",

@@ -212,31 +212,40 @@
     overview.append(pool);
   }
 
-  function renderAssignments(data, allocations) {
+  function renderAssignments(data, allocations, { absent, unavailable }) {
     const overview = document.querySelector('#assignment-overview');
     if (!overview) return; // Older generated pages remain compatible with the shared script.
     const groups = new Map();
     data.standards.forEach((standard, index) => {
       for (const mark of standard.checkmarks) {
-        const match = /^(exam|lab)(\d+)-q(\d+)/.exec(mark.id || '');
-        const name = match ? `${match[1] === 'exam' ? 'Exam' : 'Lab'} ${match[2]}`
+        const match = /^(?:(exam|lab)(\d+)|examretry)-q(\d+)/.exec(mark.id || '');
+        const name = match?.[1] ? `${match[1] === 'exam' ? 'Exam' : 'Lab'} ${match[2]}`
           : mark.label.split(' · ')[0];
         if (!groups.has(name)) groups.set(name, []);
         groups.get(name).push({ mark, standard, allocation: allocations[index], question: match ? Number(match[3]) : 0 });
       }
     });
-    const names = [...groups.keys()].sort((a, b) => a.localeCompare(b, undefined, { numeric: true }));
+    const names = [...new Set([...groups.keys(), ...absent, ...unavailable])];
+    const sortName = name => name === 'Exam Retry' ? 'Exam 3.5' : name;
+    names.sort((a, b) => sortName(a).localeCompare(sortName(b), undefined, { numeric: true }));
+    const reviewPages = {'Exam 3': 'exam3/', 'Exam Retry': 'exam_retry/'};
     for (const name of names) {
       const row = make('div', 'assignment-row');
       const heading = make('h3', '', name);
-      const reviewPages = {'Exam 3': 'exam3/', 'Exam Retry': 'exam_retry/'};
+      row.append(heading);
+      const marks = groups.get(name);
+      if (!marks) {
+        row.append(make('span', 'note', unavailable.includes(name)
+          ? 'Unavailable — showing other results. Try refreshing.' : 'Not available yet'));
+        overview.append(row);
+        continue;
+      }
       if (reviewPages[name]) {
         const link = make('a', '', name); link.href = reviewPages[name];
         heading.replaceChildren(link);
       }
-      row.append(heading);
       const slots = make('div', 'assignment-slots');
-      for (const { mark, standard, allocation } of groups.get(name).sort((a, b) => a.question - b.question)) {
+      for (const { mark, standard, allocation } of marks.sort((a, b) => a.question - b.question)) {
         const slot = make('a', 'assignment-slot');
         const reviewPage = mark.id?.startsWith('exam3-q') ? 'exam3/' : mark.id?.startsWith('examretry-q') ? 'exam_retry/' : null;
         slot.href = reviewPage ? (mark.status === 'not_graded' ? reviewPage : `${reviewPage}#q${mark.id.split('-q')[1]}`) : `#standard-${standard.id}`;
@@ -253,7 +262,7 @@
       row.append(slots);
       overview.append(row);
     }
-    if (names.length === 0 && !window.Exam3Review) overview.append(make('p', 'note', 'No assignment checkmarks available yet.'));
+    if (names.length === 0) overview.append(make('p', 'note', 'No assignment checkmarks available yet.'));
   }
 
   function renderCheckmark(checkmark, allocation) {
@@ -308,7 +317,7 @@
     section.hidden = false;
   }
 
-  function render(data, updatedAt, unmappedColumns) {
+  function render({ data, absent, unavailable }, updatedAt, unmappedColumns) {
     document.querySelector('.summary-strip span').textContent = 'Checkmarks earned';
     document.querySelector('#dashboard-description').textContent =
       'Your lab checkoffs, autograder results, and available exam checkmarks, mapped to course standards.';
@@ -325,7 +334,7 @@
     let available = 0;
     const allocations = data.standards.map(standard => allocateStandard(standard.checkmarks));
     renderOverview(data, allocations);
-    renderAssignments(data, allocations);
+    renderAssignments(data, allocations, { absent, unavailable });
     const standards = document.querySelector('#standards');
     for (const [standardIndex, standard] of data.standards.entries()) {
       const allocation = allocations[standardIndex];
@@ -568,16 +577,7 @@
     .then(async data => {
       const validated = validatePayload(data);
       const result = await loadSupplements(data);
-      render(result.data, validated.updatedAt, validated.unmappedColumns);
-      const overview = document.querySelector('#assignment-overview');
-      if (overview) {
-        for (const name of [...result.absent, ...result.unavailable]) {
-          const row = make('div', 'assignment-row');
-          row.append(make('h3', '', name), make('span', 'note', result.unavailable.includes(name)
-            ? 'Unavailable — showing other results. Try refreshing.' : 'Not available yet'));
-          overview.append(row);
-        }
-      }
+      render(result, validated.updatedAt, validated.unmappedColumns);
     })
     .catch(error => {
       statusElement.textContent = `Unable to load checkoffs. ${error.message} Please refresh or contact course staff.`;

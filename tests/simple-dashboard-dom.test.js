@@ -61,7 +61,7 @@ function payload(version, pending) {
   };
 }
 
-async function run(data, { legacyTemplate = false, examData = undefined } = {}) {
+async function run(data, { legacyTemplate = false, examData = undefined, retryData = null } = {}) {
   const nodes = elements();
   nodes["#dashboard"].hidden = true;
   nodes["#unmapped-columns-section"].hidden = true;
@@ -90,9 +90,11 @@ async function run(data, { legacyTemplate = false, examData = undefined } = {}) 
       createDocumentFragment() { return new Element("fragment"); }
     },
     location: {hash: ''},
-    fetch: async url => url.endsWith('exam3.json')
-      ? {ok: examData !== null, status: examData === null ? 404 : 200, json: async () => examData}
-      : { ok: true, json: async () => data },
+    fetch: async url => {
+      if (url === 'checkoffs.json') return {ok: true, json: async () => data};
+      const review = url === 'exam3.json' ? examData : retryData;
+      return review === null ? {ok: false, status: 404} : {ok: true, json: async () => review};
+    },
     console,
     setTimeout,
   };
@@ -255,9 +257,6 @@ async function checkStaffIndex(withNames = false, supplementFailure = false) {
   const examSlots = integrated['#assignment-overview'].children[0].children[1].children;
   assert.equal(examSlots.length, 9);
   assert.equal(examSlots[0].href, 'exam3/#q1');
-  const absentExam = await run(payload(6, []), {examData: null});
-  assert.equal(absentExam['#earned-total'].textContent, '0 of 0');
-  assert.equal(absentExam['#assignment-overview'].children[0].children[1].textContent, 'Not available yet');
   const assignmentData = payload(6, []);
   const examMark = (id, status, kind = 'purple') => ({
     id, label: id, status, kind,
@@ -275,6 +274,26 @@ async function checkStaffIndex(withNames = false, supplementFailure = false) {
   assert.deepStrictEqual(slots.map(slot => slot.children[0].textContent), ['S2', 'S1', 'S1']);
   assert.deepStrictEqual(slots.map(slot => slot.children[1].textContent), ['–', '?', '✦']);
   assert.strictEqual(slots[0].href, '#standard-S2');
+
+  assignmentData.standards[0].checkmarks.push(examMark('exam2-q1', 'complete'), examMark('exam4-q1', 'complete'), {
+    id: 'lab1-q1', label: 'Lab 1 · Question 1', kind: 'green', status: 'complete', requirements: [manual]
+  });
+  const absentExams = await run(assignmentData, {examData: null});
+  const assignmentRows = absentExams['#assignment-overview'].children;
+  assert.deepStrictEqual(assignmentRows.map(row => row.children[0].textContent),
+    ['Exam 1', 'Exam 2', 'Exam 3', 'Exam Retry', 'Exam 4', 'Lab 1']);
+  assert.equal(assignmentRows[2].children[1].textContent, 'Not available yet');
+  assert.equal(assignmentRows[3].children[1].textContent, 'Not available yet');
+  assert.equal(absentExams['#earned-total'].textContent, '4 of 6');
+
+  const retryData = {...examData, exam: 'retry', questions: [examData.questions[0]]};
+  const reversedStandards = {...assignmentData, standards: [...assignmentData.standards].reverse()};
+  const withRetry = await run(reversedStandards, {examData: null, retryData});
+  const retryRow = withRetry['#assignment-overview'].children[3];
+  assert.equal(retryRow.children[0].children[0].href, 'exam_retry/');
+  assert.equal(retryRow.children[1].children.length, 7);
+  assert.equal(retryRow.children[1].children[0].href, 'exam_retry/#q1');
+
   const hostile = "<img src=x onerror=alert(1)>";
   const current = await run(payload(6, [hostile]));
   assert.strictEqual(current["#unmapped-columns-section"].hidden, false);

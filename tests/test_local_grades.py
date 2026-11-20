@@ -3,11 +3,11 @@ import sys
 
 import pytest
 
-from scripts import pull_local_grades
+from scripts import pull_local_grades, set_exam_retry_visibility
 from scripts.refresh_combined_dashboard import _acquire_lock
 from sync.exam_publication import write_publication_state, visible_records
 from sync.local_grades import load_local_grades
-from sync.simple_generate import EXAM3_HIDDEN_RULE, write_simple_release
+from sync.simple_generate import EXAM3_HIDDEN_RULE, EXAM_RETRY_HIDDEN_RULE, update_authorization_files, write_simple_release
 from test_exam2_combined import merged
 from test_examiner_exports import batch
 
@@ -119,7 +119,6 @@ def test_explicit_pdf_refresh_replaces_cached_scan(tmp_path, monkeypatch):
 
 
 def test_exam_retry_imports_beside_exam3_and_is_hidden_until_released(tmp_path, monkeypatch):
-    from sync.simple_generate import EXAM_RETRY_HIDDEN_RULE
     source, state, output, lock, netid = setup(tmp_path, monkeypatch, visible=True)
     pull_local_grades.main()
     retry = tmp_path / 'retry' / 'exports'
@@ -138,8 +137,16 @@ def test_exam_retry_imports_beside_exam3_and_is_hidden_until_released(tmp_path, 
     assert (student / 'exam_retry' / 'index.html').is_file()
     htaccess = (student / '.htaccess').read_text()
     assert EXAM_RETRY_HIDDEN_RULE in htaccess and EXAM3_HIDDEN_RULE not in htaccess
+    update_authorization_files(output)
+    assert (student / '.htaccess').read_text() == htaccess
     # Pulling Exam 3 again keeps the retry's review and scan.
     monkeypatch.setattr(sys, 'argv', ['pull_local_grades', str(source), '--state', str(state), '--output', str(output),
                                       '--lock-file', str(lock)])
     pull_local_grades.main()
     assert (student / 'exam_retry.json').is_file() and (student / 'exam_retry.pdf').is_file()
+
+    monkeypatch.setattr(sys, 'argv', ['set_exam_retry_visibility', 'on', str(state), str(output),
+                                      '--lock-file', str(lock)])
+    set_exam_retry_visibility.main()
+    update_authorization_files(output)
+    assert EXAM_RETRY_HIDDEN_RULE not in (student / '.htaccess').read_text()
