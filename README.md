@@ -1,6 +1,6 @@
 # ORIE 4580 Grade Dashboard
 
-Examiner review publishing: see [the pull setup and permissions guide](docs/examiner-publication.md).
+For local exam review publishing, see [the pull setup and permissions guide](docs/examiner-publication.md).
 
 A small Zola frontend and Python publishing pipeline for the Fall 2026 standards-based grade dashboard. The UI allocates green, purple, and shiny-purple checkmarks to the syllabus checkbox system and shows the first currently satisfied grading threshold.
 
@@ -421,10 +421,10 @@ tests/                 Python tests
 
 Run `python -m pytest -q && zola check` before sharing or deploying changes.
 
-## Exam 3 review
+## Local exam reviews
 
 Open `static/exam3-review.html` and select an individual JSON file produced by
-Examiner's **Preview student JSON** export. The file is read locally in the browser;
+the exam exporter. The file is read locally in the browser;
 no upload or server is needed. `fixtures/exam3/synthetic-student.json` is an invented
 Q1–Q9 example with embedded scan images, correct/incorrect/blank outcomes, and code
 output. Its answers and judgments are illustrative, not exam solutions.
@@ -436,28 +436,22 @@ Distribution plots use filled histograms and step CDFs for discrete distribution
 with axes, explicit plot types, sample counts, and sampled/expected legends. Only
 CDFs and histograms are displayed; diagnostic tables are omitted. Re-export with
 the updated Examiner to use its curated summary and complete plot labels.
-Q7 plots have explicit IDs supplied by Examiner; the viewer orders those IDs
+Exam 3 Q7 plots have explicit IDs supplied by Examiner; the viewer orders those IDs
 without guessing distributions from titles or numeric data. Older Q7 exports
 without IDs show a request to re-export instead of an inferred summary.
-The student dashboard fetches `exam3.json` from the same student directory as
-`checkoffs.json`, with the existing same-origin authorization and no-store caching.
-Its decisions feed the Exam 3 assignment row, standard allocations, and staff
-summaries. Assignment links open a separate `exam3/` review page. Missing files show “Not
-available yet”; invalid/unreadable files show Exam 3 as unavailable. No fetched
-Examiner data is written back to `checkoffs.json`.
+The student dashboard fetches local exam JSON files from the same protected student
+directory as `checkoffs.json`, with same-origin credentials and no-store caching.
+The reviews feed assignment rows, standard allocations, and staff summaries.
+Assignment links open the review page for that exam. Missing or hidden reviews
+show “Not available yet,” and failed loads identify the affected exam.
 
-The review page links to `exam3.pdf` in that same directory; zoom overlays link
-to the source PDF page for their scan. Its header shows NetID and the export time
-as Last synced. The publisher creates the static `exam3/index.html` page shell. Question headings
-remain visible when collapsed; all questions start collapsed. The standalone file picker remains available for
-local inspection.
-
-This pass does not place or preserve `exam3.json`/`exam3.pdf` during directory
-refresh. The existing publisher still replaces the student tree; file delivery
-and preservation are a separate follow-up.
+Each review links to its published PDF, and zoom overlays link to the page
+for their scan. The header shows the NetID and the export time as Last synced.
+All questions start collapsed. See [local exam publication](docs/examiner-publication.md)
+for import and rebuild behavior.
 
 All dashboard and calculator marks load `static/checkmarks.css` directly.
-Dashboard, calculator, and Exam 3 share `course-nav.css` and `course-nav.js`.
+The dashboard, calculator, and local exam review pages share `course-nav.css` and `course-nav.js`.
 Calculator links carry a validated student NetID solely for navigation; access
 to student data remains controlled by Apache.
 

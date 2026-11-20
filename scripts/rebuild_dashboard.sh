@@ -44,6 +44,6 @@ paths = write_simple_release(
     exam3_visible=state.get('exam3_visible', False),
     exam_retry_visible=state.get('exam_retry_visible', False),
 )
-print(f'Rebuilt {len(paths)} student dashboards, staff index, Exam 3 pages, and shared assets.')
-print('Visibility settings and existing Exam 3 JSON/PDF files preserved. No source refresh performed.')
+print(f"Rebuilt {len(paths)} student dashboards, the staff index, and local exam review pages. Installed shared assets.")
+print("Preserved exam visibility settings and existing local exam reviews and PDFs. Used saved data.")
 PY

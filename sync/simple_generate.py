@@ -107,8 +107,6 @@ def render_staff_index(netids: list[str]) -> str:
       <nav class="course-nav" aria-label="Course" data-root="../">
         <a data-page="dashboard" href="../" aria-current="page">Dashboard</a>
         <a data-page="calculator" href="../grade_calculator/">Grade calculator</a>
-        <a data-page="exam3" aria-disabled="true" title="Open a student dashboard to view Exam 3">Exam 3</a>
-        <a data-page="exam_retry" aria-disabled="true" title="Open a student dashboard to view Exam Retry">Exam Retry</a>
       </nav>
     </header>
     <p class="page-intro">Protected staff index. Select a NetID to open that student's dashboard.</p>
@@ -261,23 +259,23 @@ def write_simple_release(
         source = Path(source_path).resolve()
         destination = Path(output_dir).resolve()
         if source == destination or source.is_relative_to(destination) or destination.is_relative_to(source):
-            raise ValueError("Examiner exports and student output must be separate trees")
+            raise ValueError("Local exam exports and student output must be separate trees")
         local_documents = load_local_grades(Path(source_path), seen,
                                            allow_empty_exam3=examiner_exports is not None)
 
     if refresh_examiner_pdfs and examiner_pdfs is None:
-        raise ValueError("Refreshing PDFs requires an Examiner PDF directory")
+        raise ValueError("Refreshing PDFs requires an exam PDF directory")
     pdf_sources = {}
     if examiner_pdfs is not None:
         if source_path is None:
             raise ValueError("PDF import requires a local grades source")
         pdf_root = Path(examiner_pdfs)
         if pdf_root.is_symlink() or not pdf_root.is_dir():
-            raise ValueError("Examiner PDFs must be a real directory")
+            raise ValueError("Exam PDFs must come from a real directory")
         for path in pdf_root.iterdir():
             if path.suffix.lower() == '.pdf':
                 if path.is_symlink() or not path.is_file() or path.stem in pdf_sources:
-                    raise ValueError("Examiner PDFs must have unique submission filenames and be regular files")
+                    raise ValueError("Exam PDFs must have unique submission filenames and be regular files")
                 pdf_sources[path.stem] = path
 
     template = Path(template_path).read_text(encoding="utf-8")
@@ -320,7 +318,7 @@ def write_simple_release(
                     identifier = document['student']['id']
                     old_review = output / netid / review
                     if (output / netid).is_symlink() or previous.is_symlink() or old_review.is_symlink():
-                        raise ValueError("Existing Examiner review must be a regular protected file")
+                        raise ValueError("Existing exam review must be a regular protected file")
                     same_submission = (previous.is_file() and old_review.is_file() and
                         json.loads(old_review.read_text(encoding='utf-8')).get('student', {}).get('id') == identifier)
                     if same_submission and not refresh_examiner_pdfs:
@@ -328,7 +326,7 @@ def write_simple_release(
                     else:
                         source_pdf = pdf_sources.get(identifier)
                         if source_pdf is None:
-                            raise ValueError(f"Missing Examiner PDF for submission {identifier}")
+                            raise ValueError(f"Missing exam PDF for submission {identifier}")
                         shutil.copyfile(source_pdf, target)
                     os.chmod(target, 0o640)
                     continue
@@ -338,12 +336,12 @@ def write_simple_release(
                             'published_at': local_imported_at or record['updated_at']}), encoding='utf-8')
                 elif previous.exists() or previous.is_symlink():
                     if (output / netid).is_symlink() or previous.is_symlink() or not previous.is_file():
-                        raise ValueError("Existing Examiner review must be a regular protected file")
+                        raise ValueError("Existing exam review must be a regular protected file")
                     if review is not None:
                         if review in local_documents:
                             old_review = output / netid / review
                             if old_review.is_symlink():
-                                raise ValueError("Existing Examiner review must be a regular protected file")
+                                raise ValueError("Existing exam review must be a regular protected file")
                             current_id = local_documents[review][netid]['student']['id']
                             if (not old_review.is_file() or
                                 json.loads(old_review.read_text(encoding='utf-8')).get('student', {}).get('id') != current_id):

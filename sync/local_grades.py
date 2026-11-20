@@ -33,8 +33,7 @@ def local_format(root: Path, *, allow_empty_exam3=False) -> tuple:
     if not formats:
         raise ValueError("No completed exports found; select the exports parent directory")
     if len(formats) != 1 or not formats <= ADAPTERS.keys():
-        raise ValueError("Unsupported or mixed local grades formats; currently supports Examiner Exam 3 "
-                         "and Examinator Exam Retry, version 1")
+        raise ValueError("Unsupported or mixed local exam export formats. Use one supported format per source directory.")
     return next(iter(formats))
 
 

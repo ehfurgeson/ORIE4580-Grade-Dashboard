@@ -53,7 +53,7 @@ test('local viewer renders answer text safely and clears rejected files', async 
   assert.ok(marks().every(node => node.className === 'checkmark shiny_purple earned'));
   await load({schema_version: 99});
   assert.equal(nodes['#review'].children.length, 0);
-  assert.match(nodes['#status'].textContent, /Expected an Exam 3/);
+  assert.match(nodes['#status'].textContent, /Expected a supported student exam export/);
 });
 
 test('exam3 adapter merges once and distinguishes hidden or missing files from failures', async () => {
@@ -71,7 +71,8 @@ test('exam3 adapter merges once and distinguishes hidden or missing files from f
   response = {status: 403, ok: false};
   assert.equal(await api.load(), null);
   response = {status: 500, ok: false};
-  await assert.rejects(api.load(), /unavailable/);
+  await assert.rejects(api.load(), /Exam 3 unavailable/);
+  await assert.rejects(api.load('exam_retry.json', 'retry'), /Exam Retry unavailable/);
   const exam = JSON.parse(fs.readFileSync(path.join(__dirname, '../fixtures/exam3/synthetic-student.json')));
   const original = {standards: ['S1', 'S2', 'S3', 'S4', 'S5', 'S6', 'S7'].map(id => ({id, checkmarks: [{id: 'lab1-q1', kind: 'green', status: 'complete'}]}))};
   const merged = api.merge(original, exam);
@@ -120,23 +121,32 @@ test('dedicated page loads metadata and offers correct page links from zoom over
   assert.equal(plotDialog.children[0].children.at(-1).textContent, 'Close');
 });
 
-for (const unavailableStatus of [403, 404]) test(`direct review URL with JSON status ${unavailableStatus} exposes no exam content, even with a question hash`, async () => {
+const unavailableReviews = [
+  [3, 'Exam 3', 'exam3', 403],
+  [3, 'Exam 3', 'exam3', 404],
+  ['retry', 'Exam Retry', 'exam_retry', 403],
+  ['retry', 'Exam Retry', 'exam_retry', 404],
+  ['retry', 'Exam Retry', 'exam_retry', 500],
+];
+for (const [exam, name, filename, status] of unavailableReviews) test(`${name} review with JSON status ${status} names the exam and shows no results`, async () => {
   const keys = ['#exam3-page', '#review', '#status', '#student-netid', '#updated-at'];
   const nodes = Object.fromEntries(keys.map(id => [id, new Element(id)]));
-  nodes['#exam3-page'].dataset = {source: '../exam3.json', checkoffs: '../checkoffs.json', pdf: '../exam3.pdf'};
+  const source = `../${filename}.json`;
+  nodes['#exam3-page'].dataset = {exam: String(exam), source, checkoffs: '../checkoffs.json', pdf: `../${filename}.pdf`};
   const requests = [];
   vm.runInNewContext(fs.readFileSync(path.join(__dirname, '../static/exam3-review.js'), 'utf8'), {
     document: {querySelector: id => nodes[id]}, window: {}, location: {hash: '#q2'},
     fetch: async url => {
       requests.push(url);
-      if (url === '../exam3.json') return {status: unavailableStatus, ok: false};
+      if (url === source) return {status, ok: false};
       return {status: 200, ok: true, json: async () => ({student: {netid: 'abc123'}, updated_at: '2026-11-11T15:00:00Z'})};
     }
   });
   await new Promise(resolve => setImmediate(resolve));
-  assert.equal(nodes['#status'].textContent, 'Exam 3 is not available yet.');
+  const message = status === 500 ? `Unable to load ${name}. Please refresh.` : `${name} is not available yet.`;
+  assert.equal(nodes['#status'].textContent, message);
   assert.equal(nodes['#review'].children.length, 0, 'No results, scans, plots, question links, or PDF link');
-  assert.deepEqual(requests.sort(), ['../checkoffs.json', '../exam3.json']);
+  assert.deepEqual(requests.sort(), ['../checkoffs.json', source]);
 });
 
 test('distribution summary has filled bins, step CDFs, axes and explicit titles without tables', () => {

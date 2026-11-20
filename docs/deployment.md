@@ -32,12 +32,11 @@ sudo sh scripts/rebuild_dashboard.sh
 ```
 
 This installs all shared assets and the calculator, then regenerates the staff
-index, student dashboards, and Exam 3 page shells. It preserves both visibility
-settings and existing Exam 3 JSON/PDF files. It holds the normal refresh lock and
+index, student dashboards, and local exam review pages. It preserves exam visibility
+settings and existing local exam reviews and PDFs. It holds the normal refresh lock and
 refuses to run while a refresh is active. No timer pause is needed.
 
-It does not pull Git, run Examiner exports, import new export batches, or fetch
-Google/Gradescope data. Use the normal refresh service to collect new data.
+It uses saved data and the installed checkout. Use the normal refresh service to collect new data.
 Hard-refresh the browser afterward. Assets and pages are installed sequentially,
 so this is a presentation deployment, not an atomic whole-site rollback mechanism.
 
@@ -347,14 +346,13 @@ Use unique backup/output names if they already exist. Skip migration if there is
 
 Run a successful normal combined refresh before using the Exam 2 visibility switch, so its private combined snapshot includes real Lab 7 results. Verify Q1 under S6 and Q2 under S7, both with only **Manual checkoff**, True earning green and False not earning green. Verify Exam 2 visibility remains as intended, owner/cross-user/staff authorization, and updated grade estimates. Re-enable the timer only after success. Old full-catalog row-import fixtures/releases also need regeneration with S7.
 
-## Exam 3 browser assets
+## Local exam review assets
 
 The generated student template and staff index load `exam3-review.js`; student
 pages also load `exam3-review.css`. Deploy both alongside the shared dashboard
 assets before serving the updated templates. Asset-copy options include them.
-The browser expects protected per-student `exam3.json` and `exam3.pdf` files.
-File production and preservation across student-tree refreshes are not implemented
-in this pass; do not assume that manually placed files survive a refresh.
+Review pages load each exam's protected per-student JSON and link to its PDF.
+See [local exam publication](examiner-publication.md) for import and visibility commands.
 
 ## Lab 8 and Lab 9 activation
 
@@ -370,9 +368,9 @@ sudo cp -p /var/lib/orie4580-dashboard/exam-publication.json /var/lib/orie4580-d
 sudo install -o orie4580-dashboard -g www-data -m 0600 /var/lib/orie4580-dashboard/exam-publication.lab89-migrated.json /var/lib/orie4580-dashboard/exam-publication.json
 ```
 
-The script reads no network sources and does not change served pages. It preserves Exam 2/3 visibility, collection timestamps, and existing marks, adds empty S8/S9, and removes only the three activated pending headers. It rejects other catalogs, changed wording, and malformed state. Skip migration if no state exists or it already has the current S1–S9 catalog. For a still-pre-Lab-7 deployment, the historical `migrate_lab7_publication` now expands to the current catalog directly; do not run both migrations on the same state.
+The script reads no network sources and does not change served pages. It preserves exam visibility settings, collection timestamps, and existing marks, adds empty S8/S9, and removes only the three activated pending headers. It rejects other catalogs, changed wording, and malformed state. Skip migration if no state exists or it already has the current S1–S9 catalog. For a still-pre-Lab-7 deployment, the historical `migrate_lab7_publication` now expands to the current catalog directly; do not run both migrations on the same state.
 
-Run a normal full combined refresh before toggling visibility or rebuilding from saved records. Verify Lab 8 Q1 under S8 and Lab 9 Q2 under S9 each list only **Manual checkoff**, while Lab 9 Q1 under S7 lists **Manual checkoff** and **Autograder**, requiring both for green. Review pending headers, updated grade estimates, preserved exam visibility and Exam 3 files, and owner/cross-user/staff authorization. Re-enable the timer only after a successful refresh and these checks. Old full-catalog row-import releases must also be regenerated with S8/S9.
+Run a normal full combined refresh before toggling visibility or rebuilding from saved records. Verify Lab 8 Q1 under S8 and Lab 9 Q2 under S9 each list only **Manual checkoff**, while Lab 9 Q1 under S7 lists **Manual checkoff** and **Autograder**, requiring both for green. Review pending headers, updated grade estimates, preserved exam visibility and local exam files, and owner/cross-user/staff authorization. Re-enable the timer only after a successful refresh and these checks. Old full-catalog row-import releases must also be regenerated with S8/S9.
 
 ### Recovering from Lab 8/9 deployment errors
 
@@ -400,7 +398,7 @@ sudo systemctl show orie4580-checkoffs.service -p ActiveState -p SubState -p Exe
 Use the actual state path shown after `--exam-state` (or its older alias
 `--exam2-state`). For an S1–S7 state, run the Lab 8/9 migration commands above
 against that file, using unused output and backup names. The migration preserves
-existing marks and both exam visibility choices. Do not delete the publication
+existing marks and exam visibility choices. Do not delete the publication
 state; a missing state resets visibility defaults. If the migration rejects the
 source catalog, stop and inspect the catalog rather than installing partial output.
 
@@ -408,7 +406,7 @@ Validate the installed state without printing student data (substitute the
 actual state path if different):
 
 ```sh
-sudo -u orie4580-dashboard -g www-data .venv/bin/python -c 'from sync.exam_publication import load_publication_state; s = load_publication_state("/var/lib/orie4580-dashboard/exam-publication.json"); assert s is not None; print("Publication state valid; standards:", len(s["records"][0]["standards"])); print("Exam 2 visible:", s["visible"]); print("Exam 3 visible:", s.get("exam3_visible", False))'
+sudo -u orie4580-dashboard -g www-data .venv/bin/python -c 'from sync.exam_publication import load_publication_state; s = load_publication_state("/var/lib/orie4580-dashboard/exam-publication.json"); assert s is not None; print("Publication state valid; standards:", len(s["records"][0]["standards"])); print("Exam 2 visible:", s["visible"]); print("Stored local exam visibility flags:", {key: value for key, value in s.items() if key.endswith("_visible")})'
 ```
 
 Confirm the installed Gradescope config has 13 assignments. If you already moved

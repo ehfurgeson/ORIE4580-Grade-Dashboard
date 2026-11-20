@@ -15,7 +15,7 @@ def main() -> None:
 
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument('source', type=Path, help="private exports directory containing completed batches")
-    parser.add_argument('--pdfs', type=Path, help="Examiner PDF directory (default: pdfs/ beside exports/)")
+    parser.add_argument('--pdfs', type=Path, help="exam PDF directory (default: pdfs/ beside exports/)")
     parser.add_argument('--refresh-pdfs', action='store_true', help="replace published PDFs from the source, even for unchanged submission IDs")
     parser.add_argument('--state', type=Path, required=True, help="same publication state used by scheduled refresh")
     parser.add_argument('--output', type=Path, required=True, help="protected students directory")

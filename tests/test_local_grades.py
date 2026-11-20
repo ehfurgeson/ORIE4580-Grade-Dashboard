@@ -134,7 +134,9 @@ def test_exam_retry_imports_beside_exam3_and_is_hidden_until_released(tmp_path, 
     assert json.loads((student / 'exam_retry.json').read_text())['exam'] == 'retry'
     assert (student / 'exam_retry.pdf').read_bytes() == b'%PDF-1.4 synthetic retry scan'
     assert (student / 'exam3.pdf').read_bytes() == b'%PDF-1.4 synthetic scan'
-    assert (student / 'exam_retry' / 'index.html').is_file()
+    retry_page = (student / 'exam_retry' / 'index.html').read_text()
+    assert '<h1>Exam Retry</h1>' in retry_page
+    assert 'data-exam="retry" data-source="../exam_retry.json"' in retry_page
     htaccess = (student / '.htaccess').read_text()
     assert EXAM_RETRY_HIDDEN_RULE in htaccess and EXAM3_HIDDEN_RULE not in htaccess
     update_authorization_files(output)

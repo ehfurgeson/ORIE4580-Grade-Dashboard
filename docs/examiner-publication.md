@@ -1,13 +1,14 @@
-# Publishing Examiner reviews
+# Publishing local exam reviews
 
 ## One-time local grades pull
 
 Use `scripts.pull_local_grades` to import completed local exports without polling
-Google Sheets or Gradescope or changing the timer. It detects the format from the
-manifests; Examiner Exam 3 schema version 1 is the first supported adapter.
-Pass the **exports parent directory**, not an individual `student-*` batch.
+Google Sheets or Gradescope or changing the timer. It detects the exam and format
+from the manifests. Pass the **exports parent directory** that contains the
+`student-*` batches.
 
-After installing the updated dashboard code, run:
+After installing the updated dashboard code, run this with the exports directory
+for the exam you want to import. The example uses Exam 3.
 
 ```sh
 cd /opt/orie4580-grade-dashboard
@@ -27,7 +28,7 @@ step grants both to `orie4580-dashboard`; routine `--update` preserves these gra
 No systemd override or service restart is needed for this command.
 
 The pull also copies each exported student's scan from the sibling `pdfs/`
-directory into their protected `exam3.pdf`. Use `--pdfs /another/private/pdf-directory`
+directory into their protected exam PDF. Use `--pdfs /another/private/pdf-directory`
 to override that source. PDF filenames must match exported submission IDs.
 Scans are treated as immutable: the same submission ID reuses the published PDF
 without hashing, timestamp checks, or copying bytes again. Missing PDFs abort
@@ -38,10 +39,10 @@ to replace cached PDFs even when submission IDs have not changed. This copies
 the source PDFs as-is; it does not remove pages or change PDF page references.
 
 The command rebuilds the protected student tree from existing collected records
-under the normal refresh lock. It preserves both exam visibility settings and
-does not write the publication state or advance the overall grade timestamp.
+under the normal refresh lock. It preserves exam visibility settings and the
+overall grade timestamp.
 Each imported JSON gets a fresh `published_at`; its `exported_at` still records
-when Examiner exported it. `--require-hidden` refuses the import if Exam 3 is
+the original export time. `--require-hidden` refuses the import if that exam is
 already visible. Omitting it preserves the current setting, including ON.
 
 An invalid/unsupported export or a concurrent refresh aborts without replacing
@@ -158,7 +159,7 @@ cd /opt/orie4580-grade-dashboard
 sudo -u orie4580-dashboard -g www-data .venv/bin/python -m scripts.set_exam3_visibility off /var/lib/orie4580-dashboard/exam-publication.json /var/www/html/orie4580_fa26/students --lock-file /var/lib/orie4580-dashboard/refresh.lock
 ```
 
-Use `on` in place of `off` to release it. The shared file stores both exam visibility choices. A collected state from the normal
+Use `on` in place of `off` to release it. The shared file stores exam visibility choices. A collected state from the normal
 refresh must exist first. The command rebuilds the protected release under the
 shared lock; it does not change Exam 2 visibility or contact grading sources.
 Like the Exam 2 command, it persists the desired choice before rebuilding: if the

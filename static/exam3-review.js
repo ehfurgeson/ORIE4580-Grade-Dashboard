@@ -1,4 +1,4 @@
-/* Shared Exam 3 / Exam Retry renderer and dashboard adapter. Student files stay in their protected directory. */
+/* Shared local exam renderer and dashboard adapter. Student files stay in their protected directory. */
 (() => {
   'use strict';
   // Both exams share one export format; a file's `exam` picks its settings.
@@ -167,7 +167,7 @@
 
   function render(data, root = document.querySelector('#review'), prefix = '', pdfUrl = null) {
     const config = exams[data.exam];
-    if (data.schema_version !== 1 || !config || !Array.isArray(data.questions)) throw new Error('Expected an Exam 3 or Exam Retry student export (version 1).');
+    if (data.schema_version !== 1 || !config || !Array.isArray(data.questions)) throw new Error('Expected a supported student exam export (version 1).');
     const fragment = document.createDocumentFragment();
     const nav = styled('nav', 'exam-nav'); nav.setAttribute('aria-label', 'Exam questions');
     const questions = [...data.questions].sort((a, b) => Number(a.id.slice(1)) - Number(b.id.slice(1)));
@@ -224,7 +224,7 @@
         evidence.append(partHeading);
         const plots = styled('div', 'plot-grid'); selectedPlots.forEach(plot => plots.append(plotFigure(plot)));
         evidence.append(plots);
-        if (oldSummary) evidence.append(styled('p', 'review-message', 'Plot summary needs a fresh export from the updated Examiner.'));
+        if (oldSummary) evidence.append(styled('p', 'review-message', 'Plot summary needs a fresh exam export.'));
         if (part.message) evidence.append(styled('p', 'review-message', part.message));
         summaries.append(evidence);
       }
@@ -241,7 +241,7 @@
   }
   function validate(data, exam) {
     const config = exams[data?.exam];
-    if (!data || data.schema_version !== 1 || !config || (exam !== undefined && data.exam !== exam) || !Array.isArray(data.questions)) throw new Error('Expected an Exam 3 or Exam Retry student export (version 1).');
+    if (!data || data.schema_version !== 1 || !config || (exam !== undefined && data.exam !== exam) || !Array.isArray(data.questions)) throw new Error('Expected a supported student exam export (version 1).');
     const standards = config.standards;
     const seen = new Set();
     for (const question of data.questions) {
@@ -257,9 +257,9 @@
   }
   async function load(url = 'exam3.json', exam = 3) {
     const response = await fetch(url, {credentials: 'same-origin', cache: 'no-store', headers: {Accept: 'application/json'}});
-    // The publication switch denies these files with 403 while Exam 3 is hidden.
+    // The publication switch returns 403 while the exam is hidden.
     if (response.status === 403 || response.status === 404) return null;
-    if (!response.ok) throw new Error('Exam 3 unavailable.');
+    if (!response.ok) throw new Error(`${exams[exam]?.name || 'Exam'} unavailable.`);
     return validate(await response.json(), exam);
   }
   function merge(record, exam) {
@@ -284,7 +284,12 @@
   window.Exam3Review = {render, load, merge, validate, openQuestion};
   const page = document.querySelector('#exam3-page');
   if (page) {
-    const config = exams[page.dataset?.exam] || exams[3];
+    // Older Exam 3 pages omitted the exam setting.
+    const config = exams[page.dataset?.exam ?? 3];
+    if (!config) {
+      document.querySelector('#status').textContent = 'Exam not available.';
+      return;
+    }
     Promise.all([load(page.dataset?.source || 'exam3.json', config.exam), fetch(page.dataset?.checkoffs || 'checkoffs.json', {credentials: 'same-origin', cache: 'no-store'})
       .then(response => { if (!response.ok) throw new Error('Unable to load student details.'); return response.json(); })])
       .then(([exam, checkoffs]) => {
