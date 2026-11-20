@@ -102,16 +102,14 @@
     }[status];
   }
 
-  function renderCombinedRequirements(requirements, body) {
+  function renderLabRequirements(requirements, body) {
     const list = make('ul', 'source-requirements');
     for (const requirement of requirements) {
       const row = make('li', `source-requirement ${requirement.id} ${requirement.status}`);
       const label = make('span', 'source-requirement-name', requirement.label);
       const text = requirement.id === 'manual'
         ? (requirement.status === 'complete' ? 'Complete' : 'Incomplete')
-        : requirement.id === 'exam_score'
-          ? (requirement.outcome === 'blank' ? 'Blank' : { complete: 'Checkmark earned', incomplete: 'Checkmark not earned', not_graded: 'Not available yet' }[requirement.status])
-          : autograderLabel(requirement.status);
+        : autograderLabel(requirement.status);
       row.append(label, make('strong', 'source-requirement-status', text));
       if (requirement.id === 'manual' && requirement.details.length > 1) {
         const details = document.createElement('details');
@@ -140,12 +138,16 @@
     const eligible = earned.filter(item => !excludedRetry.has(item));
     const linked = [...eligible].sort((a, b) => priority[a.kind] - priority[b.kind]).slice(0, 2);
     const shiny = eligible.filter(item => item.kind === 'shiny_purple' && !linked.includes(item));
-    return { earned, linked, shiny, excludedRetry };
+    const redundant = new Set(earned.filter(item => !linked.includes(item) && !shiny.includes(item)));
+    return { earned, linked, shiny, excludedRetry, redundant };
   }
 
   function allocationLabel(checkmark, allocation) {
     if (allocation.excludedRetry.has(checkmark)) {
       return 'Does not count toward the grade because this standard already has purple credit from Exams 1–3';
+    }
+    if (allocation.redundant.has(checkmark)) {
+      return 'Does not count toward the grade because both standard-linked boxes are filled';
     }
     if (allocation.linked.includes(checkmark)) return 'Counts in standard-linked box';
     if (allocation.shiny.includes(checkmark)) return 'Counts in shiny pool (overflow)';
@@ -156,13 +158,13 @@
     return { green: 'Green', purple: 'Purple', shiny_purple: 'Shiny purple' }[kind];
   }
 
-  function renderCompactCheckmark(checkmark, label, excludedRetry = false) {
+  function renderCompactCheckmark(checkmark, label, redundant = false) {
     const color = checkmarkKindLabel(checkmark.kind);
     const mark = make(
       'span', `checkmark ${checkmark.kind}`,
       checkmark.kind === 'shiny_purple' ? '✦' : '✓'
     );
-    if (excludedRetry) mark.classList.add('retry-excluded');
+    if (redundant) mark.classList.add('redundant-mark');
     const description = `${color}: ${checkmark.label}. ${label}`;
     mark.title = description;
     mark.setAttribute('role', 'img');
@@ -206,7 +208,7 @@
       link.href = `#standard-${standard.id}`;
       const marks = make('div', 'compact-marks');
       for (const item of allocation.earned) {
-        marks.append(renderCompactCheckmark(item, allocationLabel(item, allocation), allocation.excludedRetry.has(item)));
+        marks.append(renderCompactCheckmark(item, allocationLabel(item, allocation), allocation.redundant.has(item)));
       }
       if (allocation.earned.length === 0) marks.append(make('span', 'note', 'None yet'));
       row.append(link, renderLinkedBoxes(allocation, true), marks);
@@ -262,7 +264,7 @@
           : mark.status === 'not_graded' ? 'Not available yet' : 'Checkmark not earned';
         slot.title = `${mark.label} · ${standard.id}: ${result}`;
         slot.setAttribute('aria-label', `${slot.title}. View details.`);
-        const symbol = mark.status === 'complete' ? renderCompactCheckmark(mark, result, allocation.excludedRetry.has(mark))
+        const symbol = mark.status === 'complete' ? renderCompactCheckmark(mark, result, allocation.redundant.has(mark))
           : make('span', 'checkmark empty-box', mark.status === 'not_graded' ? '?' : '–');
         symbol.setAttribute('aria-hidden', 'true');
         slot.append(make('span', 'assignment-standard', standard.id), symbol);
@@ -276,27 +278,27 @@
 
   function renderCheckmark(checkmark, allocation) {
     const item = make('li', `mapped-checkoff ${checkmark.kind} ${checkmark.status}`);
+    const redundant = allocation.redundant.has(checkmark);
     const earnedSymbol = checkmark.kind === 'shiny_purple' ? '✦' : '✓';
     const mark = make(
       'span', `checkmark ${checkmark.kind} ${checkmark.status === 'complete' ? 'earned' : 'unearned'}`,
       checkmark.status === 'complete' ? earnedSymbol : '–'
     );
-    if (allocation.excludedRetry.has(checkmark)) mark.classList.add('retry-excluded');
+    if (redundant) mark.classList.add('redundant-mark');
     mark.setAttribute('aria-hidden', 'true');
     const body = make('div', 'checkoff-body');
     body.append(make('strong', 'checkoff-name', checkmark.label));
-    body.append(make(
-      'span',
-      'checkoff-status',
-      checkmark.status === 'complete'
-        ? `${checkmarkKindLabel(checkmark.kind)} checkmark earned`
-        : checkmark.status === 'not_graded' ? 'Score not available yet' : 'Checkmark not earned'
-    ));
+    const status = {
+      complete: `${checkmarkKindLabel(checkmark.kind)} checkmark earned${redundant ? ', but redundant' : ''}`,
+      not_graded: 'Score not available yet',
+      incomplete: checkmark.requirements[0].outcome === 'blank' ? 'Blank' : 'Checkmark not earned'
+    }[checkmark.status];
+    body.append(make('span', 'checkoff-status', status));
     if (checkmark.status === 'complete') {
       body.append(make('span', 'checkoff-allocation', allocationLabel(checkmark, allocation)));
     }
 
-    renderCombinedRequirements(checkmark.requirements, body);
+    if (checkmark.kind === 'green') renderLabRequirements(checkmark.requirements, body);
     item.append(mark, body);
     return item;
   }

@@ -302,14 +302,22 @@ async function checkStaffIndex(withNames = false, supplementFailure = false) {
     examMark('exam2-q5', 'incomplete'), examMark('exam2-q6', 'not_graded'),
     {id: 'lab5-q1', label: 'Lab 5 · Question 1', kind: 'green', status: 'complete', requirements: [manual]}
   ];
+  retryEligibility.standards[6].checkmarks = [
+    examMark('exam2-q7', 'complete'), examMark('exam2-q10', 'complete'),
+    examMark('exam4-q7', 'complete'), examMark('exam4-q8', 'complete', 'shiny_purple'),
+    {id: 'lab7-q1', label: 'Lab 7 · Question 1', kind: 'green', status: 'complete', requirements: [manual]}
+  ];
   const metQuestion = number => ({...examData.questions[0], id: `q${number}`, standard: `S${number}`});
   const eligibilityNodes = await run(retryEligibility, {
-    examData: {...examData, questions: [metQuestion(3)]},
+    examData: {...examData, questions: [metQuestion(3), {...metQuestion(5), normal_credit: 'blank'}]},
     retryData: {...retryData, questions: [1, 2, 3, 4, 5, 6].map(metQuestion)}
   });
-  const overviewRows = eligibilityNodes['#checkmark-overview'].children.slice(1, 7);
+  const overviewRows = eligibilityNodes['#checkmark-overview'].children.slice(1, 8);
   assert.deepStrictEqual(overviewRows.map(row => row.children[1].children.map(box => box.textContent)),
-    [['✓', '–'], ['✦', '–'], ['✓', '–'], ['✓', '✓'], ['✓', '✓'], ['✓', '–']]);
+    [['✓', '–'], ['✦', '–'], ['✓', '–'], ['✓', '✓'], ['✓', '✓'], ['✓', '–'], ['✓', '✓']]);
+  const shinyOverflow = eligibilityNodes['#checkmark-overview'].children.at(-1).children[1];
+  assert.equal(shinyOverflow.className, 'checkmark shiny_purple');
+  assert.match(shinyOverflow.title, /S7: Counts in shiny pool/);
   const eligibilitySlots = eligibilityNodes['#assignment-overview'].children
     .find(row => row.children[0].children[0]?.href === 'exam_retry/').children[1].children;
   for (const slot of eligibilitySlots.slice(0, 3)) {
@@ -320,10 +328,22 @@ async function checkStaffIndex(withNames = false, supplementFailure = false) {
   }
   for (const selector of ['#checkmark-overview', '#assignment-overview', '#standards']) {
     const fadedMarks = eligibilityNodes[selector].querySelectorAll('*')
-      .filter(node => node.className.split(' ').includes('retry-excluded'));
-    assert.equal(fadedMarks.length, 3, `Only the three excluded Retry marks are faded in ${selector}`);
-    assert(fadedMarks.every(node => node.className.split(' ').includes('checkmark')));
+      .filter(node => node.className.split(' ').includes('redundant-mark'));
+    assert.equal(fadedMarks.length, 5, `Only redundant marks are faded in ${selector}`);
+    assert.equal(fadedMarks.filter(node => node.className.split(' ').includes('purple')).length, 4);
+    assert.equal(fadedMarks.filter(node => node.className.split(' ').includes('green')).length, 1);
   }
+  const standardDetails = eligibilityNodes['#standards'].querySelectorAll('*');
+  const statuses = row => row.querySelectorAll('*')
+    .filter(node => ['checkoff-status', 'source-requirement-status'].includes(node.className))
+    .map(node => node.textContent);
+  const checkoff = label => standardDetails.find(node => node.className === 'checkoff-name' && node.textContent === label).parent.parent;
+  assert.deepStrictEqual(statuses(checkoff('Exam Retry · Question 1')), ['Purple checkmark earned, but redundant']);
+  assert.deepStrictEqual(statuses(checkoff('exam4-q7')), ['Purple checkmark earned, but redundant']);
+  assert.deepStrictEqual(statuses(checkoff('exam4-q8')), ['Shiny purple checkmark earned']);
+  assert.deepStrictEqual(statuses(checkoff('Exam 3 · Question 5')), ['Blank']);
+  assert.deepStrictEqual(statuses(checkoff('Lab 5 · Question 1')), ['Green checkmark earned', 'Complete']);
+  assert.deepStrictEqual(statuses(checkoff('Lab 7 · Question 1')), ['Green checkmark earned, but redundant', 'Complete']);
 
   const hostile = "<img src=x onerror=alert(1)>";
   const current = await run(payload(6, [hostile]));
