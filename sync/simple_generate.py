@@ -60,6 +60,10 @@ Options -Indexes
 
 # Deny the actual files, including guessed URLs; collecting them is still allowed.
 EXAM3_HIDDEN_RULE = '\n<FilesMatch "^exam3\\.(json|pdf)$">\n    Require all denied\n</FilesMatch>\n'
+EXAM_RETRY_HIDDEN_RULE = EXAM3_HIDDEN_RULE.replace('exam3', 'exam_retry')
+# Each exam review's JSON and its scan; both are preserved across rebuilds.
+REVIEW_PDFS = {'exam3.json': 'exam3.pdf', 'exam_retry.json': 'exam_retry.pdf'}
+PDF_REVIEWS = {pdf: review for review, pdf in REVIEW_PDFS.items()}
 
 def render_staff_index(netids: list[str]) -> str:
     """Render a protected staff index from validated canonical NetIDs."""
@@ -209,6 +213,7 @@ def write_simple_release(
     retain_previous: bool = False,
     examiner_exports: str | Path | None = None,
     exam3_visible: bool = False,
+    exam_retry_visible: bool = False,
     local_grades: str | Path | None = None,
     examiner_pdfs: str | Path | None = None,
     refresh_examiner_pdfs: bool = False,
@@ -271,6 +276,10 @@ def write_simple_release(
 
     template = Path(template_path).read_text(encoding="utf-8")
     exam_template = (Path(__file__).resolve().parents[1] / "templates" / "exam3_student_review.html").read_text(encoding="utf-8")
+    # Exam Retry's page is Exam 3's, pointed at its own files.
+    retry_template = (exam_template.replace('data-exam="3"', 'data-exam="retry"')
+                      .replace('exam3.json', 'exam_retry.json').replace('exam3.pdf', 'exam_retry.pdf')
+                      .replace('Exam 3', 'Exam Retry'))
     output = Path(output_dir)
     output.parent.mkdir(parents=True, exist_ok=True)
     staging = Path(tempfile.mkdtemp(prefix=f".{output.name}-staging-", dir=output.parent))
@@ -291,17 +300,18 @@ def write_simple_release(
             student_dir.mkdir(mode=0o750)
             # A local rebuild (including the Exam 2 switch) preserves reviews.
             # Configured pulls reconstruct JSON from the authoritative exports.
-            for name in sorted({'exam3.json', 'exam3.pdf'} | local_documents.keys()):
+            for name in sorted(REVIEW_PDFS.keys() | PDF_REVIEWS.keys() | local_documents.keys()):
                 previous = output / netid / name
                 target = student_dir / name
-                if name == 'exam3.pdf' and 'exam3.json' in local_documents and netid not in local_documents['exam3.json']:
+                review = PDF_REVIEWS.get(name)  # The review a scan belongs to (None: not a scan).
+                if review in local_documents and netid not in local_documents[review]:
                     continue  # Retracting the review also retracts its scan.
-                if name == 'exam3.pdf' and examiner_pdfs is not None:
-                    document = local_documents['exam3.json'].get(netid)
+                if review in local_documents and examiner_pdfs is not None:
+                    document = local_documents[review].get(netid)
                     if document is None:
                         continue
                     identifier = document['student']['id']
-                    old_review = output / netid / 'exam3.json'
+                    old_review = output / netid / review
                     if (output / netid).is_symlink() or previous.is_symlink() or old_review.is_symlink():
                         raise ValueError("Existing Examiner review must be a regular protected file")
                     same_submission = (previous.is_file() and old_review.is_file() and
@@ -322,12 +332,12 @@ def write_simple_release(
                 elif previous.exists() or previous.is_symlink():
                     if (output / netid).is_symlink() or previous.is_symlink() or not previous.is_file():
                         raise ValueError("Existing Examiner review must be a regular protected file")
-                    if name == 'exam3.pdf':
-                        if 'exam3.json' in local_documents:
-                            old_review = output / netid / 'exam3.json'
+                    if review is not None:
+                        if review in local_documents:
+                            old_review = output / netid / review
                             if old_review.is_symlink():
                                 raise ValueError("Existing Examiner review must be a regular protected file")
-                            current_id = local_documents['exam3.json'][netid]['student']['id']
+                            current_id = local_documents[review][netid]['student']['id']
                             if (not old_review.is_file() or
                                 json.loads(old_review.read_text(encoding='utf-8')).get('student', {}).get('id') != current_id):
                                 continue
@@ -337,13 +347,14 @@ def write_simple_release(
                 if target.exists():
                     os.chmod(target, 0o640)
             (student_dir / "index.html").write_text(template, encoding="utf-8")
-            exam_dir = student_dir / "exam3"
-            exam_dir.mkdir(mode=0o750)
-            (exam_dir / "index.html").write_text(exam_template, encoding="utf-8")
-            os.chmod(exam_dir / "index.html", 0o640)
+            for exam_dir, page in ((student_dir / "exam3", exam_template), (student_dir / "exam_retry", retry_template)):
+                exam_dir.mkdir(mode=0o750)
+                (exam_dir / "index.html").write_text(page, encoding="utf-8")
+                os.chmod(exam_dir / "index.html", 0o640)
             (student_dir / "checkoffs.json").write_text(_payload(record), encoding="utf-8")
             (student_dir / ".htaccess").write_text(
-                HTACCESS_TEMPLATE.format(netid=netid) + ("" if exam3_visible else EXAM3_HIDDEN_RULE), encoding="utf-8"
+                HTACCESS_TEMPLATE.format(netid=netid) + ("" if exam3_visible else EXAM3_HIDDEN_RULE)
+                + ("" if exam_retry_visible else EXAM_RETRY_HIDDEN_RULE), encoding="utf-8"
             )
             os.chmod(student_dir / "index.html", 0o640)
             os.chmod(student_dir / "checkoffs.json", 0o640)

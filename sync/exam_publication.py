@@ -1,4 +1,4 @@
-"""Private collected records and independent Exam 2 / Exam 3 visibility flags."""
+"""Private collected records and independent Exam 2 / Exam 3 / Exam Retry visibility flags."""
 from __future__ import annotations
 
 from copy import deepcopy
@@ -15,10 +15,12 @@ _EXAM2_IDS = {item["id"] for item in EXAM2_OPPORTUNITIES}
 
 
 def _validate_state(state: dict) -> None:
-    if not isinstance(state, dict) or set(state) - {"exam3_visible"} != {"schema_version", "visible", "collected_at", "records"} or type(state.get("schema_version")) is not int or state["schema_version"] != 1:
+    if not isinstance(state, dict) or set(state) - {"exam3_visible", "exam_retry_visible"} != {"schema_version", "visible", "collected_at", "records"} or type(state.get("schema_version")) is not int or state["schema_version"] != 1:
         raise ValueError("invalid exam publication state schema")
     if type(state.get("exam3_visible", False)) is not bool:
         raise ValueError("Exam 3 visibility must be a boolean")
+    if type(state.get("exam_retry_visible", False)) is not bool:
+        raise ValueError("Exam Retry visibility must be a boolean")
     if type(state.get("visible")) is not bool:
         raise ValueError("Exam 2 visibility must be a boolean")
     if not isinstance(state.get("collected_at"), str) or not state["collected_at"]:

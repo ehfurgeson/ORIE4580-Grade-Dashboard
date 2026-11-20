@@ -116,3 +116,30 @@ def test_explicit_pdf_refresh_replaces_cached_scan(tmp_path, monkeypatch):
     with pytest.raises(SystemExit):
         pull_local_grades.main()
     assert before == {p.relative_to(output): p.read_bytes() for p in output.rglob('*') if p.is_file()}
+
+
+def test_exam_retry_imports_beside_exam3_and_is_hidden_until_released(tmp_path, monkeypatch):
+    from sync.simple_generate import EXAM_RETRY_HIDDEN_RULE
+    source, state, output, lock, netid = setup(tmp_path, monkeypatch, visible=True)
+    pull_local_grades.main()
+    retry = tmp_path / 'retry' / 'exports'
+    folder = batch(retry, email=netid + '@cornell.edu')
+    for path in folder.iterdir():
+        path.write_text(path.read_text().replace('"exam": 3', '"exam": "retry"'))
+    (tmp_path / 'retry' / 'pdfs').mkdir()
+    (tmp_path / 'retry' / 'pdfs' / '123.pdf').write_bytes(b'%PDF-1.4 synthetic retry scan')
+    monkeypatch.setattr(sys, 'argv', ['pull_local_grades', str(retry), '--state', str(state), '--output', str(output),
+                                      '--lock-file', str(lock), '--require-hidden'])
+    pull_local_grades.main()     # Exam 3 is visible; the retry is not, so this is allowed.
+    student = output / netid
+    assert json.loads((student / 'exam_retry.json').read_text())['exam'] == 'retry'
+    assert (student / 'exam_retry.pdf').read_bytes() == b'%PDF-1.4 synthetic retry scan'
+    assert (student / 'exam3.pdf').read_bytes() == b'%PDF-1.4 synthetic scan'
+    assert (student / 'exam_retry' / 'index.html').is_file()
+    htaccess = (student / '.htaccess').read_text()
+    assert EXAM_RETRY_HIDDEN_RULE in htaccess and EXAM3_HIDDEN_RULE not in htaccess
+    # Pulling Exam 3 again keeps the retry's review and scan.
+    monkeypatch.setattr(sys, 'argv', ['pull_local_grades', str(source), '--state', str(state), '--output', str(output),
+                                      '--lock-file', str(lock)])
+    pull_local_grades.main()
+    assert (student / 'exam_retry.json').is_file() and (student / 'exam_retry.pdf').is_file()

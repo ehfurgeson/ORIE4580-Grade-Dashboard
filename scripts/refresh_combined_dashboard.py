@@ -246,6 +246,7 @@ def main() -> None:
         publication_state = load_publication_state(args.exam_state) if collect_exam2 else None
         exam2_visible = bool(publication_state and publication_state["visible"])
         exam3_visible = bool(publication_state and publication_state.get("exam3_visible", False))
+        exam_retry_visible = bool(publication_state and publication_state.get("exam_retry_visible", False))
         if args.exam2_preview:
             exam2_visible = True
         email = _secret("GRADESCOPE_EMAIL")
@@ -414,12 +415,13 @@ def main() -> None:
         if collect_exam2:
             write_publication_state(args.exam_state, {
                 "schema_version": 1, "visible": exam2_visible, "exam3_visible": exam3_visible,
+                "exam_retry_visible": exam_retry_visible,
                 "collected_at": timestamp, "records": combined,
             })
         public_records = visible_records(combined, exam2_visible)
         paths = write_simple_release(public_records, args.output, retain_previous=False,
                                      examiner_exports=args.examiner_exports, local_grades=args.local_grades,
-                                     exam3_visible=exam3_visible)
+                                     exam3_visible=exam3_visible, exam_retry_visible=exam_retry_visible)
         write_snapshot_atomic(snapshot, args.snapshot)
         if cache_active and args.completion_cache is not None:
             next_cache = build_completion_cache(

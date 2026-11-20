@@ -1,6 +1,11 @@
-/* Shared Exam 3 renderer and dashboard adapter. Student files stay in their protected directory. */
+/* Shared Exam 3 / Exam Retry renderer and dashboard adapter. Student files stay in their protected directory. */
 (() => {
   'use strict';
+  // Both exams share one export format; a file's `exam` picks its settings.
+  const exams = {
+    3: {exam: 3, name: 'Exam 3', mark: 'exam3', standards: ['S1', 'S2', 'S3', 'S4', 'S5', 'S6', 'S6', 'S7', 'S7']},
+    retry: {exam: 'retry', name: 'Exam Retry', mark: 'examretry', standards: ['S1', 'S2', 'S3', 'S4', 'S5', 'S6', 'S7']},
+  };
   const make = (tag, text) => {
     const node = document.createElement(tag);
     if (text !== undefined) node.textContent = text;
@@ -161,7 +166,8 @@
   }
 
   function render(data, root = document.querySelector('#review'), prefix = '', pdfUrl = null) {
-    if (data.schema_version !== 1 || data.exam !== 3 || !Array.isArray(data.questions)) throw new Error('Expected an Exam 3 student export (version 1).');
+    const config = exams[data.exam];
+    if (data.schema_version !== 1 || !config || !Array.isArray(data.questions)) throw new Error('Expected an Exam 3 or Exam Retry student export (version 1).');
     const fragment = document.createDocumentFragment();
     const nav = styled('nav', 'exam-nav'); nav.setAttribute('aria-label', 'Exam questions');
     const questions = [...data.questions].sort((a, b) => Number(a.id.slice(1)) - Number(b.id.slice(1)));
@@ -178,7 +184,7 @@
       section.open = false;
       const body = styled('div', 'question-body');
       const heading = styled('summary', 'question-heading'), award = styled('div', 'question-award');
-      award.append(styled('span', 'standard-id', question.standard || 'Exam 3'), mark(question, true));
+      award.append(styled('span', 'standard-id', question.standard || config.name), mark(question, true));
       const title = styled('div', 'question-title');
       const line = styled('div', 'question-title-line'); line.append(make('h2', `${question.id.toUpperCase()} · ${question.title}`));
       const badges = styled('div', 'question-statuses');
@@ -233,9 +239,10 @@
     const outer = root.closest('details'); if (outer) outer.open = true;
     const question = root.querySelector(`#${prefix}${id}`); if (question) question.open = true;
   }
-  const standards = ['S1', 'S2', 'S3', 'S4', 'S5', 'S6', 'S6', 'S7', 'S7'];
-  function validate(data) {
-    if (!data || data.schema_version !== 1 || data.exam !== 3 || !Array.isArray(data.questions)) throw new Error('Expected an Exam 3 student export (version 1).');
+  function validate(data, exam) {
+    const config = exams[data?.exam];
+    if (!data || data.schema_version !== 1 || !config || (exam !== undefined && data.exam !== exam) || !Array.isArray(data.questions)) throw new Error('Expected an Exam 3 or Exam Retry student export (version 1).');
+    const standards = config.standards;
     const seen = new Set();
     for (const question of data.questions) {
       if (!/^q[1-9]$/.test(question.id) || seen.has(question.id) || typeof question.title !== 'string' ||
@@ -243,32 +250,33 @@
           !Array.isArray(question.answers) || !Array.isArray(question.parts) ||
           (question.credit_kind != null && !['purple', 'shiny_purple'].includes(question.credit_kind)) ||
           question.answers.some(answer => typeof answer.text !== 'string') ||
-          (question.standard != null && question.standard !== standards[Number(question.id.slice(1)) - 1])) throw new Error('Invalid Exam 3 question.');
+          (question.standard != null && question.standard !== standards[Number(question.id.slice(1)) - 1])) throw new Error(`Invalid ${config.name} question.`);
       seen.add(question.id);
     }
     return data;
   }
-  async function load(url = 'exam3.json') {
+  async function load(url = 'exam3.json', exam = 3) {
     const response = await fetch(url, {credentials: 'same-origin', cache: 'no-store', headers: {Accept: 'application/json'}});
     // The publication switch denies these files with 403 while Exam 3 is hidden.
     if (response.status === 403 || response.status === 404) return null;
     if (!response.ok) throw new Error('Exam 3 unavailable.');
-    return validate(await response.json());
+    return validate(await response.json(), exam);
   }
   function merge(record, exam) {
     if (!exam) return record;
     validate(exam);
+    const config = exams[exam.exam];
     const questions = new Map(exam.questions.map(question => [question.id, question]));
     return {...record, standards: record.standards.map(standard => {
-      const marks = standard.checkmarks.filter(mark => !/^exam3-q/.test(mark.id || ''));
-      standards.forEach((standardId, index) => {
+      const marks = standard.checkmarks.filter(mark => !(mark.id || '').startsWith(`${config.mark}-q`));
+      config.standards.forEach((standardId, index) => {
         if (standardId !== standard.id) return;
         const id = `q${index + 1}`, question = questions.get(id);
         const outcome = question?.normal_credit || 'not_checked';
         const status = outcome === 'met' ? 'complete' : outcome === 'not_checked' ? 'not_graded' : 'incomplete';
         const kind = question ? (earnedKind(question) || question.credit_kind || (id === 'q9' ? 'shiny_purple' : 'purple')) : id === 'q9' ? 'shiny_purple' : 'purple';
-        marks.push({id: `exam3-${id}`, label: `Exam 3 · Question ${index + 1}`, kind, status,
-          requirements: [{id: 'exam_score', source: 'examiner', label: 'Exam 3', status, outcome}]});
+        marks.push({id: `${config.mark}-${id}`, label: `${config.name} · Question ${index + 1}`, kind, status,
+          requirements: [{id: 'exam_score', source: 'examiner', label: config.name, status, outcome}]});
       });
       return {...standard, checkmarks: marks};
     })};
@@ -276,7 +284,8 @@
   window.Exam3Review = {render, load, merge, validate, openQuestion};
   const page = document.querySelector('#exam3-page');
   if (page) {
-    Promise.all([load(page.dataset?.source || 'exam3.json'), fetch(page.dataset?.checkoffs || 'checkoffs.json', {credentials: 'same-origin', cache: 'no-store'})
+    const config = exams[page.dataset?.exam] || exams[3];
+    Promise.all([load(page.dataset?.source || 'exam3.json', config.exam), fetch(page.dataset?.checkoffs || 'checkoffs.json', {credentials: 'same-origin', cache: 'no-store'})
       .then(response => { if (!response.ok) throw new Error('Unable to load student details.'); return response.json(); })])
       .then(([exam, checkoffs]) => {
         const status = document.querySelector('#status');
@@ -284,14 +293,14 @@
         const time = document.querySelector('#updated-at');
         const timestamp = exam?.exported_at || checkoffs.updated_at;
         time.dateTime = timestamp; time.textContent = new Date(timestamp).toLocaleString(undefined, {timeZoneName: 'short'});
-        if (!exam) { status.textContent = 'Exam 3 is not available yet.'; return; }
+        if (!exam) { status.textContent = `${config.name} is not available yet.`; return; }
         const root = document.querySelector('#review');
         render(exam, root, '', page.dataset?.pdf || 'exam3.pdf'); status.textContent = '';
         if (/^#q[1-9]$/.test(location.hash)) {
           openQuestion(root, location.hash.slice(1));
           root.querySelector(location.hash)?.scrollIntoView();
         }
-      }).catch(() => { document.querySelector('#status').textContent = 'Unable to load Exam 3. Please refresh.'; });
+      }).catch(() => { document.querySelector('#status').textContent = `Unable to load ${config.name}. Please refresh.`; });
     return;
   }
   const fileInput = document.querySelector('#file');

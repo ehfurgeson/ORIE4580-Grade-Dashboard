@@ -165,3 +165,21 @@ Like the Exam 2 command, it persists the desired choice before rebuilding: if th
 rebuild fails, the previous release remains until a successful retry or refresh.
 Confirm direct JSON/PDF requests are denied on the deployed Apache server before
 relying on the switch; it has not been deployed merely by editing this repository.
+
+## Exam Retry (Examinator)
+
+Examinator's `deploy/export-dashboard.py` writes the same format with exam
+`'retry'` (questions `q1`-`q7`, one per standard S1-S7). Import it with the same
+command as above, pointed at its exports directory; it publishes
+`exam_retry.json` and `exam_retry.pdf` beside Exam 3's, and every rebuild keeps
+them. Its visibility is its own flag, off until released:
+
+```sh
+sudo -u orie4580-dashboard -g www-data .venv/bin/python -m scripts.set_exam_retry_visibility on /var/lib/orie4580-dashboard/exam-publication.json /var/www/html/orie4580_fa26/students --lock-file /var/lib/orie4580-dashboard/refresh.lock
+```
+
+`--require-hidden` checks the visibility of the exam being imported. Another exam
+in this format is a row in `sync/local_grades.py` `ADAPTERS`, in
+`sync/simple_generate.py` `REVIEW_PDFS` (and its page and hidden rule), in
+`static/exam3-review.js` `exams` and `static/simple-dashboard.js` sources, plus
+its own visibility flag.

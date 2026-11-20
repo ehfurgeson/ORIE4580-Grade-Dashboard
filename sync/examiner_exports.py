@@ -9,11 +9,11 @@ import re
 from .simple_checkoffs import NETID_PATTERN
 
 
-def _read(path: Path) -> dict:
+def _read(path: Path, exam=3) -> dict:
     if path.is_symlink() or not path.is_file():
         raise ValueError("Examiner export must contain regular files")
     value = json.loads(path.read_text(encoding='utf-8'))
-    if not isinstance(value, dict) or value.get('schema_version') != 1 or value.get('exam') != 3:
+    if not isinstance(value, dict) or value.get('schema_version') != 1 or value.get('exam') != exam:
         raise ValueError("Unsupported Examiner export format")
     return value
 
@@ -27,8 +27,10 @@ def _timestamp(value):
     return stamp
 
 
-def load_reviews(root: Path, netids: set[str]) -> dict[str, dict]:
+def load_reviews(root: Path, netids: set[str], *, exam=3) -> dict[str, dict]:
     """Replay completed batches; the newest exported version of each question wins.
+
+    ``exam`` is the exports' exam: 3 (Examiner) or 'retry' (Examinator, same format).
 
     The configured root is authoritative. Removing all batches retracts reviews.
     Unknown roster members are ignored, but their export identity is still checked.
@@ -41,7 +43,7 @@ def load_reviews(root: Path, netids: set[str]) -> dict[str, dict]:
             continue  # Includes Examiner's unfinished .building-* directories.
         if not re.fullmatch(r'student-[0-9a-f]{16}', folder.name) or folder.is_symlink() or not folder.is_dir():
             raise ValueError("Unsafe Examiner export directory")
-        manifest = _read(folder / 'manifest.json')
+        manifest = _read(folder / 'manifest.json', exam)
         batches.append((_timestamp(manifest.get('exported_at')), folder, manifest))
     batches.sort(key=lambda batch: (batch[0], batch[1].name))
     reviews, versions = {}, {}
@@ -64,7 +66,7 @@ def load_reviews(root: Path, netids: set[str]) -> dict[str, dict]:
             questions.add(question)
         batch_netids = set()
         for identifier, question_ids in expected.items():
-            document = _read(folder / (identifier + '.json'))
+            document = _read(folder / (identifier + '.json'), exam)
             student = document.get('student')
             if not isinstance(student, dict) or student.get('id') != identifier:
                 raise ValueError("Examiner submission identity mismatch")

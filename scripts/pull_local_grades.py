@@ -6,6 +6,7 @@ from datetime import datetime, timezone
 from pathlib import Path
 
 from sync.exam_publication import load_publication_state, visible_records
+from sync.local_grades import ADAPTERS, local_format
 from sync.simple_generate import write_simple_release
 
 
@@ -19,7 +20,7 @@ def main() -> None:
     parser.add_argument('--state', type=Path, required=True, help="same publication state used by scheduled refresh")
     parser.add_argument('--output', type=Path, required=True, help="protected students directory")
     parser.add_argument('--lock-file', type=Path, required=True, help="same lock used by scheduled refresh")
-    parser.add_argument('--require-hidden', action='store_true', help="abort if Exam 3 is already visible")
+    parser.add_argument('--require-hidden', action='store_true', help="abort if the imported exam is already visible")
     args = parser.parse_args()
     handle = None
     try:
@@ -34,14 +35,18 @@ def main() -> None:
         if state is None:
             raise ValueError("No collected dashboard state; use the state path from the scheduled refresh")
         exam3_visible = state.get('exam3_visible', False)
-        if args.require_hidden and exam3_visible:
-            raise ValueError("Exam 3 is visible; hide it with set_exam3_visibility before importing")
+        exam_retry_visible = state.get('exam_retry_visible', False)
+        retry = ADAPTERS[local_format(args.source)][0] == 'exam_retry.json'
+        exam, visible = ("Exam Retry", exam_retry_visible) if retry else ("Exam 3", exam3_visible)
+        if args.require_hidden and visible:
+            raise ValueError(f"{exam} is visible; hide it with set_exam{'_retry' if retry else '3'}_visibility before importing")
         imported_at = datetime.now(timezone.utc).isoformat()
         pdfs = args.pdfs or args.source.parent / 'pdfs'
         _require_private_state(pdfs, args.output, args.output.parent)
         paths = write_simple_release(visible_records(state['records'], state['visible']), args.output,
                                      local_grades=args.source, local_imported_at=imported_at,
-                                     exam3_visible=exam3_visible, examiner_pdfs=pdfs,
+                                     exam3_visible=exam3_visible, exam_retry_visible=exam_retry_visible,
+                                     examiner_pdfs=pdfs,
                                      refresh_examiner_pdfs=args.refresh_pdfs)
     except (OSError, ValueError, KeyError, RuntimeError) as error:
         parser.error(str(error))
@@ -49,7 +54,7 @@ def main() -> None:
         if handle is not None:
             handle.close()
     print(f"Imported local grades at {imported_at}; rebuilt {len(paths)} student dashboard(s). "
-          f"Exam 3 visibility remains {'ON' if exam3_visible else 'OFF'}. "
+          f"{exam} visibility remains {'ON' if visible else 'OFF'}. "
           f"Remote grades remain as of {state['collected_at']}; no remote sources contacted.")
 
 

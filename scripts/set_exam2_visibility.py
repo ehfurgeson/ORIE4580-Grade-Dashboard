@@ -30,7 +30,8 @@ def main() -> None:
         state["visible"] = args.visibility == "on"
         write_publication_state(args.state, state)
         paths = write_simple_release(visible_records(state["records"], state["visible"]), args.output, retain_previous=False,
-                                     exam3_visible=state.get("exam3_visible", False))
+                                     exam3_visible=state.get("exam3_visible", False),
+                                     exam_retry_visible=state.get("exam_retry_visible", False))
     except (OSError, ValueError, KeyError, RuntimeError) as error:
         parser.error(str(error))
     finally:

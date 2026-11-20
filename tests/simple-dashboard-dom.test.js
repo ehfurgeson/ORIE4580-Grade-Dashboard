@@ -192,7 +192,7 @@ async function checkStaffIndex(withNames = false, supplementFailure = false) {
   assert.match(rows[1].querySelectorAll('.staff-private')[0].textContent, /Unavailable.*403/);
   controls['#toggle-checkmarks'].listeners.click();
   assert.strictEqual(requests.length, supplementFailure ? 4 : 3, 'Failed and partial rows are retried');
-  if (supplementFailure) assert.match(cells[0].children.at(-1).textContent, /Partial results: Exam 3 unavailable/);
+  if (supplementFailure) assert.match(cells[0].children.at(-1).textContent, /Partial results: Exam 3, Exam Retry unavailable/);
   allHeaders[withNames ? 3 : 1].children[0].listeners.click();
   assert.strictEqual(allHeaders[withNames ? 3 : 1].attributes['aria-sort'], 'descending');
   assert.strictEqual(body.children[0].dataset.netid, 'abc123', 'Unavailable stays last');

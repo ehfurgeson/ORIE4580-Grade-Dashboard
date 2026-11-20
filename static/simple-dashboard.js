@@ -14,10 +14,11 @@
   async function loadSupplements(data, base = '') {
     const unavailable = [], absent = [];
     const sources = window.Exam3Review
-      ? [{name: 'Exam 3', file: 'exam3.json', adapter: window.Exam3Review}] : [];
+      ? [{name: 'Exam 3', file: 'exam3.json', exam: 3, adapter: window.Exam3Review},
+         {name: 'Exam Retry', file: 'exam_retry.json', exam: 'retry', adapter: window.Exam3Review}] : [];
     for (const source of sources) {
       try {
-        const extra = await source.adapter.load(`${base}${source.file}`);
+        const extra = await source.adapter.load(`${base}${source.file}`, source.exam);
         if (extra) data = source.adapter.merge(data, extra);
         else absent.push(source.name);
       } catch {
@@ -228,15 +229,17 @@
     for (const name of names) {
       const row = make('div', 'assignment-row');
       const heading = make('h3', '', name);
-      if (name === 'Exam 3') {
-        const link = make('a', '', name); link.href = 'exam3/';
+      const reviewPages = {'Exam 3': 'exam3/', 'Exam Retry': 'exam_retry/'};
+      if (reviewPages[name]) {
+        const link = make('a', '', name); link.href = reviewPages[name];
         heading.replaceChildren(link);
       }
       row.append(heading);
       const slots = make('div', 'assignment-slots');
       for (const { mark, standard, allocation } of groups.get(name).sort((a, b) => a.question - b.question)) {
         const slot = make('a', 'assignment-slot');
-        slot.href = mark.id?.startsWith('exam3-q') ? (mark.status === 'not_graded' ? 'exam3/' : `exam3/#q${mark.id.split('-q')[1]}`) : `#standard-${standard.id}`;
+        const reviewPage = mark.id?.startsWith('exam3-q') ? 'exam3/' : mark.id?.startsWith('examretry-q') ? 'exam_retry/' : null;
+        slot.href = reviewPage ? (mark.status === 'not_graded' ? reviewPage : `${reviewPage}#q${mark.id.split('-q')[1]}`) : `#standard-${standard.id}`;
         const result = mark.status === 'complete' ? allocationLabel(mark, allocation)
           : mark.status === 'not_graded' ? 'Not available yet' : 'Checkmark not earned';
         slot.title = `${mark.label} · ${standard.id}: ${result}`;

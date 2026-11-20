@@ -104,7 +104,7 @@ def test_cli_writes_desired_state_before_publication(tmp_path, monkeypatch, stat
     monkeypatch.setattr(sys, "argv", ["switch", "on", str(state_path), str(output), "--lock-file", str(tmp_path / "private" / "refresh.lock")])
     def failed_publication(records, directory, **kwargs):
         assert load_publication_state(state_path)["visible"] is True
-        assert kwargs == {"retain_previous": False, "exam3_visible": False}
+        assert kwargs == {"retain_previous": False, "exam3_visible": False, "exam_retry_visible": False}
         raise OSError("fake publication failure")
     monkeypatch.setattr(switch, "write_simple_release", failed_publication)
     with pytest.raises(SystemExit):
