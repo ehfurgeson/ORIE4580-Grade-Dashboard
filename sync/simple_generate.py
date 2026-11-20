@@ -147,7 +147,7 @@ def render_staff_index(netids: list[str]) -> str:
     </section>
   </main>
   <script src="../exam3-review.js" defer></script>
-  <script src="../simple-dashboard.js?v=roster-columns" defer></script>
+  <script src="../simple-dashboard.js?v=roster-columns-2" defer></script>
 </body>
 </html>
 """

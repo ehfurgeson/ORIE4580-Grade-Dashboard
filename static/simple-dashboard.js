@@ -398,13 +398,12 @@
     const standardIds = [...root.querySelectorAll('[data-standard]')].map(cell => cell.dataset.standard);
     const sortValues = new Map();
     const headers = [...root.querySelectorAll('thead th')].filter(header => !header.className.split(' ').includes('staff-line-number'));
-    const legacyKeys = ['netid', 'purple', 'missing', ...standardIds, 'shiny'];
-    const sortKeys = headers.map((header, index) => header.dataset.sort || header.dataset.standard || legacyKeys[index]);
+    const sortKeys = headers.map(header => header.dataset.sort || header.dataset.standard);
     const rosterKeys = sortKeys.filter((_, index) => headers[index].dataset.rosterColumn !== undefined);
-    const identityKeys = new Set(['netid', 'firstName', 'lastName', 'class', ...rosterKeys]);
-    const searchKeys = sortKeys.filter(key => identityKeys.has(key));
+    const searchKeys = ['netid', ...rosterKeys];
+    const identityKeys = new Set(searchKeys);
     const identityValues = new Map(rows.map(row => {
-      const values = { ...row.dataset };
+      const values = { netid: row.dataset.netid };
       row.querySelectorAll('.staff-roster-value').forEach((cell, index) => {
         values[rosterKeys[index]] = cell.textContent;
       });

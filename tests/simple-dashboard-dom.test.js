@@ -104,9 +104,7 @@ async function run(data, { legacyTemplate = false, examData = undefined, retryDa
   return nodes;
 }
 
-async function checkStaffIndex(roster = 'none', supplementFailure = false) {
-  const withNames = roster !== 'none';
-  const dynamicRoster = roster === 'csv';
+async function checkStaffIndex(withRoster = false, supplementFailure = false) {
   const root = new Element();
   const controls = Object.fromEntries([
     '#student-search', '#toggle-checkmarks', '#staff-status', '#student-count', '#no-students'
@@ -123,15 +121,12 @@ async function checkStaffIndex(roster = 'none', supplementFailure = false) {
     row.dataset.netid = netid;
     return row;
   });
-  if (withNames) {
+  if (withRoster) {
     const fields = [['Zoe', 'Adams', '5581'], ['Alice', 'Brown', '4580']];
     rows.forEach((row, rowIndex) => {
-      if (!dynamicRoster) {
-        [row.dataset.firstName, row.dataset.lastName, row.dataset.class] = fields[rowIndex];
-      }
       for (const value of fields[rowIndex]) {
         const cell = new Element('td');
-        if (dynamicRoster) cell.className = 'staff-roster-value';
+        cell.className = 'staff-roster-value';
         cell.textContent = value;
         row.append(cell);
       }
@@ -139,15 +134,19 @@ async function checkStaffIndex(roster = 'none', supplementFailure = false) {
   }
   const body = new Element('tbody');
   body.append(...rows);
-  const allHeaders = [new Element('th'), new Element('th'), new Element('th'), ...headings, new Element('th')];
-  if (withNames) {
-    const keys = ['netid', 'purple', 'missing', 'S1', 'S2', 'shiny'];
-    allHeaders.forEach((header, index) => { header.dataset.sort = keys[index]; });
-    const rosterHeaders = ['firstName', 'lastName', 'class'].map((key, index) => {
+  const [netidHeader, purpleHeader, missingHeader, shinyHeader] = ['netid', 'purple', 'missing', 'shiny'].map(key => {
+    const header = new Element('th');
+    header.dataset.sort = key;
+    if (key !== 'netid') header.className = 'staff-private';
+    return header;
+  });
+  const allHeaders = [netidHeader, purpleHeader, missingHeader, ...headings, shinyHeader];
+  if (withRoster) {
+    const rosterHeaders = ['Given Name', 'Family Name', 'Course Section'].map((label, index) => {
       const header = new Element('th');
-      header.textContent = ['First Name', 'Last Name', dynamicRoster ? 'Course Section' : 'Class'][index];
-      header.dataset.sort = dynamicRoster ? `roster${index}` : key;
-      if (dynamicRoster) header.dataset.rosterColumn = '';
+      header.textContent = label;
+      header.dataset.sort = `roster${index}`;
+      header.dataset.rosterColumn = '';
       return header;
     });
     allHeaders.splice(1, 0, ...rosterHeaders);
@@ -202,7 +201,6 @@ async function checkStaffIndex(roster = 'none', supplementFailure = false) {
   controls['#toggle-checkmarks'].listeners.click();
   assert.strictEqual(requests.length, supplementFailure ? 4 : 3, 'Failed and partial rows are retried');
   if (supplementFailure) assert.match(cells[0].children.at(-1).textContent, /Partial results: Exam 3, Exam Retry unavailable/);
-  const purpleHeader = allHeaders[withNames ? 4 : 1];
   purpleHeader.children[0].listeners.click();
   assert.strictEqual(purpleHeader.attributes['aria-sort'], 'descending');
   assert.strictEqual(body.children[0].dataset.netid, 'abc123', 'Unavailable stays last');
@@ -224,7 +222,7 @@ async function checkStaffIndex(roster = 'none', supplementFailure = false) {
   assert(root.querySelectorAll('.staff-private').every(cell => cell.hidden));
   assert.strictEqual(controls['#toggle-checkmarks'].attributes['aria-expanded'], 'false');
   await new Promise(resolve => setImmediate(resolve));
-  if (withNames) {
+  if (withRoster) {
     assert.strictEqual(rows[0].children[0].textContent, 'Zoe', 'Loading preserves name cells');
     allHeaders[1].children[0].listeners.click();
     assert.strictEqual(body.children[0].dataset.netid, 'xy99', 'First name ascending');
@@ -232,23 +230,21 @@ async function checkStaffIndex(roster = 'none', supplementFailure = false) {
     assert.strictEqual(body.children[0].dataset.netid, 'abc123', 'First name descending');
     allHeaders[2].children[0].listeners.click();
     assert.strictEqual(body.children[0].dataset.netid, 'abc123', 'Last name ascending');
-    assert.strictEqual(rows[0].children[2].textContent, '5581', 'Loading preserves Class cells');
+    assert.strictEqual(rows[0].children[2].textContent, '5581', 'Loading preserves course section cells');
     allHeaders[3].children[0].listeners.click();
-    assert.strictEqual(body.children[0].dataset.netid, 'xy99', 'Class ascending');
+    assert.strictEqual(body.children[0].dataset.netid, 'xy99', 'Course section ascending');
     doc.listeners.keydown({ key: 'Escape' });
-    assert.strictEqual(allHeaders[3].attributes['aria-sort'], 'ascending', 'Hide preserves Class sorting');
+    assert.strictEqual(allHeaders[3].attributes['aria-sort'], 'ascending', 'Hide preserves course section sorting');
     allHeaders[3].children[0].listeners.click();
-    assert.strictEqual(body.children[0].dataset.netid, 'abc123', 'Class descending');
+    assert.strictEqual(body.children[0].dataset.netid, 'abc123', 'Course section descending');
     controls['#student-search'].value = 'alice brown';
     controls['#student-search'].listeners.input();
     assert.strictEqual(rows[0].hidden, true);
     assert.strictEqual(rows[1].hidden, false);
-    if (dynamicRoster) {
-      controls['#student-search'].value = '5581';
-      controls['#student-search'].listeners.input();
-      assert.strictEqual(rows[0].hidden, false, 'Search matches values in a custom CSV column');
-      assert.strictEqual(rows[1].hidden, true);
-    }
+    controls['#student-search'].value = '5581';
+    controls['#student-search'].listeners.input();
+    assert.strictEqual(rows[0].hidden, false, 'Search matches values in a custom CSV column');
+    assert.strictEqual(rows[1].hidden, true);
   }
 }
 
@@ -268,9 +264,8 @@ async function checkStaffIndex(roster = 'none', supplementFailure = false) {
   assert.strictEqual(labs89Nodes['#standards'].children.length, 9);
   assert.strictEqual(labs89Nodes['#earned-total'].textContent, '3 of 3');
   await checkStaffIndex();
-  await checkStaffIndex('legacy');
-  await checkStaffIndex('csv');
-  await checkStaffIndex('none', true);
+  await checkStaffIndex(true);
+  await checkStaffIndex(false, true);
   const examData = JSON.parse(fs.readFileSync('fixtures/exam3/synthetic-student.json'));
   const integrated = await run(payload(6, []), {examData});
   assert.equal(integrated['#earned-total'].textContent, '4 of 9');
