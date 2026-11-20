@@ -418,19 +418,22 @@ def test_staff_index_renderer_rejects_unsafe_or_duplicate_netids():
 
 def test_staff_roster_filters_only_index_and_escapes_fields(tmp_path, monkeypatch):
     roster = tmp_path / 'names.csv'
-    roster.write_text('NetID,First Name,Last Name,Class\nabc123,<Alice>,"O""Brien",<5581>\nzz123,Other,Student,4580\n')
+    roster.write_text('First Name,NetID,Campus & Section,Last Name\n<Alice>,abc123,<5581>,"O""Brien"\nOther,zz123,4580,Student\n')
     monkeypatch.setattr('sync.staff_roster.STAFF_ROSTER_PATH', roster)
     output = tmp_path / 'students'
     paths = write_simple_release(published_records(make_rows()), output)
     student_html = output / 'abc123' / 'index.html'
     before = {path: path.read_bytes() for path in [*paths, student_html]}
     assert all(b'<5581>' not in contents and b'&lt;5581&gt;' not in contents for contents in before.values())
-    assert 'data-class="&lt;5581&gt;"' in (output / 'index.html').read_text()
+    assert '>Campus &amp; Section</th>' in (output / 'index.html').read_text()
     update_authorization_files(output)
     index = (output / 'index.html').read_text()
     assert '&lt;Alice&gt;' in index and 'O&quot;Brien' in index
-    assert 'data-sort="class">Class</th>' in index
-    assert '<td>&lt;5581&gt;</td>' in index
+    assert 'data-sort="roster0" data-roster-column>First Name</th>' in index
+    assert 'data-sort="roster1" data-roster-column>Campus &amp; Section</th>' in index
+    assert 'data-sort="roster2" data-roster-column>Last Name</th>' in index
+    assert '<td class="staff-roster-value">&lt;5581&gt;</td>' in index
+    assert '>Class</th>' not in index
     assert 'data-netid="abc123"' in index
     assert 'data-netid="xy99"' not in index
     assert 'data-netid="zz123"' not in index
@@ -439,5 +442,8 @@ def test_staff_roster_filters_only_index_and_escapes_fields(tmp_path, monkeypatc
     assert (output / 'xy99' / '.htaccess').exists()
     roster.write_text('NetID,First Name,Last Name\n')
     update_authorization_files(output)
-    assert 'data-netid=' not in (output / 'index.html').read_text()
+    index = (output / 'index.html').read_text()
+    assert 'data-netid=' not in index
+    assert '>Campus &amp; Section</th>' not in index
+    assert '>First Name</th>' in index
     assert {path: path.read_bytes() for path in before} == before

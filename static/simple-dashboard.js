@@ -400,7 +400,16 @@
     const headers = [...root.querySelectorAll('thead th')].filter(header => !header.className.split(' ').includes('staff-line-number'));
     const legacyKeys = ['netid', 'purple', 'missing', ...standardIds, 'shiny'];
     const sortKeys = headers.map((header, index) => header.dataset.sort || header.dataset.standard || legacyKeys[index]);
-    const identityKeys = new Set(['netid', 'firstName', 'lastName', 'class']);
+    const rosterKeys = sortKeys.filter((_, index) => headers[index].dataset.rosterColumn !== undefined);
+    const identityKeys = new Set(['netid', 'firstName', 'lastName', 'class', ...rosterKeys]);
+    const searchKeys = sortKeys.filter(key => identityKeys.has(key));
+    const identityValues = new Map(rows.map(row => {
+      const values = { ...row.dataset };
+      row.querySelectorAll('.staff-roster-value').forEach((cell, index) => {
+        values[rosterKeys[index]] = cell.textContent;
+      });
+      return [row, values];
+    }));
     let sortKey = 'netid';
     let ascending = true;
     const sortButtons = headers.map((header, index) => {
@@ -421,8 +430,8 @@
       const ordered = [...rows].sort((a, b) => {
         const tie = a.dataset.netid.localeCompare(b.dataset.netid);
         if (identityKeys.has(sortKey)) {
-          const left = a.dataset[sortKey] || '';
-          const right = b.dataset[sortKey] || '';
+          const left = identityValues.get(a)[sortKey] || '';
+          const right = identityValues.get(b)[sortKey] || '';
           if (!left || !right) return !left ? (!right ? tie : 1) : -1;
           const comparison = left.localeCompare(right, undefined, { sensitivity: 'base' });
           return (ascending ? comparison : -comparison) || tie;
@@ -566,7 +575,8 @@
       const query = search.value.trim().toLowerCase();
       let matches = 0;
       for (const row of rows) {
-        row.hidden = !`${row.dataset.netid} ${row.dataset.firstName || ''} ${row.dataset.lastName || ''}`.toLowerCase().includes(query);
+        const values = identityValues.get(row);
+        row.hidden = !searchKeys.map(key => values[key] || '').join(' ').toLowerCase().includes(query);
         if (!row.hidden) matches += 1;
       }
       root.querySelector('#student-count').textContent = `${matches} of ${rows.length} students`;

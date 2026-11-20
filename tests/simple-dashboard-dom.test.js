@@ -34,7 +34,7 @@ class Element {
   querySelectorAll(selector) {
     const descendants = this.children.flatMap(child => [child, ...child.querySelectorAll('*')]);
     return descendants.filter(child => selector === '*' ||
-      (selector === '.staff-private' ? child.className.split(' ').includes('staff-private') : child.tag === selector));
+      (selector.startsWith('.') ? child.className.split(' ').includes(selector.slice(1)) : child.tag === selector));
   }
 }
 
@@ -104,7 +104,9 @@ async function run(data, { legacyTemplate = false, examData = undefined, retryDa
   return nodes;
 }
 
-async function checkStaffIndex(withNames = false, supplementFailure = false) {
+async function checkStaffIndex(roster = 'none', supplementFailure = false) {
+  const withNames = roster !== 'none';
+  const dynamicRoster = roster === 'csv';
   const root = new Element();
   const controls = Object.fromEntries([
     '#student-search', '#toggle-checkmarks', '#staff-status', '#student-count', '#no-students'
@@ -122,17 +124,17 @@ async function checkStaffIndex(withNames = false, supplementFailure = false) {
     return row;
   });
   if (withNames) {
-    rows.forEach((row, index) => {
-      row.dataset.firstName = ['Zoe', 'Alice'][index];
-      row.dataset.lastName = ['Adams', 'Brown'][index];
-      row.dataset.class = ['5581', '4580'][index];
-      const first = new Element('td');
-      first.textContent = row.dataset.firstName;
-      const last = new Element('td');
-      last.textContent = row.dataset.lastName;
-      const classCell = new Element('td');
-      classCell.textContent = row.dataset.class;
-      row.append(first, last, classCell);
+    const fields = [['Zoe', 'Adams', '5581'], ['Alice', 'Brown', '4580']];
+    rows.forEach((row, rowIndex) => {
+      if (!dynamicRoster) {
+        [row.dataset.firstName, row.dataset.lastName, row.dataset.class] = fields[rowIndex];
+      }
+      for (const value of fields[rowIndex]) {
+        const cell = new Element('td');
+        if (dynamicRoster) cell.className = 'staff-roster-value';
+        cell.textContent = value;
+        row.append(cell);
+      }
     });
   }
   const body = new Element('tbody');
@@ -141,9 +143,11 @@ async function checkStaffIndex(withNames = false, supplementFailure = false) {
   if (withNames) {
     const keys = ['netid', 'purple', 'missing', 'S1', 'S2', 'shiny'];
     allHeaders.forEach((header, index) => { header.dataset.sort = keys[index]; });
-    const rosterHeaders = ['firstName', 'lastName', 'class'].map(key => {
+    const rosterHeaders = ['firstName', 'lastName', 'class'].map((key, index) => {
       const header = new Element('th');
-      header.dataset.sort = key;
+      header.textContent = ['First Name', 'Last Name', dynamicRoster ? 'Course Section' : 'Class'][index];
+      header.dataset.sort = dynamicRoster ? `roster${index}` : key;
+      if (dynamicRoster) header.dataset.rosterColumn = '';
       return header;
     });
     allHeaders.splice(1, 0, ...rosterHeaders);
@@ -233,10 +237,18 @@ async function checkStaffIndex(withNames = false, supplementFailure = false) {
     assert.strictEqual(body.children[0].dataset.netid, 'xy99', 'Class ascending');
     doc.listeners.keydown({ key: 'Escape' });
     assert.strictEqual(allHeaders[3].attributes['aria-sort'], 'ascending', 'Hide preserves Class sorting');
+    allHeaders[3].children[0].listeners.click();
+    assert.strictEqual(body.children[0].dataset.netid, 'abc123', 'Class descending');
     controls['#student-search'].value = 'alice brown';
     controls['#student-search'].listeners.input();
     assert.strictEqual(rows[0].hidden, true);
     assert.strictEqual(rows[1].hidden, false);
+    if (dynamicRoster) {
+      controls['#student-search'].value = '5581';
+      controls['#student-search'].listeners.input();
+      assert.strictEqual(rows[0].hidden, false, 'Search matches values in a custom CSV column');
+      assert.strictEqual(rows[1].hidden, true);
+    }
   }
 }
 
@@ -256,8 +268,9 @@ async function checkStaffIndex(withNames = false, supplementFailure = false) {
   assert.strictEqual(labs89Nodes['#standards'].children.length, 9);
   assert.strictEqual(labs89Nodes['#earned-total'].textContent, '3 of 3');
   await checkStaffIndex();
-  await checkStaffIndex(true);
-  await checkStaffIndex(false, true);
+  await checkStaffIndex('legacy');
+  await checkStaffIndex('csv');
+  await checkStaffIndex('none', true);
   const examData = JSON.parse(fs.readFileSync('fixtures/exam3/synthetic-student.json'));
   const integrated = await run(payload(6, []), {examData});
   assert.equal(integrated['#earned-total'].textContent, '4 of 9');

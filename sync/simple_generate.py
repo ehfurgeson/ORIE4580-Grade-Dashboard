@@ -72,8 +72,13 @@ def render_staff_index(netids: list[str]) -> str:
     if len(netids) != len(set(netids)):
         raise ValueError("staff index NetIDs must be unique")
     roster = load_staff_roster()
+    roster_headings = ''
     if roster is not None:
-        netids = [netid for netid in netids if netid in roster]
+        netids = [netid for netid in netids if netid in roster.rows]
+        roster_headings = ''.join(
+            f'<th scope="col" data-sort="roster{index}" data-roster-column>{escape(label)}</th>'
+            for index, label in enumerate(roster.columns)
+        )
     headings = ''.join(
         f'<th scope="col" class="staff-private" data-standard="{standard_id}" hidden '
         f'title="{escape(name, quote=True)}">{standard_id}</th>'
@@ -81,13 +86,12 @@ def render_staff_index(netids: list[str]) -> str:
     )
     rows = []
     for netid in sorted(netids):
-        fields = (roster or {}).get(netid, ('', '', ''))
-        first, last, class_name = (escape(value, quote=True) for value in fields)
+        fields = roster.rows[netid] if roster is not None else ()
+        cells = ''.join(f'<td class="staff-roster-value">{escape(value)}</td>' for value in fields)
         rows.append(
-            f'<tr data-netid="{netid}" data-first-name="{first}" data-last-name="{last}" '
-            f'data-class="{class_name}">'
+            f'<tr data-netid="{netid}">'
             f'<td class="staff-line-number"></td><th scope="row"><a href="./{netid}/">{netid}</a></th>'
-            f'<td class="staff-name">{first}</td><td class="staff-name">{last}</td><td>{class_name}</td></tr>'
+            f'{cells}</tr>'
         )
     links = "\n".join(rows)
     return f"""<!doctype html>
@@ -117,7 +121,7 @@ def render_staff_index(netids: list[str]) -> str:
     <section aria-labelledby="student-list-title">
       <h2 id="student-list-title">Students ({len(netids)})</h2>
       <div class="staff-controls">
-        <label for="student-search">Search by NetID or name
+        <label for="student-search">Search students
           <input id="student-search" type="search" autocomplete="off" spellcheck="false" placeholder="e.g. abc123">
         </label>
         <button id="toggle-checkmarks" type="button" aria-expanded="false" aria-controls="student-table" disabled>Show checkmarks</button>
@@ -128,9 +132,7 @@ def render_staff_index(netids: list[str]) -> str:
       <table id="student-table" class="staff-table">
         <caption class="note">Student dashboards — <span id="student-count">{len(netids)} students</span></caption>
         <thead><tr><th class="staff-line-number" scope="col" aria-label="Line number"></th><th scope="col" data-sort="netid">NetID</th>
-          <th scope="col" data-sort="firstName">First Name</th>
-          <th scope="col" data-sort="lastName">Last Name</th>
-          <th scope="col" data-sort="class">Class</th>
+          {roster_headings}
           <th scope="col" data-sort="purple" class="staff-private" hidden>Total purple</th>
           <th scope="col" data-sort="missing" class="staff-private" hidden>Total missing</th>
           {headings}
@@ -145,7 +147,7 @@ def render_staff_index(netids: list[str]) -> str:
     </section>
   </main>
   <script src="../exam3-review.js" defer></script>
-  <script src="../simple-dashboard.js" defer></script>
+  <script src="../simple-dashboard.js?v=roster-columns" defer></script>
 </body>
 </html>
 """

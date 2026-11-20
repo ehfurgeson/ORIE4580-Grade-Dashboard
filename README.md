@@ -306,7 +306,7 @@ sudo systemctl enable --now orie4580-checkoffs.timer
 
 ### Authorization-only update
 
-The staff-only `/students/` index supports NetID and name search and a **Show checkmarks** button. Checkmark columns start hidden; **Hide checkmarks**, Escape, switching tabs, or returning to the page hides them again. On first reveal, it reads the existing protected student JSON files (six requests at a time), respecting published Exam 2 visibility. Each row shows counted purple marks (including shiny purple), missing linked boxes, each standard's two linked boxes, and shiny overflow. Click any column heading to sort, and click again to reverse. Standard columns sort by purple boxes (including shiny), then purple + green boxes, then shiny purple boxes. Unavailable values stay last. Hiding checkmarks resets grade-based ordering to NetID for privacy; name sorting is retained. Standards outside a student's course catalog show N/A. Failed summaries show an error instead of zero totals; hide and show again to retry. Reload to pick up newly synced results. This page uses the existing `simple-dashboard.js`, `simple-style.css`, `checkmarks.css`, and `exam3-review.js` assets, which need to be updated along with the generated index.
+The staff-only `/students/` index supports searching the roster and a **Show checkmarks** button. Checkmark columns start hidden; **Hide checkmarks**, Escape, switching tabs, or returning to the page hides them again. On first reveal, it reads the existing protected student JSON files (six requests at a time), respecting published Exam 2 visibility. Each row shows counted purple marks (including shiny purple), missing linked boxes, each standard's two linked boxes, and shiny overflow. Click any column heading to sort, and click again to reverse. Standard columns sort by purple boxes (including shiny), then purple + green boxes, then shiny purple boxes. Unavailable values stay last. Hiding checkmarks resets grade-based ordering to NetID for privacy and preserves sorting by roster columns. Standards outside a student's course catalog show N/A. Failed summaries show an error instead of zero totals; hide and show again to retry. Reload to pick up newly synced results. This page uses the existing `simple-dashboard.js`, `simple-style.css`, `checkmarks.css`, and `exam3-review.js` assets, which need to be updated along with the generated index.
 
 Staff authorization and the protected staff index can be updated without fetching Google Sheets or Gradescope and without changing any student HTML or JSON:
 
@@ -322,7 +322,8 @@ The command validates all student directory names before writing, atomically rep
 ### Private staff roster
 
 Optionally install a UTF-8 CSV outside the web root at
-`/var/lib/orie4580-dashboard/student-names.csv`, with `Class` as an optional fourth column.
+`/var/lib/orie4580-dashboard/student-names.csv`. `NetID` is the only required
+header. For example, a roster can contain:
 
 ```csv
 NetID,First Name,Last Name,Class
@@ -338,16 +339,17 @@ sudo install -o orie4580-dashboard -g www-data -m 0600 \
 
 The private CSV is read automatically by both normal publication (including the
 Exam 2 visibility switch) and the authorization/index updater. It is never copied
-into the served tree. Only the staff-protected index displays the roster fields.
-First Name, Last Name, and Class are separately sortable. Search matches names
-as well as NetIDs.
+into the served tree. The staff-protected index shows NetID first as the dashboard
+link, then the other columns in CSV order. All roster columns are sortable and
+searchable. Add, rename, remove, or reorder a CSV column and refresh the index
+to apply the change.
 
 When the CSV exists, the index lists only NetIDs present in both the CSV and the
 student output. Students omitted from the CSV keep their folders, authorization,
 and dashboards. CSV entries without a dashboard are not listed. A header-only
-CSV lists nobody. Without a CSV, the original full NetID list remains with blank
-name and Class cells. NetIDs are trimmed and lowercased; duplicates and malformed rows
-fail the update rather than silently falling back to the full list.
+CSV lists nobody. Without a CSV, the index lists all available NetIDs. NetIDs
+are trimmed and lowercased. Duplicate NetIDs, duplicate or empty headers, and
+malformed rows stop publication.
 
 After installing or editing the CSV, rebuild the index without fetching grades
 or restarting services (run from `/opt/orie4580-grade-dashboard`):

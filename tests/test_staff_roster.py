@@ -3,7 +3,7 @@ import unittest
 from pathlib import Path
 from unittest.mock import patch
 
-from sync.staff_roster import load_staff_roster
+from sync.staff_roster import StaffRoster, load_staff_roster
 
 
 class StaffRosterTests(unittest.TestCase):
@@ -12,10 +12,10 @@ class StaffRosterTests(unittest.TestCase):
             path = Path(directory) / 'names.csv'
             with patch('sync.staff_roster.STAFF_ROSTER_PATH', path):
                 self.assertIsNone(load_staff_roster())
-                path.write_text('\ufeffNetID,First Name,Last Name\nABC123,Zoë,"Smith, Jr."\n', encoding='utf-8')
-                self.assertEqual(load_staff_roster(), {'abc123': ('Zoë', 'Smith, Jr.', '')})
+                path.write_text('\ufeffDisplay Name,NetID,Section\n"Smith, Zoë",ABC123,002\n', encoding='utf-8')
+                self.assertEqual(load_staff_roster(), StaffRoster(('Display Name', 'Section'), {'abc123': ('Smith, Zoë', '002')}))
                 path.write_text('NetID,First Name,Last Name\n', encoding='utf-8')
-                self.assertEqual(load_staff_roster(), {})
+                self.assertEqual(load_staff_roster(), StaffRoster(('First Name', 'Last Name'), {}))
 
     def test_bad_roster_fails_instead_of_showing_all_students(self):
         with tempfile.TemporaryDirectory() as directory:
@@ -26,6 +26,8 @@ class StaffRosterTests(unittest.TestCase):
                     'NetID,First Name,Last Name\nabc123,Alice,A\nABC123,Bob,B\n',
                     'NetID,First Name,Last Name\n../unsafe,Alice,A\n',
                     'NetID,First Name,Last Name\nabc123,Alice\n',
+                    'NetID,Section, Section \nabc123,001,002\n',
+                    'NetID,\nabc123,001\n',
                 ):
                     with self.subTest(contents=contents):
                         path.write_text(contents, encoding='utf-8')
