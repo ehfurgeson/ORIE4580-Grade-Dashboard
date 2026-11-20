@@ -133,12 +133,20 @@
   function allocateStandard(checkmarks) {
     const priority = { purple: 0, shiny_purple: 1, green: 2 };
     const earned = checkmarks.filter(item => item.status === 'complete');
-    const linked = [...earned].sort((a, b) => priority[a.kind] - priority[b.kind]).slice(0, 2);
-    const shiny = earned.filter(item => item.kind === 'shiny_purple' && !linked.includes(item));
-    return { earned, linked, shiny };
+    const hasEarlierExamPurple = earned.some(item => item.kind !== 'green' && /^exam[123]-q\d+/.test(item.id || ''));
+    const excludedRetry = new Set(earned.filter(item =>
+      hasEarlierExamPurple && item.kind !== 'green' && item.id?.startsWith('examretry-q')
+    ));
+    const eligible = earned.filter(item => !excludedRetry.has(item));
+    const linked = [...eligible].sort((a, b) => priority[a.kind] - priority[b.kind]).slice(0, 2);
+    const shiny = eligible.filter(item => item.kind === 'shiny_purple' && !linked.includes(item));
+    return { earned, linked, shiny, excludedRetry };
   }
 
   function allocationLabel(checkmark, allocation) {
+    if (allocation.excludedRetry.has(checkmark)) {
+      return 'Does not count toward the grade because this standard already has purple credit from Exams 1–3';
+    }
     if (allocation.linked.includes(checkmark)) return 'Counts in standard-linked box';
     if (allocation.shiny.includes(checkmark)) return 'Counts in shiny pool (overflow)';
     return 'Extra checkmark — does not count toward grade';
@@ -322,7 +330,8 @@
     document.querySelector('#dashboard-description').textContent =
       'Your lab checkoffs, autograder results, and available exam checkmarks, mapped to course standards.';
     document.querySelector('#completion-note').textContent =
-      'Lab green checkmarks require the listed Lab sources. Manual-only Lab opportunities have no autograded component. Exam 1 scores over 0.8 earn their mapped purple or shiny-purple checkmark. Exam 2 requires fully correct parts: Q1 at least 4 of 5, Q2 at least 7 of 8, Q3 at least 5 of 6, and all parts for other questions except Q8. Q8 earns one shiny-purple mark for all 4 parts correct; otherwise, parts 8.1 and 8.2 correct earn one purple mark. Unavailable exam scores do not earn a mark.';
+      'Lab green checkmarks require the listed Lab sources. Manual-only Lab opportunities have no autograded component. Exam 1 scores over 0.8 earn their mapped purple or shiny-purple checkmark. Exam 2 requires fully correct parts: Q1 at least 4 of 5, Q2 at least 7 of 8, Q3 at least 5 of 6, and all parts for other questions except Q8. Q8 earns one shiny-purple mark for all 4 parts correct; otherwise, parts 8.1 and 8.2 correct earn one purple mark. Unavailable exam scores do not earn a mark. ' +
+      'Exam Retry credit counts only in standards without a purple or shiny-purple checkmark from Exams 1–3.';
     document.querySelector('#student-netid').textContent = data.student.netid;
     document.querySelector('#worksheet').textContent = data.worksheet;
     const time = document.querySelector('#updated-at');

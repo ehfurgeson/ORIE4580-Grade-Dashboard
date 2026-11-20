@@ -294,6 +294,31 @@ async function checkStaffIndex(withNames = false, supplementFailure = false) {
   assert.equal(retryRow.children[1].children.length, 7);
   assert.equal(retryRow.children[1].children[0].href, 'exam_retry/#q1');
 
+  const retryEligibility = payload(6, []);
+  retryEligibility.standards[0].checkmarks = [examMark('exam1-q3', 'complete')];
+  retryEligibility.standards[1].checkmarks = [examMark('exam2-q12', 'complete', 'shiny_purple')];
+  retryEligibility.standards[3].checkmarks = [examMark('exam4-q1', 'complete')];
+  retryEligibility.standards[4].checkmarks = [
+    examMark('exam2-q5', 'incomplete'), examMark('exam2-q6', 'not_graded'),
+    {id: 'lab5-q1', label: 'Lab 5 · Question 1', kind: 'green', status: 'complete', requirements: [manual]}
+  ];
+  const metQuestion = number => ({...examData.questions[0], id: `q${number}`, standard: `S${number}`});
+  const eligibilityNodes = await run(retryEligibility, {
+    examData: {...examData, questions: [metQuestion(3)]},
+    retryData: {...retryData, questions: [1, 2, 3, 4, 5, 6].map(metQuestion)}
+  });
+  const overviewRows = eligibilityNodes['#checkmark-overview'].children.slice(1, 7);
+  assert.deepStrictEqual(overviewRows.map(row => row.children[1].children.map(box => box.textContent)),
+    [['✓', '–'], ['✦', '–'], ['✓', '–'], ['✓', '✓'], ['✓', '✓'], ['✓', '–']]);
+  const eligibilitySlots = eligibilityNodes['#assignment-overview'].children
+    .find(row => row.children[0].children[0]?.href === 'exam_retry/').children[1].children;
+  for (const slot of eligibilitySlots.slice(0, 3)) {
+    assert.match(slot.title, /already has purple credit from Exams 1–3/);
+  }
+  for (const slot of eligibilitySlots.slice(3, 6)) {
+    assert.match(slot.title, /Counts in standard-linked box/);
+  }
+
   const hostile = "<img src=x onerror=alert(1)>";
   const current = await run(payload(6, [hostile]));
   assert.strictEqual(current["#unmapped-columns-section"].hidden, false);
