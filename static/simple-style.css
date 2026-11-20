@@ -101,13 +101,8 @@ header > p:last-child { margin: .4rem 0 0; color: var(--muted); }
 .summary-strip strong { font-size: 1.05rem; }
 
 .checkmark.redundant-mark {
-  --mark-color: color-mix(in srgb, var(--mark-purple) 65%, white);
   border-style: dashed;
-  background: white;
-}
-
-.checkmark.green.redundant-mark {
-  --mark-color: color-mix(in srgb, var(--mark-green) 65%, white);
+  opacity: .5;
 }
 
 .checkmark-summary { padding: 1rem 0; border-bottom: 1px solid var(--line); }

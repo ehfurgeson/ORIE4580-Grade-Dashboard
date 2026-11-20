@@ -47,11 +47,10 @@
 .checkmark.unearned, .checkmark.empty-box {
   color: var(--mark-muted);
   background: transparent;
-  border: calc(var(--checkmark-size) * .065) solid #9aa0a6;
+  border: calc(var(--checkmark-size) * .065) dashed #9aa0a6;
   font-size: calc(var(--checkmark-size) * .56);
   font-weight: 400;
 }
-.checkmark.empty-box { border-style: dashed; }
 
 .linked-box {
   min-width: 4rem;
