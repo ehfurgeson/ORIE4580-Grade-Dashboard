@@ -156,12 +156,13 @@
     return { green: 'Green', purple: 'Purple', shiny_purple: 'Shiny purple' }[kind];
   }
 
-  function renderCompactCheckmark(checkmark, label) {
+  function renderCompactCheckmark(checkmark, label, excludedRetry = false) {
     const color = checkmarkKindLabel(checkmark.kind);
     const mark = make(
       'span', `checkmark ${checkmark.kind}`,
       checkmark.kind === 'shiny_purple' ? '✦' : '✓'
     );
+    if (excludedRetry) mark.classList.add('retry-excluded');
     const description = `${color}: ${checkmark.label}. ${label}`;
     mark.title = description;
     mark.setAttribute('role', 'img');
@@ -205,7 +206,7 @@
       link.href = `#standard-${standard.id}`;
       const marks = make('div', 'compact-marks');
       for (const item of allocation.earned) {
-        marks.append(renderCompactCheckmark(item, allocationLabel(item, allocation)));
+        marks.append(renderCompactCheckmark(item, allocationLabel(item, allocation), allocation.excludedRetry.has(item)));
       }
       if (allocation.earned.length === 0) marks.append(make('span', 'note', 'None yet'));
       row.append(link, renderLinkedBoxes(allocation, true), marks);
@@ -261,7 +262,7 @@
           : mark.status === 'not_graded' ? 'Not available yet' : 'Checkmark not earned';
         slot.title = `${mark.label} · ${standard.id}: ${result}`;
         slot.setAttribute('aria-label', `${slot.title}. View details.`);
-        const symbol = mark.status === 'complete' ? renderCompactCheckmark(mark, result)
+        const symbol = mark.status === 'complete' ? renderCompactCheckmark(mark, result, allocation.excludedRetry.has(mark))
           : make('span', 'checkmark empty-box', mark.status === 'not_graded' ? '?' : '–');
         symbol.setAttribute('aria-hidden', 'true');
         slot.append(make('span', 'assignment-standard', standard.id), symbol);
@@ -280,6 +281,7 @@
       'span', `checkmark ${checkmark.kind} ${checkmark.status === 'complete' ? 'earned' : 'unearned'}`,
       checkmark.status === 'complete' ? earnedSymbol : '–'
     );
+    if (allocation.excludedRetry.has(checkmark)) mark.classList.add('retry-excluded');
     mark.setAttribute('aria-hidden', 'true');
     const body = make('div', 'checkoff-body');
     body.append(make('strong', 'checkoff-name', checkmark.label));
@@ -330,7 +332,7 @@
     document.querySelector('#dashboard-description').textContent =
       'Your lab checkoffs, autograder results, and available exam checkmarks, mapped to course standards.';
     document.querySelector('#completion-note').textContent =
-      'Lab green checkmarks require the listed Lab sources. Manual-only Lab opportunities have no autograded component. Exam 1 scores over 0.8 earn their mapped purple or shiny-purple checkmark. Exam 2 requires fully correct parts: Q1 at least 4 of 5, Q2 at least 7 of 8, Q3 at least 5 of 6, and all parts for other questions except Q8. Q8 earns one shiny-purple mark for all 4 parts correct; otherwise, parts 8.1 and 8.2 correct earn one purple mark. Unavailable exam scores do not earn a mark. ' +
+      'Lab green checkmarks require the listed Lab sources. Manual-only Lab opportunities have no autograded component. Exam 1 scores over 0.8 earn their mapped purple or shiny-purple checkmark. Exam 2 requires fully correct parts: Q1 at least 4 of 5, Q2 at least 7 of 8, Q3 at least 5 of 6, and all parts for other questions except Q8. Q8 earns one shiny-purple mark for all 4 parts correct; otherwise, parts 8.1 and 8.2 correct earn one purple mark. ' +
       'Exam Retry credit counts only in standards without a purple or shiny-purple checkmark from Exams 1–3.';
     document.querySelector('#student-netid').textContent = data.student.netid;
     document.querySelector('#worksheet').textContent = data.worksheet;

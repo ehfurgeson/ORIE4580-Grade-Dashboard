@@ -318,6 +318,12 @@ async function checkStaffIndex(withNames = false, supplementFailure = false) {
   for (const slot of eligibilitySlots.slice(3, 6)) {
     assert.match(slot.title, /Counts in standard-linked box/);
   }
+  for (const selector of ['#checkmark-overview', '#assignment-overview', '#standards']) {
+    const fadedMarks = eligibilityNodes[selector].querySelectorAll('*')
+      .filter(node => node.className.split(' ').includes('retry-excluded'));
+    assert.equal(fadedMarks.length, 3, `Only the three excluded Retry marks are faded in ${selector}`);
+    assert(fadedMarks.every(node => node.className.split(' ').includes('checkmark')));
+  }
 
   const hostile = "<img src=x onerror=alert(1)>";
   const current = await run(payload(6, [hostile]));
@@ -335,6 +341,7 @@ async function checkStaffIndex(withNames = false, supplementFailure = false) {
   assert.match(explanation, /Q1 at least 4 of 5, Q2 at least 7 of 8, Q3 at least 5 of 6/);
   assert.match(explanation, /Q8 earns one shiny-purple mark for all 4 parts correct/);
   assert.match(explanation, /parts 8\.1 and 8\.2 correct earn one purple mark/);
+  assert.doesNotMatch(explanation, /Unavailable exam scores do not earn a mark/);
 
   const empty = await run(payload(6, []));
   assert.strictEqual(empty["#unmapped-columns-section"].hidden, true);

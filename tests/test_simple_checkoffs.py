@@ -381,8 +381,8 @@ def test_authorization_only_update_does_not_touch_dashboard_data(tmp_path):
 
     assert len(written) == len(records) + 1
     staff_index = (output / "index.html").read_text()
-    assert 'data-page="exam3"' not in staff_index
-    assert 'data-page="exam_retry"' not in staff_index
+    assert 'data-page="exam3" aria-disabled="true"' in staff_index
+    assert 'data-page="exam_retry" aria-disabled="true"' in staff_index
     for record in records:
         netid = record["student"]["netid"]
         assert f'<a href="./{netid}/">{netid}</a>' in staff_index
