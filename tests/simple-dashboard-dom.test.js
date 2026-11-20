@@ -282,8 +282,11 @@ async function checkStaffIndex(withNames = false, supplementFailure = false) {
   const assignmentRows = absentExams['#assignment-overview'].children;
   assert.deepStrictEqual(assignmentRows.map(row => row.children[0].textContent),
     ['Exam 1', 'Exam 2', 'Exam 3', 'Exam Retry', 'Exam 4', 'Lab 1']);
-  assert.equal(assignmentRows[2].children[1].textContent, 'Not available yet');
-  assert.equal(assignmentRows[3].children[1].textContent, 'Not available yet');
+  for (const [row, count] of [[assignmentRows[2], 9], [assignmentRows[3], 7]]) {
+    const emptySlots = row.children[1].children;
+    assert.equal(emptySlots.length, count);
+    assert(emptySlots.every(slot => slot.children[1].textContent === '–' && !slot.href));
+  }
   assert.equal(absentExams['#earned-total'].textContent, '4 of 6');
 
   const retryData = {...examData, exam: 'retry', questions: [examData.questions[0]]};

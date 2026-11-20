@@ -281,7 +281,8 @@
       return {...standard, checkmarks: marks};
     })};
   }
-  window.Exam3Review = {render, load, merge, validate, openQuestion};
+  window.Exam3Review = {render, load, merge, validate, openQuestion,
+    questionStandards: exam => exams[exam].standards};
   const page = document.querySelector('#exam3-page');
   if (page) {
     // Older Exam 3 pages omitted the exam setting.
@@ -298,7 +299,7 @@
         const time = document.querySelector('#updated-at');
         const timestamp = exam?.exported_at || checkoffs.updated_at;
         time.dateTime = timestamp; time.textContent = new Date(timestamp).toLocaleString(undefined, {timeZoneName: 'short'});
-        if (!exam) { status.textContent = `${config.name} is not available yet.`; return; }
+        if (!exam) { status.textContent = `${config.name} is not available.`; return; }
         const root = document.querySelector('#review');
         render(exam, root, '', page.dataset?.pdf || 'exam3.pdf'); status.textContent = '';
         if (/^#q[1-9]$/.test(location.hash)) {

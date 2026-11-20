@@ -443,7 +443,9 @@ The student dashboard fetches local exam JSON files from the same protected stud
 directory as `checkoffs.json`, with same-origin credentials and no-store caching.
 The reviews feed assignment rows, standard allocations, and staff summaries.
 Assignment links open the review page for that exam. Missing or hidden reviews
-show “Not available yet,” and failed loads identify the affected exam.
+show empty boxes in the assignment summary and have disabled navigation tabs.
+Opening a review directly shows that the exam is unavailable. Failed loads name
+the affected exam.
 
 Each review links to its published PDF, and zoom overlays link to the page
 for their scan. The header shows the NetID and the export time as Last synced.

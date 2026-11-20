@@ -2,7 +2,7 @@ const test = require('node:test');
 const assert = require('node:assert/strict');
 const fs = require('node:fs');
 const vm = require('node:vm');
-function run(path, root, {staffIndex = false, status = 403, redirected = false} = {}) {
+function run(path, root, {staffIndex = false, status = 403, redirected = false, examStatuses = {}} = {}) {
   const makeLink = () => ({dataset: {}, removeAttribute(name) { delete this[name]; }, setAttribute(name, value) { this[name] = value; }});
   const order = ['dashboard', 'exam3', 'exam_retry', 'calculator'];
   const links = Object.fromEntries(order.map(key => [key, makeLink()]));
@@ -15,15 +15,18 @@ function run(path, root, {staffIndex = false, status = 403, redirected = false} 
     location: {href: url.href, pathname: url.pathname, search: url.search}, URL, URLSearchParams,
     fetch: async (href, options) => {
       requests.push({href, ...options});
+      const filename = href.split('/').at(-1);
+      if (filename.endsWith('.json')) return {ok: (examStatuses[filename] ?? 200) === 200};
       if (redirected) throw new Error('Redirected to sign-in');
       return {ok: status === 200};
     }
   });
   return {links, order, requests};
 }
-test('navigation preserves the student across exam and calculator pages', () => {
+test('navigation preserves the student across exam and calculator pages', async () => {
   for (const [path, root] of [['/course/students/abc123/', '../../'], ['/course/students/abc123/exam3/', '../../../'], ['/course/students/abc123/exam_retry/', '../../../'], ['/course/grade_calculator/?student=abc123', '../']]) {
     const {links} = run(path, root);
+    await new Promise(resolve => setImmediate(resolve));
     assert.equal(links.dashboard.href, 'https://example.org/course/students/abc123/');
     assert.equal(links.exam3.href, 'https://example.org/course/students/abc123/exam3/');
     assert.equal(links.exam_retry.href, 'https://example.org/course/students/abc123/exam_retry/');
@@ -56,11 +59,29 @@ test('student dashboard, exam review, and calculator add Index for staff session
   for (const [path, root] of [['/course/students/abc123/', '../../'], ['/course/students/abc123/exam_retry/', '../../../'], ['/course/grade_calculator/', '../']]) {
     const {links, order, requests} = run(path, root, {status: 200});
     await new Promise(resolve => setImmediate(resolve));
-    assert.deepEqual(requests, [{href: 'https://example.org/course/students/', method: 'HEAD',
-      credentials: 'same-origin', cache: 'no-store', redirect: 'error'}]);
+    const expectedFiles = path.includes('/students/abc123/')
+      ? ['students/abc123/exam3.json', 'students/abc123/exam_retry.json'] : [];
+    assert.deepEqual(requests, [...expectedFiles, 'students/'].map(file => ({
+      href: `https://example.org/course/${file}`, method: 'HEAD',
+      credentials: 'same-origin', cache: 'no-store', redirect: 'error'
+    })));
     assert.equal(links.index.href, 'https://example.org/course/students/');
     assert.equal(links.index.textContent, 'Index');
     assert.deepEqual(order, ['index', 'dashboard', 'exam3', 'exam_retry', 'calculator']);
+  }
+});
+
+test('missing or hidden exams stay disabled even for staff', async () => {
+  for (const status of [403, 404]) {
+    const {links} = run('/course/students/abc123/exam_retry/', '../../../', {
+      status: 200, examStatuses: {'exam_retry.json': status}
+    });
+    assert.equal(links.exam_retry.href, undefined, 'Disabled while the access check is pending');
+    await new Promise(resolve => setImmediate(resolve));
+    assert.equal(links.exam_retry['aria-disabled'], 'true');
+    assert.equal(links.exam_retry.href, undefined);
+    assert.equal(links.exam3.href, 'https://example.org/course/students/abc123/exam3/');
+    assert.equal(links.index.href, 'https://example.org/course/students/');
   }
 });
 

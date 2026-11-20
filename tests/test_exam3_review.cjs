@@ -143,7 +143,7 @@ for (const [exam, name, filename, status] of unavailableReviews) test(`${name} r
     }
   });
   await new Promise(resolve => setImmediate(resolve));
-  const message = status === 500 ? `Unable to load ${name}. Please refresh.` : `${name} is not available yet.`;
+  const message = status === 500 ? `Unable to load ${name}. Please refresh.` : `${name} is not available.`;
   assert.equal(nodes['#status'].textContent, message);
   assert.equal(nodes['#review'].children.length, 0, 'No results, scans, plots, question links, or PDF link');
   assert.deepEqual(requests.sort(), ['../checkoffs.json', source]);

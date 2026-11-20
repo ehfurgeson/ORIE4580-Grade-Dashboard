@@ -7,6 +7,16 @@
   const pathMatch = location.pathname.match(/\/students\/([a-z]{2,3}[0-9]+)\/(?:(exam3|exam_retry)\/)?(?:index\.html)?$/);
   const candidate = pathMatch?.[1] || new URLSearchParams(location.search).get('student');
   const student = !onStaffIndex && /^[a-z]{2,3}[0-9]+$/.test(candidate || '') ? candidate : null;
+
+  async function canAccess(url) {
+    try {
+      const response = await fetch(url.href, {method: 'HEAD', credentials: 'same-origin', cache: 'no-store', redirect: 'error'});
+      return response.ok;
+    } catch {
+      return false;
+    }
+  }
+
   const dashboard = nav.querySelector('[data-page="dashboard"]');
   if (student) {
     const studentDashboard = new URL(`students/${student}/`, root);
@@ -16,10 +26,16 @@
     for (const page of ['exam3', 'exam_retry']) {
       const exam = nav.querySelector(`[data-page="${page}"]`);
       if (!exam) continue;
-      exam.href = new URL(`${page}/`, studentDashboard).href;
-      exam.removeAttribute('aria-disabled');
-      exam.removeAttribute('title');
-      if (pathMatch?.[2] === page) exam.setAttribute('aria-current', 'page');
+      exam.removeAttribute('href');
+      exam.setAttribute('aria-disabled', 'true');
+      exam.setAttribute('title', `${exam.textContent} is not available.`);
+      canAccess(new URL(`${page}.json`, studentDashboard)).then(available => {
+        if (!available) return;
+        exam.href = new URL(`${page}/`, studentDashboard).href;
+        exam.removeAttribute('aria-disabled');
+        exam.removeAttribute('title');
+        if (pathMatch?.[2] === page) exam.setAttribute('aria-current', 'page');
+      });
     }
   } else {
     dashboard.removeAttribute('href');
@@ -40,8 +56,6 @@
     addIndexLink();
   } else {
     // Check the protected index with the current session without fetching its HTML.
-    fetch(indexUrl.href, {method: 'HEAD', credentials: 'same-origin', cache: 'no-store', redirect: 'error'})
-      .then(response => { if (response.ok) addIndexLink(); })
-      .catch(() => {}); // A missing or expired session leaves the shared links visible.
+    canAccess(indexUrl).then(available => { if (available) addIndexLink(); });
   }
 })();

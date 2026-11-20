@@ -12,7 +12,7 @@
   // Optional sources may augment a valid dashboard, but must never replace it
   // with an error. Keep this boundary shared by student and staff views.
   async function loadSupplements(data, base = '') {
-    const unavailable = [], absent = [];
+    const unavailable = [], absent = new Map();
     const sources = window.Exam3Review
       ? [{name: 'Exam 3', file: 'exam3.json', exam: 3, adapter: window.Exam3Review},
          {name: 'Exam Retry', file: 'exam_retry.json', exam: 'retry', adapter: window.Exam3Review}] : [];
@@ -20,7 +20,7 @@
       try {
         const extra = await source.adapter.load(`${base}${source.file}`, source.exam);
         if (extra) data = source.adapter.merge(data, extra);
-        else absent.push(source.name);
+        else absent.set(source.name, source.adapter.questionStandards?.(source.exam) ?? []);
       } catch {
         unavailable.push(source.name);
       }
@@ -144,14 +144,14 @@
 
   function allocationLabel(checkmark, allocation) {
     if (allocation.excludedRetry.has(checkmark)) {
-      return 'Does not count toward the grade because this standard already has purple credit from Exams 1–3';
+      return 'Does not count because this standard already has purple credit from Exams 1–3';
     }
     if (allocation.redundant.has(checkmark)) {
-      return 'Does not count toward the grade because both standard-linked boxes are filled';
+      return 'Does not count because both standard-linked boxes are filled';
     }
     if (allocation.linked.includes(checkmark)) return 'Counts in standard-linked box';
     if (allocation.shiny.includes(checkmark)) return 'Counts in shiny pool (overflow)';
-    return 'Extra checkmark — does not count toward grade';
+    return 'Does not count';
   }
 
   function checkmarkKindLabel(kind) {
@@ -236,7 +236,7 @@
         groups.get(name).push({ mark, standard, allocation: allocations[index], question: match ? Number(match[3]) : 0 });
       }
     });
-    const names = [...new Set([...groups.keys(), ...absent, ...unavailable])];
+    const names = [...new Set([...groups.keys(), ...absent.keys(), ...unavailable])];
     const sortName = name => name === 'Exam Retry' ? 'Exam 3.5' : name;
     names.sort((a, b) => sortName(a).localeCompare(sortName(b), undefined, { numeric: true }));
     const reviewPages = {'Exam 3': 'exam3/', 'Exam Retry': 'exam_retry/'};
@@ -246,8 +246,20 @@
       row.append(heading);
       const marks = groups.get(name);
       if (!marks) {
-        row.append(make('span', 'note', unavailable.includes(name)
-          ? 'Unavailable — showing other results. Try refreshing.' : 'Not available yet'));
+        if (unavailable.includes(name)) {
+          row.append(make('span', 'note', 'Unavailable — showing other results. Try refreshing.'));
+        } else {
+          const slots = make('div', 'assignment-slots');
+          for (const [index, standard] of absent.get(name).entries()) {
+            const slot = make('span', 'assignment-slot');
+            const box = make('span', 'checkmark empty-box', '–');
+            box.setAttribute('role', 'img');
+            box.setAttribute('aria-label', `Question ${index + 1}: No result`);
+            slot.append(make('span', 'assignment-standard', standard), box);
+            slots.append(slot);
+          }
+          row.append(slots);
+        }
         overview.append(row);
         continue;
       }
